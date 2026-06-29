@@ -17,6 +17,7 @@ import {
 } from '../services/socket.js';
 import { clearActiveMatch, clearMatchmakingContext, getActiveMatch, saveActiveMatch } from '../store/gameStore.js';
 import { useLanguage } from '../i18n/useLanguage.js';
+import { mockGameState as fullMockGameState } from '../mocks/mockGameState.js';
 import avatarBunbun from '../assets/profile/avatar-bunbun.png';
 import avatarKiki from '../assets/profile/avatar-kiki.png';
 import avatarPanda from '../assets/profile/avatar-panda.png';
@@ -799,12 +800,22 @@ function getRelativeSeatPosition(activeSeat, ownSeat, playerCount = 3) {
 function getSeatPosition(seat, state = {}) {
   if (!seat) return '';
 
+  // Always prefer the relative seat calculation based on mySeat.
+  // This gives each client a DIFFERENT perspective (the whole point).
+  // Do NOT use player.position from state.players — those positions are
+  // assigned by array index during normalization and are the SAME on all clients.
+  const ownSeat = state.mySeat || state.seat || state.currentPlayerSeat || state.selfSeat;
+  if (ownSeat) {
+    const playerCount = getExpectedGameplayPlayerCount(state);
+    const relative = getRelativeSeatPosition(seat, ownSeat, playerCount);
+    if (relative) return relative;
+  }
+
+  // Fallback: check rendered player objects (only if mySeat is unknown)
   const playerWithSeat = toArray(state.players).find((player) => normalizeSeat(player.seat) === normalizeSeat(seat));
   if (playerWithSeat?.position) return playerWithSeat.position;
 
-  const ownSeat = state.mySeat || state.seat || state.currentPlayerSeat || state.selfSeat;
-  const playerCount = getExpectedGameplayPlayerCount(state);
-  return getRelativeSeatPosition(seat, ownSeat, playerCount);
+  return '';
 }
 
 function mergeTurnStart(current, payload = {}) {
@@ -913,6 +924,16 @@ function mergeActionBroadcast(current, payload = {}) {
     discards[key] = [...normalizeTileList(discards[key]), renderedTile];
     next.discards = discards;
 
+    // Also update the per-player discards array so that getDiscardTilesByPosition
+    // picks up discards from the correct player object (already positioned by seat).
+    if (actionIds.length && Array.isArray(current.players)) {
+      next.players = current.players.map((player) => {
+        if (!playerMatchesAnyId(player, actionIds)) return player;
+        const playerDiscards = toArray(player.discards || player.discardTiles || []);
+        return { ...player, discards: [...playerDiscards, tileId], discardTiles: [...playerDiscards, tileId] };
+      });
+    }
+
     if (isLocalDiscard) {
       const discardedRawId = String(tileId);
       next.handTiles = removeOneTileFromHand(
@@ -955,9 +976,9 @@ function normalizeInitialSocketState(payload = {}, fallbackMatchId = '') {
     roomId: normalized.roomId || payload.roomId,
     tierId: normalized.tierId || payload.tierId || payload.room?.tierId,
     status: normalized.status || 'playing',
-    myPlayerId: privateHandPlayerId || normalized.myPlayerId || payload.myPlayerId,
-    selfPlayerId: privateHandPlayerId || normalized.selfPlayerId || payload.selfPlayerId || payload.myPlayerId,
-    mySeat: privateHandSeat || payload.mySeat || payload.selfSeat || payload.seat || normalized.mySeat || normalized.seat,
+    myPlayerId: payload.myPlayerId || payload.selfPlayerId || privateHandPlayerId || normalized.myPlayerId,
+    selfPlayerId: payload.selfPlayerId || payload.myPlayerId || privateHandPlayerId || normalized.selfPlayerId,
+    mySeat: payload.mySeat || payload.selfSeat || privateHandSeat || payload.seat || normalized.mySeat || normalized.seat,
     seat: privateHandSeat || payload.seat || normalized.seat,
     players,
     handTiles,
@@ -969,11 +990,19 @@ function normalizeInitialSocketState(payload = {}, fallbackMatchId = '') {
   };
 }
 
-export default function MahjongGamePage() {
+export default function MahjongGamePage({ mockMode = false } = {}) {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const location = useLocation();
   const { matchId: routeMatchId } = useParams();
+  const isMockGameplay = Boolean(
+    mockMode
+    || location.pathname === ROUTES.mockGame
+    || location.pathname === ROUTES.gameplayMock
+    || location.pathname === ROUTES.mockGameCompact
+    || routeMatchId === 'mock-game'
+    || routeMatchId === 'gameplay-mock'
+  );
   const [storedMatch] = useState(() => {
     const match = getActiveMatch();
     const user = getStoredAuthUser();
@@ -987,21 +1016,33 @@ export default function MahjongGamePage() {
     }
     return match;
   });
-  const gameApiAvailable = isGameApiAvailable();
-  const initialSocketPayload = location.state?.initialGameState || storedMatch?.initialGameState || null;
-  const socketGameplayEnabled = Boolean(location.state?.socketMode || storedMatch?.socketMode || initialSocketPayload || !gameApiAvailable);
-  const resolvedMatchId = routeMatchId
-    || location.state?.matchId
-    || storedMatch?.matchId
-    || initialSocketPayload?.matchId
-    || initialSocketPayload?.gameId
-    || initialSocketPayload?.roomId
-    || 'live_match';
+  const gameApiAvailable = isMockGameplay ? false : isGameApiAvailable();
+  const initialSocketPayload = isMockGameplay
+    ? fullMockGameState
+    : (location.state?.initialGameState || storedMatch?.initialGameState || null);
+  const socketGameplayEnabled = !isMockGameplay && Boolean(location.state?.socketMode || storedMatch?.socketMode || initialSocketPayload || !gameApiAvailable);
+  const resolvedMatchId = isMockGameplay
+    ? (fullMockGameState.matchId || 'mock_full_gameplay')
+    : (routeMatchId
+      || location.state?.matchId
+      || storedMatch?.matchId
+      || initialSocketPayload?.matchId
+      || initialSocketPayload?.gameId
+      || initialSocketPayload?.roomId
+      || 'live_match');
 
   const [selectedAction, setSelectedAction] = useState(null);
   const [gameState, setGameState] = useState(() => ({
     ...EMPTY_SOCKET_GAME_STATE,
     ...(initialSocketPayload ? normalizeInitialSocketState(initialSocketPayload, resolvedMatchId) : {}),
+    ...(isMockGameplay ? {
+      status: 'playing',
+      timer: 999,
+      timeLimit: 999,
+      timerDeadlineMs: 0,
+      activeTurnPosition: 'left',
+      availableActions: ['chow', 'pong', 'kong', 'pass'],
+    } : {}),
     matchId: resolvedMatchId,
   }));
   const [gameError, setGameError] = useState('');
@@ -1009,7 +1050,7 @@ export default function MahjongGamePage() {
   const [displayTimer, setDisplayTimer] = useState(() => Number(gameState.timer ?? gameState.timeLimit ?? 0) || 0);
 
   useEffect(() => {
-    if (!routeMatchId && resolvedMatchId) {
+    if (!isMockGameplay && !routeMatchId && resolvedMatchId) {
       navigate(buildGameRoute(resolvedMatchId), { replace: true, state: location.state });
       return undefined;
     }
@@ -1025,6 +1066,26 @@ export default function MahjongGamePage() {
       maxPlayers: location.state?.maxPlayers || storedMatch?.maxPlayers || initialSocketPayload?.maxPlayers,
       players: location.state?.players || storedMatch?.players || initialSocketPayload?.players,
     };
+
+    if (isMockGameplay) {
+      const normalizedMock = normalizeInitialSocketState(fullMockGameState, resolvedMatchId);
+      setGameState({
+        ...EMPTY_SOCKET_GAME_STATE,
+        ...normalizedMock,
+        status: 'playing',
+        timer: 999,
+        timeLimit: 999,
+        timerDeadlineMs: 0,
+        activeTurnPosition: 'left',
+        availableActions: ['chow', 'pong', 'kong', 'pass'],
+        claimWindow: null,
+        matchId: normalizedMock.matchId || resolvedMatchId,
+      });
+      setGameError('');
+      return () => {
+        isMounted = false;
+      };
+    }
 
     if (!gameApiAvailable && !socketGameplayEnabled && !getActiveGameSocket()) {
       setGameError('No active gameplay session found. Start from matchmaking or join a room first.');
@@ -1185,12 +1246,17 @@ export default function MahjongGamePage() {
       }
       // Keep the live socket alive while navigating from the game to the result screen.
       if (!socketGameplayEnabled) {
-        gameSocket?.disconnect?.();
+        disconnectGameSocket();
       }
     };
-  }, [gameApiAvailable, initialSocketPayload, location.state, navigate, resolvedMatchId, routeMatchId, socketGameplayEnabled, storedMatch, t]);
+  }, [gameApiAvailable, initialSocketPayload, isMockGameplay, location.state, navigate, resolvedMatchId, routeMatchId, socketGameplayEnabled, storedMatch, t]);
 
   useEffect(() => {
+    if (isMockGameplay) {
+      setDisplayTimer(999);
+      return;
+    }
+
     const deadline = Number(gameState.timerDeadlineMs || 0);
 
     if (deadline) {
@@ -1200,7 +1266,7 @@ export default function MahjongGamePage() {
 
     const nextTimer = Number(gameState.timer ?? gameState.remainingSeconds ?? gameState.timeLimit ?? 0);
     setDisplayTimer(Number.isFinite(nextTimer) ? nextTimer : 0);
-  }, [gameState.timerDeadlineMs, gameState.timer, gameState.remainingSeconds, gameState.timeLimit, gameState.activeTurnPosition, gameState.claimWindow]);
+  }, [gameState.timerDeadlineMs, gameState.timer, gameState.remainingSeconds, gameState.timeLimit, gameState.activeTurnPosition, gameState.claimWindow, isMockGameplay]);
 
   const expectedPlayerCount = useMemo(() => getExpectedGameplayPlayerCount(
     gameState,
@@ -1235,7 +1301,7 @@ export default function MahjongGamePage() {
     players,
     locationState: location.state,
     storedMatch,
-    useMockFallback: gameApiAvailable,
+    useMockFallback: gameApiAvailable || isMockGameplay,
   });
   const isUserTurn = activeTurnPosition === 'left';
   const activeTurnName = activeTurnPosition === 'top'
@@ -1272,6 +1338,10 @@ export default function MahjongGamePage() {
 
 
   useEffect(() => {
+    if (isMockGameplay) {
+      return undefined;
+    }
+
     const status = String(gameState.status || '').toLowerCase();
     const shouldRunTimer = ['playing', 'resolving', 'active'].includes(status) || isUserTurn || isClaimWindowOpen;
     const deadline = Number(gameState.timerDeadlineMs || 0);
@@ -1296,10 +1366,12 @@ export default function MahjongGamePage() {
     }, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [displayTimer, gameState.timerDeadlineMs, gameState.status, isClaimWindowOpen, isUserTurn]);
+  }, [gameState.timerDeadlineMs, gameState.status, gameState.turnStartedAt, isClaimWindowOpen, isMockGameplay, isUserTurn]);
 
 
   useEffect(() => {
+    if (isMockGameplay) return;
+
     const status = String(gameState.status || '').toLowerCase();
     const winner = gameState.winner || gameState.winnerId || gameState.result?.winner || gameState.result?.winnerId;
 
@@ -1313,12 +1385,17 @@ export default function MahjongGamePage() {
         },
       });
     }
-  }, [gameState.matchId, gameState.result, gameState.status, gameState.winner, gameState.winnerId, navigate, resolvedMatchId]);
+  }, [gameState.matchId, gameState.result, gameState.status, gameState.winner, gameState.winnerId, isMockGameplay, navigate, resolvedMatchId]);
 
   const handleExitGameplaySession = async () => {
     if (isLeavingGame) return;
 
     setIsLeavingGame(true);
+
+    if (isMockGameplay) {
+      navigate(ROUTES.mainMenu, { replace: true });
+      return;
+    }
 
     const leavePayload = {
       matchId: gameState.matchId || resolvedMatchId,
@@ -1349,6 +1426,30 @@ export default function MahjongGamePage() {
     const tileId = getTileId(rawTileId);
     if (!tileId) return;
 
+    if (isMockGameplay) {
+      const renderedTile = tileIdToAssetName(tileId);
+      setGameState((current) => {
+        const handTiles = removeOneTileFromHand(
+          getFirstRawTileList(current.handTiles, current.myHand, current.playerHand),
+          String(tileId),
+          renderedTile
+        );
+        const discards = { ...(current.discards || {}) };
+        discards.left = [...normalizeTileList(discards.left), renderedTile];
+
+        return {
+          ...(current || {}),
+          handTiles,
+          myHand: handTiles,
+          discards,
+          currentDiscard: renderedTile,
+          pendingDiscardTileId: null,
+        };
+      });
+      setGameError('');
+      return;
+    }
+
     const sent = discardTile(tileId);
     if (sent) {
       setGameState((current) => ({ ...(current || {}), pendingDiscardTileId: tileId }));
@@ -1360,6 +1461,11 @@ export default function MahjongGamePage() {
 
   const handleMahjongAction = (actionKey) => {
     setSelectedAction(actionKey);
+
+    if (isMockGameplay) {
+      setGameError('');
+      return;
+    }
 
     if (actionKey === 'pass') {
       const sent = passClaimWindow();
@@ -1388,7 +1494,7 @@ export default function MahjongGamePage() {
   };
 
   return (
-    <section className="gameplay-screen" aria-label="Mahjong gameplay screen">
+    <section className={`gameplay-screen ${isMockGameplay ? 'gameplay-screen--mock' : ''}`} aria-label="Mahjong gameplay screen">
       <img className="gameplay-bg" src={asset('BG.png')} alt="" draggable="false" />
       <div className="gameplay-vignette" aria-hidden="true" />
       <div className="gameplay-sakura-particles" aria-hidden="true">

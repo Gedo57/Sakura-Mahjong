@@ -48,7 +48,7 @@ export default function RoomSelectPage() {
   };
 
   return (
-    <section className="screen">
+    <section className="screen room-select-screen">
       <ScreenHeader
         eyebrow={t('lobby')}
         title={t('selectRoom')}

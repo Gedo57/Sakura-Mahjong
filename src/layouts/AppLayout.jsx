@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { ROUTES } from '../router/routes.js';
 import { useResolutionScale } from '../hooks/useResolutionScale.js';
@@ -18,110 +17,43 @@ const routeBackgrounds = {
 };
 
 function getBackgroundForPath(pathname) {
-  if (pathname.startsWith('/game/')) {
+  if (pathname.startsWith('/game/') || pathname === ROUTES.mockGame || pathname === ROUTES.gameplayMock || pathname === ROUTES.mockGameCompact) {
     return routeBackgrounds[ROUTES.game];
   }
 
   return routeBackgrounds[pathname] || routeBackgrounds[ROUTES.mainMenu];
 }
 
-function isPortraitViewport() {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  return window.matchMedia?.('(orientation: portrait)').matches ?? window.innerHeight > window.innerWidth;
-}
-
-async function tryLockLandscape() {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  const isMobileDevice = document.documentElement.dataset.device === 'mobile';
-
-  if (!isMobileDevice || !isPortraitViewport()) {
-    return;
-  }
-
-  try {
-    await window.screen?.orientation?.lock?.('landscape');
-  } catch {
-    // Browser support is inconsistent, especially on iOS/Safari.
-    // The rotate overlay remains the primary fallback.
-  }
-}
-
-
-function setKeyboardOpenState(isOpen) {
-  if (typeof document === 'undefined') {
-    return;
-  }
-
-  document.documentElement.classList.toggle('keyboard-open', isOpen);
-  document.body?.classList.toggle('keyboard-open', isOpen);
-}
-
-function isEditableTarget(target) {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-
-  const tagName = target.tagName.toLowerCase();
-  return tagName === 'input' || tagName === 'textarea' || target.isContentEditable;
-}
-
-function shouldUseKeyboardMode() {
-  if (typeof window === 'undefined' || typeof document === 'undefined') {
-    return false;
-  }
-
-  const isMobileDevice = document.documentElement.dataset.device === 'mobile';
-  const isLandscape = window.matchMedia?.('(orientation: landscape)').matches ?? window.innerWidth > window.innerHeight;
-
-  return isMobileDevice && isLandscape && isEditableTarget(document.activeElement);
-}
-
 export default function AppLayout() {
   const location = useLocation();
-  const { scale, width, height, device } = useResolutionScale();
+  const {
+    scale,
+    width,
+    height,
+    device,
+    physicalDevice,
+    orientation,
+    viewport,
+    keyboardOpen,
+  } = useResolutionScale();
   const backgroundImage = getBackgroundForPath(location.pathname);
-
-  useEffect(() => {
-    const updateKeyboardMode = () => {
-      window.requestAnimationFrame(() => {
-        setKeyboardOpenState(shouldUseKeyboardMode());
-      });
-    };
-
-    window.addEventListener('pointerdown', tryLockLandscape, { passive: true });
-    window.addEventListener('focusin', updateKeyboardMode);
-    window.addEventListener('focusout', updateKeyboardMode);
-    window.addEventListener('resize', updateKeyboardMode);
-    window.visualViewport?.addEventListener('resize', updateKeyboardMode);
-
-    updateKeyboardMode();
-
-    return () => {
-      window.removeEventListener('pointerdown', tryLockLandscape);
-      window.removeEventListener('focusin', updateKeyboardMode);
-      window.removeEventListener('focusout', updateKeyboardMode);
-      window.removeEventListener('resize', updateKeyboardMode);
-      window.visualViewport?.removeEventListener('resize', updateKeyboardMode);
-      setKeyboardOpenState(false);
-    };
-  }, []);
 
   return (
     <main
       className="app-shell fixed-resolution-shell"
       data-device={device}
+      data-physical-device={physicalDevice}
+      data-orientation={orientation}
+      data-keyboard-open={keyboardOpen ? 'true' : 'false'}
       style={{
         '--frame-scale': scale,
+        '--ui-scale': scale,
         '--design-width': `${width}px`,
         '--design-height': `${height}px`,
         '--scaled-width': `${width * scale}px`,
         '--scaled-height': `${height * scale}px`,
+        '--app-viewport-width': `${viewport.width}px`,
+        '--app-viewport-height': `${viewport.height}px`,
       }}
     >
       <div
@@ -129,14 +61,14 @@ export default function AppLayout() {
         style={{ backgroundImage: `url(${backgroundImage})` }}
         aria-hidden="true"
       />
-      <section className="rotate-device-overlay" aria-live="polite" aria-label="Rotate device message">
+      <section className="rotate-device-overlay" aria-hidden="true">
         <div className="rotate-device-card">
           <div className="rotate-device-icon" aria-hidden="true">
             <span className="rotate-device-phone" />
             <span className="rotate-device-arrow">↻</span>
           </div>
           <h1 className="rotate-device-title">Rotate your device</h1>
-          <p className="rotate-device-copy">This game is designed for landscape mode.</p>
+          <p className="rotate-device-copy">This game supports portrait and landscape mode.</p>
         </div>
       </section>
       <div className="game-frame">

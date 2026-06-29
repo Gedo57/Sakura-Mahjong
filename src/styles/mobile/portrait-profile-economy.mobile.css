@@ -1,0 +1,596 @@
+/* Portrait overrides for profile and economy screens.
+   Scope: mobile + portrait only. Desktop and mobile landscape keep their existing layouts. */
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-screen-ui,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-page,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .leaderboard-page-ui,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .missions-page-ui,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .match-history-screen {
+  width: 720px !important;
+  height: 1280px !important;
+  min-width: 720px !important;
+  min-height: 1280px !important;
+  max-width: 720px !important;
+  max-height: 1280px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+/* ───────────────────────────────── Profile / Achievements shell */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-screen-ui {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  grid-template-rows: 178px minmax(0, 1fr) !important;
+  padding: 24px 24px 28px !important;
+  gap: 16px !important;
+  background: radial-gradient(circle at 50% 0%, rgba(150, 91, 255, 0.2), rgba(12, 7, 34, 0.86) 42%, rgba(4, 2, 18, 0.95)) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-sidebar {
+  width: 100% !important;
+  height: 178px !important;
+  min-height: 0 !important;
+  padding: 16px 18px !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 24px !important;
+  display: grid !important;
+  grid-template-columns: 1fr auto !important;
+  grid-template-rows: 44px 1fr !important;
+  gap: 14px !important;
+  background: rgba(7, 7, 22, 0.7) !important;
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.28), inset 0 0 24px rgba(255, 255, 255, 0.04) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-back-line {
+  height: 44px !important;
+  min-width: 0 !important;
+  max-width: 390px !important;
+  gap: 12px !important;
+  font-size: 25px !important;
+  line-height: 1 !important;
+  overflow: hidden !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-back-line span {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-back-line img {
+  width: 26px !important;
+  height: 26px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-tabs,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-tabs--nav {
+  grid-column: 1 / -1 !important;
+  margin: 0 !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  align-self: stretch !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .achievements-page .profile-tabs--nav {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-tabs button,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-tabs--nav button {
+  width: 100% !important;
+  height: 58px !important;
+  min-height: 0 !important;
+  padding: 0 10px !important;
+  border-radius: 14px !important;
+  display: grid !important;
+  place-items: center !important;
+  text-align: center !important;
+  font-size: 18px !important;
+  line-height: 1.05 !important;
+  overflow: hidden !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-logout-button {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  justify-self: end !important;
+  align-self: center !important;
+  width: 142px !important;
+  height: 42px !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  font-size: 15px !important;
+  font-weight: 900 !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-content,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-content--compact,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .achievements-page .achievements-page__content {
+  min-height: 0 !important;
+  height: 1034px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 0 6px 6px 0 !important;
+  scrollbar-width: thin !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-header,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .achievements-page__header {
+  min-height: 0 !important;
+  padding: 18px !important;
+  border: 1px solid rgba(255, 255, 255, 0.13) !important;
+  border-radius: 24px !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 16px !important;
+  background: rgba(9, 6, 25, 0.72) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-identity,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .achievements-page__identity {
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: 118px minmax(0, 1fr) !important;
+  gap: 16px !important;
+  align-items: start !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-avatar,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-avatar-button {
+  width: 112px !important;
+  height: 112px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-avatar-button {
+  position: relative !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-avatar-edit-badge {
+  right: 2px !important;
+  bottom: 2px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-name-block {
+  min-width: 0 !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-name-block h1,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-name-display-row h1 {
+  margin: 0 0 10px !important;
+  max-width: 100% !important;
+  font-size: 34px !important;
+  line-height: 1 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-name-display-row {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 10px !important;
+  align-items: center !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-edit-name-button,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-title-inline-button,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-name-save-button,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-name-cancel-button {
+  min-height: 36px !important;
+  padding: 0 14px !important;
+  border-radius: 999px !important;
+  font-size: 13px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-name-edit-form {
+  display: grid !important;
+  grid-template-columns: 1fr auto auto !important;
+  gap: 8px !important;
+  max-width: 100% !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-name-edit-form input {
+  min-width: 0 !important;
+  height: 42px !important;
+  font-size: 16px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-stat-panel {
+  width: 100% !important;
+  min-height: 0 !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-stat-panel > div,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-stat-empty {
+  min-height: 72px !important;
+  padding: 10px !important;
+  border-radius: 16px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-section,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .achievements-section,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .achievements-page__panel {
+  min-height: 0 !important;
+  height: auto !important;
+  padding: 18px !important;
+  border-radius: 24px !important;
+  overflow: visible !important;
+  background: rgba(9, 6, 25, 0.72) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-achievement-grid,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .achievements-page__grid {
+  height: auto !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, 305px) !important;
+  justify-content: center !important;
+  gap: 16px !important;
+  padding: 0 0 18px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-achievement-card {
+  width: 305px !important;
+  min-height: 220px !important;
+  padding: 18px !important;
+  background-size: 100% 100% !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .achievements-page__scroll {
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+  padding: 0 !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-avatar-modal-backdrop {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 1000 !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 30px !important;
+  background: rgba(5, 3, 15, 0.72) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-avatar-modal,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-title-modal {
+  width: min(640px, 100%) !important;
+  max-height: 1020px !important;
+  overflow-y: auto !important;
+  border-radius: 26px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-avatar-option-grid,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-title-option-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+/* ───────────────────────────────── Shop */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-page {
+  padding: 24px !important;
+  background-size: cover !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-back-button {
+  left: 24px !important;
+  top: 24px !important;
+  width: 132px !important;
+  min-width: 132px !important;
+  height: 50px !important;
+  font-size: 16px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-balance-bar {
+  right: 24px !important;
+  top: 24px !important;
+  gap: 8px !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-balance-pill {
+  height: 44px !important;
+  min-width: 148px !important;
+  padding: 0 12px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-feedback {
+  top: 96px !important;
+  max-width: 620px !important;
+  font-size: 14px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-content-frame {
+  left: 50% !important;
+  top: 150px !important;
+  width: 660px !important;
+  height: 1090px !important;
+  max-height: 1090px !important;
+  transform: translateX(-50%) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 18px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 4px 0 28px !important;
+  scrollbar-width: thin !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-row,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-row--top,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-row--bottom {
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, 300px) !important;
+  justify-content: center !important;
+  gap: 18px 14px !important;
+  margin: 0 !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-item-card {
+  width: 300px !important;
+  height: 330px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-card-art {
+  width: 300px !important;
+  height: 330px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-price-button {
+  width: 156px !important;
+  height: 42px !important;
+  bottom: 20px !important;
+  font-size: 22px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-item-card--box .shop-price-button {
+  bottom: 38px !important;
+}
+
+/* ───────────────────────────────── Leaderboard */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .leaderboard-page-ui {
+  padding: 24px !important;
+  gap: 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background: radial-gradient(circle at 50% 0%, rgba(255, 187, 64, 0.22), rgba(31, 10, 58, 0.72) 44%, rgba(4, 2, 18, 0.95)) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .leaderboard-header {
+  height: 142px !important;
+  min-height: 142px !important;
+  display: grid !important;
+  grid-template-columns: 96px minmax(0, 1fr) !important;
+  grid-template-rows: 58px 70px !important;
+  gap: 10px !important;
+  align-items: center !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .leaderboard-back-button {
+  width: 96px !important;
+  height: 48px !important;
+  font-size: 15px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .leaderboard-title-wrap {
+  justify-self: start !important;
+  gap: 12px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .leaderboard-title-wrap img {
+  width: 56px !important;
+  height: 56px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .leaderboard-title-wrap h1 {
+  font-size: 36px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .leaderboard-my-rank-card {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  min-height: 66px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .leaderboard-content {
+  flex: 1 !important;
+  min-height: 0 !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  grid-template-rows: 310px minmax(0, 1fr) !important;
+  gap: 16px !important;
+  overflow: hidden !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .leaderboard-podium {
+  min-height: 0 !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .leaderboard-top-card,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .leaderboard-top-card-rank-1 {
+  min-height: 0 !important;
+  height: 300px !important;
+  transform: none !important;
+  padding: 16px 8px !important;
+  border-radius: 18px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .leaderboard-top-avatar-wrap,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .leaderboard-top-card-rank-1 .leaderboard-top-avatar-wrap {
+  width: 92px !important;
+  height: 92px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .leaderboard-list-panel {
+  min-height: 0 !important;
+  height: 100% !important;
+  border-radius: 20px !important;
+  padding: 12px !important;
+  overflow: hidden !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .leaderboard-list-header,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .leaderboard-row {
+  grid-template-columns: 78px minmax(0, 1fr) 120px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+}
+
+/* ───────────────────────────────── Missions */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .missions-page-ui {
+  padding: 24px !important;
+  gap: 14px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .missions-header {
+  height: 172px !important;
+  min-height: 172px !important;
+  display: grid !important;
+  grid-template-columns: 120px minmax(0, 1fr) !important;
+  grid-template-rows: 62px 92px !important;
+  gap: 12px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .missions-back-button {
+  width: 112px !important;
+  height: 48px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .missions-title-wrap {
+  justify-self: start !important;
+  gap: 12px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .missions-title-wrap img {
+  width: 58px !important;
+  height: 58px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .missions-title-wrap h1 {
+  font-size: 34px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .missions-api-card {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  min-height: 82px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .missions-status-message {
+  min-height: 34px !important;
+  font-size: 12px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .missions-content {
+  flex: 1 !important;
+  min-height: 0 !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  grid-auto-rows: minmax(0, 1fr) !important;
+  gap: 14px !important;
+  overflow: hidden !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .mission-section {
+  min-height: 0 !important;
+  height: 100% !important;
+  border-radius: 20px !important;
+  padding: 14px !important;
+  overflow: hidden !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .mission-grid {
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  padding: 0 8px 12px 0 !important;
+  gap: 14px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .mission-card {
+  min-height: 150px !important;
+  grid-template-rows: auto 36px 38px !important;
+  gap: 10px !important;
+}
+
+/* ───────────────────────────────── Match History */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .match-history-screen {
+  min-height: 0 !important;
+  padding: 24px !important;
+  background: radial-gradient(circle at 50% 0%, rgba(138, 43, 226, 0.22), rgba(26, 22, 45, 0.88) 46%, rgba(13, 11, 23, 0.98)) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .match-history-header {
+  height: 96px !important;
+  min-height: 96px !important;
+  padding: 0 !important;
+  gap: 16px !important;
+  background: transparent !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .history-back-btn {
+  width: 54px !important;
+  height: 54px !important;
+  margin: 0 !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .match-history-header h1 {
+  font-size: 34px !important;
+  line-height: 1 !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .match-history-content {
+  flex: 1 !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  padding: 0 6px 16px 0 !important;
+  margin: 0 !important;
+  overflow-y: auto !important;
+  gap: 16px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .history-card {
+  border-radius: 18px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .history-card-header {
+  padding: 14px 16px !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .history-card-body {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 16px !important;
+  padding: 16px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .history-my-stats {
+  padding: 0 0 16px !important;
+  border-right: 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .history-win-info {
+  flex-direction: column !important;
+  gap: 6px !important;
+}

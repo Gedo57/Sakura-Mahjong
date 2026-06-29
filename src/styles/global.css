@@ -17,12 +17,14 @@
 @import './desktop/missions.css';
 @import './desktop/daily-login.css';
 @import './desktop/profile-screen.css';
+@import './desktop/match-history.css';
 @import './desktop/achievements.css';
 @import './desktop/create-room.css';
 @import './desktop/join-room.css';
 @import './desktop/room-select.css';
 @import './desktop/gameplay.css';
 @import './desktop/matchmaking.css';
+@import './desktop/private-lobby.css';
 @import './desktop/help-screen.css';
 @import './desktop/win-screen.css';
 
@@ -44,6 +46,10 @@
 @import './mobile/matchmaking.mobile.css';
 @import './mobile/help-screen.mobile.css';
 @import './mobile/win-screen.mobile.css';
+@import './mobile/portrait-main-flow.mobile.css';
+@import './mobile/portrait-rooms-flow.mobile.css';
+@import './mobile/portrait-profile-economy.mobile.css';
+@import './mobile/portrait-gameplay.mobile.css';
 
 .friends-api-status,
 .friends-empty-state {

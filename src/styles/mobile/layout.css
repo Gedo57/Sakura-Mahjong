@@ -19,3 +19,27 @@ html[data-device='mobile'] input,
 html[data-device='mobile'] select {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Physical mobile handling is separate from the active layout mode.
+   Landscape phones may use the desktop 1280x720 layout while still needing
+   mobile browser/touch behavior. */
+html[data-physical-device='mobile'],
+html[data-physical-device='mobile'] body,
+html[data-physical-device='mobile'] #root {
+  width: 100%;
+  height: 100%;
+  min-height: var(--app-viewport-height, 100vh);
+  overscroll-behavior: none;
+}
+
+html[data-physical-device='mobile'] body {
+  overflow: hidden;
+  touch-action: manipulation;
+}
+
+html[data-physical-device='mobile'] button,
+html[data-physical-device='mobile'] input,
+html[data-physical-device='mobile'] select,
+html[data-physical-device='mobile'] textarea {
+  -webkit-tap-highlight-color: transparent;
+}

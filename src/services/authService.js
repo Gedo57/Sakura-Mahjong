@@ -1,4 +1,4 @@
-import { clearAuthTokens, getAuthToken, getRefreshToken, isMockApiEnabled, postToApi, setAuthTokens } from './api.js';
+import { clearAuthTokens, getAuthToken, getRefreshToken, isMockApiEnabled, postToApi, setAuthTokens, getFromApi } from './api.js';
 
 const AUTH_USER_STORAGE_KEY = 'sakura_auth_user';
 
@@ -143,6 +143,22 @@ export async function continueAsGuest() {
 export function logout() {
   clearAuthTokens();
   persistAuthUser(null);
-  localStorage.removeItem('mahjong_active_match');
-  localStorage.removeItem('mahjong_game_location_state');
+  
+  // Clear all storages to ensure no stale data remains
+  localStorage.clear();
+  sessionStorage.clear();
+  
+  // Clean up any lingering websocket connections globally
+  import('./socket.js').then(({ disconnectGameSocket }) => {
+    disconnectGameSocket();
+  }).catch(() => {});
+}
+
+export async function getUserMatchHistory() {
+  if (isMockApiEnabled()) {
+    return { success: true, history: [] }; // Return mock data for now
+  }
+  
+  const response = await getFromApi('/auth/history', () => ({ success: true, history: [] }));
+  return response?.history || [];
 }

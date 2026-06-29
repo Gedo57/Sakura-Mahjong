@@ -3,7 +3,7 @@ import { getFromApi, postToApi } from './api.js';
 import { isMockApiEnabled } from './api.js';
 
 const ECONOMY_BASE = '/economy';
-//2
+
 const DEFAULT_DAILY_REWARD_SCHEDULE = [
   { day: 1, coins: 300, diamonds: 0, chest: null },
   { day: 2, coins: 0, diamonds: 10, chest: null },

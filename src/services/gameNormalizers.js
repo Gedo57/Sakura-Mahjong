@@ -352,7 +352,7 @@ function normalizeSummaryRows(result = {}) {
 function buildResultPlayersFromMaps(result = {}, winnerId = null) {
   const payouts = result.payouts && typeof result.payouts === 'object' ? result.payouts : {};
   const finalScores = result.finalScores && typeof result.finalScores === 'object' ? result.finalScores : {};
-  const sourcePlayers = toArray(result.players || result.participants || result.room?.players || result.gameState?.players);
+  const sourcePlayers = toArray(result.players || result.results || result.standings || result.scoreboard || result.participants || result.room?.players || result.gameState?.players);
   const ids = Array.from(new Set([
     ...Object.keys(payouts),
     ...Object.keys(finalScores),
@@ -383,10 +383,7 @@ export function normalizeGameResult(response = {}) {
     ? safeResponse.result
     : safeResponse.gameResult || safeResponse.roundResult || safeResponse.data || safeResponse;
   const winnerId = result.winnerId || result.winner?.id || result.winner?.userId || safeResponse.winnerId;
-  const directPlayerList = result.players || result.results || result.standings || result.scoreboard;
-  const playerList = Array.isArray(directPlayerList) && directPlayerList.length
-    ? directPlayerList
-    : buildResultPlayersFromMaps(result, winnerId);
+  const playerList = buildResultPlayersFromMaps(result, winnerId);
   const players = Array.isArray(playerList)
     ? playerList.map((player, index) => normalizeResultPlayer(player, index, winnerId))
     : [];

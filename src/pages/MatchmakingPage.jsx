@@ -634,7 +634,7 @@ export default function MatchmakingPage() {
       window.clearTimeout(controllerJoinGuardId);
 
       if (!gameWasStarted) {
-        socket?.disconnect?.();
+        disconnectGameSocket();
       }
     };
   }, [location.state, navigate]);
@@ -685,8 +685,27 @@ export default function MatchmakingPage() {
 
       <main className="matchmaking-content">
         <div className="matchmaking-title-block">
-          <h2><AnimatedDots base={t('findingPlayers')} /></h2>
+          <h2>
+            {session.roomCode 
+              ? t('privateLobby') || 'PRIVATE LOBBY' 
+              : <AnimatedDots base={t('findingPlayers')} />}
+          </h2>
           <p>{statusText}</p>
+          {session.roomCode && (
+            <div className="match-room-code-display" style={{ marginTop: '1rem', padding: '0.5rem 1rem', background: 'rgba(0,0,0,0.4)', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '1rem' }}>
+              <span>{t('roomCode')}: <strong>{session.roomCode}</strong></span>
+              <button 
+                type="button" 
+                onClick={() => {
+                  navigator.clipboard?.writeText(session.roomCode);
+                  alert(t('roomCodeCopied') || 'Room code copied!');
+                }}
+                style={{ padding: '4px 12px', background: '#e0b875', color: '#3b2512', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                {t('copyCode') || 'Copy'}
+              </button>
+            </div>
+          )}
         </div>
 
         <section className="match-slots" aria-label={t('matchmaking')}>

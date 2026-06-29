@@ -1,0 +1,405 @@
+/* =========================================================
+   Patch 5 — Portrait Gameplay
+   Scope: mobile portrait only. Desktop and mobile landscape keep
+   their existing 1280x720 gameplay layout.
+   ========================================================= */
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-screen {
+  --gp-w: 720px;
+  --gp-h: 1280px;
+  --gp-safe-x: 24px;
+  --gp-safe-bottom: 26px;
+
+  /* Easy portrait tuning knobs */
+  --gp-room-x: 24px;
+  --gp-room-y: 18px;
+  --gp-table-x: 50%;
+  --gp-table-y: 232px;
+  --gp-table-width: 676px;
+  --gp-table-scale: 1;
+  --gp-top-player-y: 170px;
+  --gp-left-player-x: 18px;
+  --gp-left-player-y: 602px;
+  --gp-right-player-x: 548px;
+  --gp-right-player-y: 130px;
+  --gp-hand-x: 50%;
+  --gp-hand-y: 480px;
+  --gp-hand-scale: 1;
+  --gp-actions-x: 50%;
+  --gp-actions-y: 840px;
+  --gp-actions-scale: 1;
+
+  position: relative !important;
+  width: 720px !important;
+  height: 1280px !important;
+  min-width: 720px !important;
+  min-height: 1280px !important;
+  max-width: 720px !important;
+  max-height: 1280px !important;
+  overflow: hidden !important;
+  isolation: isolate !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-bg,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-vignette {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-bg {
+  object-fit: cover !important;
+  object-position: center center !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-vignette {
+  background:
+    linear-gradient(180deg, rgba(5, 6, 22, .18), rgba(5, 6, 22, .05) 38%, rgba(5, 6, 22, .58) 100%),
+    radial-gradient(circle at 50% 38%, rgba(255, 160, 209, .13), transparent 48%) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-sakura-particles {
+  z-index: 2 !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-room-title {
+  position: absolute !important;
+  z-index: 28 !important;
+  left: var(--gp-room-x) !important;
+  top: var(--gp-room-y) !important;
+  max-width: 430px !important;
+  height: 54px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 0 18px !important;
+  border-radius: 18px !important;
+  background: rgba(7, 9, 24, .58) !important;
+  border: 1px solid rgba(255, 255, 255, .12) !important;
+  font-size: 17px !important;
+  line-height: 1 !important;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, .58) !important;
+  overflow: hidden !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-room-title strong {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: 21px !important;
+}
+
+/* ───────────────────────────── Players */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-player-badge {
+  position: absolute !important;
+  z-index: 24 !important;
+  box-sizing: border-box !important;
+  border-width: 2px !important;
+  overflow: visible !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-player-badge.top {
+  top: var(--gp-top-player-y) !important;
+  left: 40% !important;
+  width: 306px !important;
+  height: 96px !important;
+  min-height: 96px !important;
+  padding: 8px 16px 8px 12px !important;
+  border-radius: 18px !important;
+  transform: translateX(-50%) !important;
+  flex-direction: row !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-player-badge.top .gameplay-player-avatar {
+  width: 78px !important;
+  height: 78px !important;
+  margin: 0 12px 0 0 !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-player-badge.left {
+  left: var(--gp-left-player-x) !important;
+  top: var(--gp-left-player-y) !important;
+  bottom: auto !important;
+  width: 310px !important;
+  height: 112px !important;
+  min-height: 112px !important;
+  padding: 12px 15px 12px 108px !important;
+  border-radius: 18px !important;
+  transform: none !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-player-badge.left .gameplay-player-avatar {
+  position: absolute !important;
+  left: -8px !important;
+  top: 50% !important;
+  width: 112px !important;
+  height: 112px !important;
+  margin: 0 !important;
+  transform: translateY(-54%) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-player-badge.left::before {
+  left: 35px !important;
+  bottom: 14px !important;
+  width: 24px !important;
+  height: 24px !important;
+  font-size: 13px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-player-badge.right {
+  right: auto !important;
+  left: var(--gp-right-player-x) !important;
+  top: var(--gp-right-player-y) !important;
+  width: 160px !important;
+  min-height: 212px !important;
+  padding: 12px 9px 13px !important;
+  border-radius: 18px !important;
+  transform: none !important;
+  flex-direction: column !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-player-badge.right .gameplay-player-avatar {
+  width: 124px !important;
+  height: 124px !important;
+  margin: 0 auto 8px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-player-info {
+  min-width: 0 !important;
+  width: 100% !important;
+  gap: 8px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-player-info strong {
+  font-size: 22px !important;
+  line-height: 1 !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-player-info small {
+  font-size: 11px !important;
+  line-height: 1.15 !important;
+  opacity: .78 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-player-info span {
+  font-size: 18px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-turn-badge {
+  height: 26px !important;
+  padding: 0 13px !important;
+  font-size: 11px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-player-badge.top .gameplay-turn-badge,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-player-badge.left .gameplay-turn-badge,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-player-badge.right .gameplay-turn-badge {
+  left: 50% !important;
+  top: -17px !important;
+  bottom: auto !important;
+  transform: translateX(-50%) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-turn-arrow {
+  display: none !important;
+}
+
+/* ───────────────────────────── Table */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-table-zone {
+  position: absolute !important;
+  z-index: 10 !important;
+  left: var(--gp-table-x) !important;
+  top: var(--gp-table-y) !important;
+  width: var(--gp-table-width) !important;
+  height: auto !important;
+  aspect-ratio: 1448 / 1086 !important;
+  transform: translateX(-50%) scale(var(--gp-table-scale)) !important;
+  transform-origin: top center !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-table {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  filter: drop-shadow(0 22px 34px rgba(0, 0, 0, .5)) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-center-compass {
+  left: 50% !important;
+  top: 48% !important;
+  width: 128px !important;
+  height: 128px !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-center-compass strong {
+  font-size: 15px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-center-compass .timer {
+  top: 8% !important;
+  font-size: 16px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-center-compass em {
+  bottom: -25px !important;
+  font-size: 10px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-tile-wall img {
+  width: 25px !important;
+  height: 76px !important;
+  margin-left: -3px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-tile-wall.wall-top {
+  top: 12.5% !important;
+  left: 50% !important;
+  transform: translateX(-50%) scaleY(.42) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-tile-wall.wall-right {
+  top: 57% !important;
+  right: 5% !important;
+  transform: rotate(74deg) scaleY(.42) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-tile {
+  width: 34px !important;
+  height: 54px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-upper-discard {
+  top: 20% !important;
+  left: 50% !important;
+  transform: translateX(-50%) scale(0.8) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-center-discard {
+  top: 66% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) scale(0.8) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-left-discard {
+  left: 50% !important;
+  bottom: 30% !important;
+  max-width: 60% !important;
+  transform: translateX(-50%) scale(0.8) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-right-discard {
+  top: 24% !important;
+  left: 72% !important;
+  transform: scale(0.8) !important;
+}
+
+/* ───────────────────────────── Hand + actions */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-hand {
+  position: absolute !important;
+  z-index: 35 !important;
+  left: var(--gp-hand-x) !important;
+  top: var(--gp-hand-y) !important;
+  bottom: auto !important;
+  width: 686px !important;
+  height: 122px !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+  transform: translateX(-50%) scale(var(--gp-hand-scale)) !important;
+  transform-origin: center bottom !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-hand-tile {
+  width: 54px !important;
+  height: 92px !important;
+  margin-left: -3px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-hand-tile:hover,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-hand-tile:focus-visible {
+  transform: translateY(-10px) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-actions {
+  position: absolute !important;
+  z-index: 42 !important;
+  left: var(--gp-actions-x) !important;
+  top: var(--gp-actions-y) !important;
+  bottom: auto !important;
+  width: 664px !important;
+  height: 118px !important;
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  transform: translateX(-50%) scale(var(--gp-actions-scale)) !important;
+  transform-origin: center center !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-action {
+  min-width: 0 !important;
+  width: 100% !important;
+  height: 92px !important;
+  padding: 0 8px !important;
+  border-radius: 18px !important;
+  font-size: 22px !important;
+  line-height: 1.05 !important;
+  white-space: normal !important;
+}
+
+/* ───────────────────────────── Side menu / errors */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-side-menu {
+  position: absolute !important;
+  z-index: 40 !important;
+  right: 22px !important;
+  top: 16px !important;
+  bottom: auto !important;
+  width: 86px !important;
+  display: block !important;
+  pointer-events: none !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-side-tool.leave {
+  width: 86px !important;
+  display: grid !important;
+  justify-items: center !important;
+  gap: 5px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-side-icon-shell {
+  width: 62px !important;
+  height: 62px !important;
+  border-radius: 17px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-side-label {
+  font-size: 11px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-error {
+  z-index: 75 !important;
+  top: 145px !important;
+  width: auto !important;
+  max-width: 620px !important;
+  padding: 8px 16px !important;
+  font-size: 12px !important;
+}
+
+/* Chrome/Safari visible viewport polish for portrait gameplay. */
+html[data-device='mobile'][data-orientation='portrait'][data-browser='chrome'] .app-shell[data-device='mobile'] .gameplay-screen,
+html[data-device='mobile'][data-orientation='portrait'][data-browser='safari'] .app-shell[data-device='mobile'] .gameplay-screen {
+  --gp-hand-y: 928px;
+  --gp-actions-y: 1122px;
+}
+
+/* Mock route marker. Keeps every gameplay control visible for UI work. */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-screen--mock .gameplay-actions {
+  opacity: 1 !important;
+}

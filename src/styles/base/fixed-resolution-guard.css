@@ -2,10 +2,11 @@
    Do not put screen-specific positions here. */
 .fixed-resolution-shell {
   width: 100vw !important;
+  width: var(--app-viewport-width, 100vw) !important;
   height: 100vh !important;
-  height: 100dvh !important;
+  height: var(--app-viewport-height, 100vh) !important;
   min-height: 100vh !important;
-  min-height: 100dvh !important;
+  min-height: var(--app-viewport-height, 100vh) !important;
   display: grid !important;
   place-items: center !important;
   overflow: hidden !important;
@@ -43,7 +44,14 @@
 .fixed-resolution-shell .main-menu-reference,
 .fixed-resolution-shell .matchmaking-screen,
 .fixed-resolution-shell .create-room-screen,
+.fixed-resolution-shell .join-room-screen,
+.fixed-resolution-shell .private-lobby-screen,
 .fixed-resolution-shell .profile-screen-ui,
+.fixed-resolution-shell .achievements-page,
+.fixed-resolution-shell .leaderboard-page-ui,
+.fixed-resolution-shell .missions-page-ui,
+.fixed-resolution-shell .match-history-screen,
+.fixed-resolution-shell .shop-page,
 .fixed-resolution-shell .win-screen,
 .fixed-resolution-shell .loading-screen-ui,
 .fixed-resolution-shell .mock-login-screen,
@@ -61,8 +69,9 @@
   position: fixed !important;
   inset: 0 !important;
   width: 100vw !important;
+  width: var(--app-viewport-width, 100vw) !important;
   height: 100vh !important;
-  height: 100dvh !important;
+  height: var(--app-viewport-height, 100vh) !important;
   background-size: cover !important;
   background-position: center center !important;
   background-repeat: no-repeat !important;
@@ -73,7 +82,14 @@
 .main-menu-ui,
 .matchmaking-screen,
 .create-room-screen,
+.join-room-screen,
+.private-lobby-screen,
 .profile-screen-ui,
+.achievements-page,
+.leaderboard-page-ui,
+.missions-page-ui,
+.match-history-screen,
+.shop-page,
 .win-screen,
 .loading-screen-ui,
 .mock-login-screen,

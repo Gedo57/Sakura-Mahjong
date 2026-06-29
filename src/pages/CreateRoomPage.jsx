@@ -16,7 +16,6 @@ export default function CreateRoomPage() {
   const [roomType, setRoomType] = useState('Private');
   const [roomName, setRoomName] = useState('My Sakura Room');
   const [roomCode, setRoomCode] = useState('');
-  const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
@@ -105,7 +104,7 @@ export default function CreateRoomPage() {
       setCreatedRoom(matchmakingState);
       saveMatchmakingContext(matchmakingState);
       setSuccessMessage(t('roomCreatedSuccessfully'));
-      navigate(ROUTES.matchmaking, { state: matchmakingState });
+      navigate(ROUTES.privateLobby, { state: matchmakingState });
     } catch (error) {
       console.error('Failed to create private room:', error);
       setErrorMessage(error.message || 'Failed to create private room');
@@ -225,18 +224,6 @@ export default function CreateRoomPage() {
             <div className="bet-controls">
               <div className="bet-value"><span>●</span>{formattedBet}</div>
             </div>
-          </div>
-
-          <div className="create-form-row">
-            <label htmlFor="room-password">{t('passwordOptional')}</label>
-            <input
-              id="room-password"
-              type="password"
-              placeholder={t('enterPassword')}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              aria-label={t('passwordOptional')}
-            />
           </div>
 
           <div className="create-form-row room-type-row">

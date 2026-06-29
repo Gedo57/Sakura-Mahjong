@@ -29,8 +29,8 @@ export default function MockLoginPage() {
 
   const handleLogin = async (formData) => {
     await login({
-      email: formData.get('email'),
-      password: formData.get('password'),
+      email: String(formData.get('email') || '').trim(),
+      password: String(formData.get('password') || ''),
       rememberMe,
     });
 

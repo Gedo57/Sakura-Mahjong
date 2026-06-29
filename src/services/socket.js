@@ -21,8 +21,8 @@ function getErrorMessage(error, fallback = 'Gameplay socket error.') {
 }
 
 export const GAME_SOCKET_EVENTS = {
-  queueJoined: 'QUEUE_JOINED',
-  privateJoined: 'PRIVATE_JOINED',
+  queueJoined: 'queue_joined',
+  privateJoined: 'private_joined',
   roomStateUpdate: 'room:state_update',
   gameStart: 'game:start',
   turnStart: 'game:turn_start',
@@ -560,4 +560,13 @@ export function declareRiichi(tileId) {
   }
 
   return emitOnActiveSocket('player:declare_riichi', { tileId });
+}
+
+export function leaveLobby(roomId) {
+  if (!roomId) {
+    console.warn('[game-socket] leaveLobby called without roomId.');
+    return false;
+  }
+
+  return emitOnActiveSocket('lobby:leave', { roomId });
 }

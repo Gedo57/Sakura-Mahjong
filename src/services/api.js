@@ -1,6 +1,6 @@
 import { mockApi } from '../mocks/mockApi.js';
 
-const DEFAULT_BACKEND_URL = 'https://mahjong-server-iltq.onrender.com';
+const DEFAULT_BACKEND_URL = 'https://mahjong-game-backend.onrender.com';
 const DEFAULT_API_PREFIX = '/api';
 
 const rawBackendUrl = import.meta.env.VITE_API_BASE_URL || DEFAULT_BACKEND_URL;

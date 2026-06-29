@@ -32,7 +32,7 @@ export default function JoinRoomPage() {
       };
 
       saveMatchmakingContext(matchmakingState);
-      navigate(ROUTES.matchmaking, { state: matchmakingState });
+      navigate(ROUTES.privateLobby, { state: matchmakingState });
     } catch (error) {
       console.error('Join room failed:', error);
       setErrorMessage(error.message || t('joinRoomUnavailable'));
