@@ -1,0 +1,155 @@
+/* Patch: Portrait Visual Polish
+   Scope: mobile portrait only. Desktop and mobile landscape remain unchanged. */
+
+/* 1) Daily Login cards — keep the card artwork tall instead of vertically squeezed. */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .daily-login-panel {
+  width: 668px !important;
+  height: 1118px !important;
+  max-width: calc(100% - 24px) !important;
+  max-height: calc(100% - 54px) !important;
+  background-size: 200% 80% !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .daily-login-cards {
+  left: 28px !important;
+  right: 28px !important;
+  top: 228px !important;
+  bottom: 28px !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  grid-auto-rows: 354px !important;
+  gap: 18px 18px !important;
+  align-items: stretch !important;
+  padding: 4px 6px 24px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .daily-login-card {
+  width: 100% !important;
+  height: 354px !important;
+  min-height: 354px !important;
+  max-height: none !important;
+  display: block !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .daily-login-card-art {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: fill !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .daily-login-claim {
+  bottom: 19px !important;
+  width: 126px !important;
+  height: 50px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .daily-login-lock {
+  bottom: 21px !important;
+}
+
+/* 2) Create Room preview panel — nudge the lower panel to the right. */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .create-room-screen .room-preview-card {
+  transform: translateX(18px) !important;
+  transform-origin: center center !important;
+}
+
+/* 3) Shop background — use the same full-screen mood/background as Main Menu. */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-page {
+  background-image: url('/assets/main-menu/bg.png') !important;
+  background-size: cover !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-page::before {
+  content: '' !important;
+  position: absolute !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  background: radial-gradient(circle at 50% 8%, rgba(255, 180, 92, 0.14), transparent 34%), rgba(7, 2, 20, 0.34) !important;
+  z-index: 0 !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-back-button,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-balance-bar,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-feedback,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .shop-content-frame {
+  z-index: 2 !important;
+}
+
+/* 4) Achievement cards — center the copy inside the artwork area. */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-achievement-card {
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) auto !important;
+  align-items: stretch !important;
+  justify-items: center !important;
+  padding: 120px 80px 18px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-achievement-copy {
+  width: 100% !important;
+  min-height: 86px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  padding: 0 6px 8px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-achievement-card h3,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-achievement-card p {
+  text-align: center !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-achievement-footer {
+  width: 100% !important;
+  display: grid !important;
+  justify-items: center !important;
+  align-content: end !important;
+}
+
+/* 7) Sakura Cup — show the whole cup artwork instead of cropping it. */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .main-menu-reference .cup-panel {
+  height: 900px !important;
+  min-height: 0px !important;
+  overflow: hidden !important;
+  background: rgba(14, 3, 32, 0.58) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .main-menu-reference .cup-panel > img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+  transform: none !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .main-menu-reference .cup-copy {
+  padding: 238px 18px 16px !important;
+  justify-content: flex-end !important;
+  background: linear-gradient(180deg, rgba(13, 3, 28, 0) 0%, rgba(13, 3, 28, 0.10) 50%, rgba(13, 3, 28, 0.78) 100%) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .main-menu-reference .cup-copy button {
+  height: 42px !important;
+}
+
+/* 9) Start screen — make Play Now and Login the same width. */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .start-actions {
+  width: 430px !important;
+  max-width: 430px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .start-image-button,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .start-play-button,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .start-login-button {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 100% !important;
+  box-sizing: border-box !important;
+}
