@@ -68,23 +68,6 @@ export default function JoinRoomPage() {
           </div>
         </section>
 
-        <div className="join-room-divider"><span>{t('or')}</span></div>
-
-        <section className="join-room-list-panel" aria-label={t('availableRooms')}>
-          <h2>{t('recentRooms')}</h2>
-
-          <div className="join-room-scroll-shell">
-            <div className="join-room-list">
-              <article className="join-room-row">
-                <strong>LIVE</strong>
-                <span>Enter a real backend room code</span>
-                <em>— / —</em>
-                <button type="button" disabled>{t('join')}</button>
-              </article>
-            </div>
-          </div>
-        </section>
-
         <p className="join-room-helper">✿ {errorMessage || t('validRoomCodeHint')} ✿</p>
 
         <div className="join-room-actions">

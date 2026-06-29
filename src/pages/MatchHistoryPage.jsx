@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../i18n/useLanguage.js';
 import { ROUTES } from '../router/routes.js';
-import { getUserMatchHistory } from '../services/authService.js';
-import { getStoredAuthUser } from '../services/authService.js';
+import { getStoredAuthUser, getUserMatchHistory, logout } from '../services/authService.js';
 
 export default function MatchHistoryPage() {
   const { t, tx } = useLanguage();
@@ -13,6 +12,11 @@ export default function MatchHistoryPage() {
   const [error, setError] = useState(null);
   
   const currentUser = getStoredAuthUser();
+
+  function handleLogout() {
+    logout();
+    navigate(ROUTES.start, { replace: true });
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -59,21 +63,31 @@ export default function MatchHistoryPage() {
   };
 
   return (
-    <div className="match-history-screen">
+    <section className="profile-screen-ui match-history-page" aria-label={t('matchHistory') || 'Match History'}>
       <div className="history-bg-fx" />
-      
-      <header className="match-history-header">
-        <button 
-          className="history-back-btn" 
-          onClick={() => navigate(ROUTES.profile)}
-          aria-label={t('backToProfile') || 'Back to Profile'}
-        >
-          ←
+
+      <aside className="profile-sidebar profile-sidebar--compact">
+        <button className="profile-back-line" type="button" onClick={() => navigate(ROUTES.profile)}>
+          <span>←</span>
+          <span>{t('matchHistory') || 'Match History'}</span>
         </button>
-        <h1>{t('matchHistory') || 'Match History'}</h1>
-      </header>
-      
-      <main className="match-history-content">
+        <div className="profile-tabs profile-tabs--nav">
+          <button type="button" onClick={() => navigate(ROUTES.profile)}>
+            {t('profileTitle')}
+          </button>
+          <button type="button" onClick={() => navigate(ROUTES.achievements)}>
+            {t('achievementsTitle')}
+          </button>
+          <button className="active" type="button" onClick={() => navigate(ROUTES.matchHistory)}>
+            {t('matchHistory') || 'Match History'}
+          </button>
+        </div>
+        <button className="profile-logout-button" type="button" onClick={handleLogout}>
+          {t('logout')}
+        </button>
+      </aside>
+
+      <main className="profile-content match-history-content">
         {isLoading ? (
           <div className="history-loading">{t('loading') || 'Loading...'}</div>
         ) : error ? (
@@ -169,6 +183,6 @@ export default function MatchHistoryPage() {
           })
         )}
       </main>
-    </div>
+    </section>
   );
 }

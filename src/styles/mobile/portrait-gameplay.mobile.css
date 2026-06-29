@@ -23,7 +23,7 @@ html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='
   --gp-right-player-x: 548px;
   --gp-right-player-y: 130px;
   --gp-hand-x: 50%;
-  --gp-hand-y: 300px;
+  --gp-hand-y: 450px;
   --gp-hand-scale: 1;
   --gp-actions-x: 50%;
   --gp-actions-y: 840px;

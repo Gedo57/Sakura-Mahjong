@@ -51,6 +51,7 @@
 @import './mobile/portrait-profile-economy.mobile.css';
 @import './mobile/portrait-gameplay.mobile.css';
 @import './mobile/portrait-visual-polish.mobile.css';
+@import './mobile/portrait-result-screen.mobile.css';
 
 .friends-api-status,
 .friends-empty-state {

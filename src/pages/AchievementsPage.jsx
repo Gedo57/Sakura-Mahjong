@@ -245,6 +245,9 @@ export default function AchievementsPage() {
           <button className="active" type="button" onClick={() => navigate(ROUTES.achievements)}>
             {t('achievementsTitle')}
           </button>
+          <button type="button" onClick={() => navigate(ROUTES.matchHistory)}>
+            {t('matchHistory') || 'Match History'}
+          </button>
         </div>
         <button className="profile-logout-button" type="button" onClick={handleLogout}>
           {t('logout')}

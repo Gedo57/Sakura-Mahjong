@@ -73,8 +73,9 @@ html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='
   align-self: stretch !important;
 }
 
-html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .achievements-page .profile-tabs--nav {
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .achievements-page .profile-tabs--nav,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .match-history-page .profile-tabs--nav {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
 }
 
 html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .profile-tabs button,

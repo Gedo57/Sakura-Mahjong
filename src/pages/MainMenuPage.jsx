@@ -866,7 +866,6 @@ export default function MainMenuPage() {
             >
               <img src={dailyAsset('gift.png')} alt="" />
             </button>
-            <button className="square-top-button has-badge" type="button" aria-label={t('notifications')}>🔔<span>3</span></button>
             <button className="profile-pill" type="button" onClick={() => navigate(ROUTES.profile)} aria-label={t('openProfile')}>
               <img src={getMainMenuAvatarSrc(profile)} alt="" />
               <span>⌄</span>

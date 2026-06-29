@@ -1,0 +1,249 @@
+/* Portrait-only result / win screen repair.
+   This file intentionally overrides the legacy mobile win CSS only in
+   mobile portrait so desktop and mobile landscape stay unchanged. */
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .win-screen {
+  width: 720px !important;
+  height: 1280px !important;
+  overflow: hidden !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .win-screen-bg {
+  object-fit: cover !important;
+  object-position: center center !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .win-content {
+  position: relative !important;
+  z-index: 2 !important;
+  width: 100% !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+  padding: 72px 34px 42px !important;
+  display: grid !important;
+  grid-template-rows: 178px minmax(0, 1fr) 112px !important;
+  gap: 18px !important;
+  overflow: hidden !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .win-title {
+  width: 100% !important;
+  max-width: 652px !important;
+  margin: 0 auto !important;
+  align-self: end !important;
+  text-align: center !important;
+  font-size: 72px !important;
+  line-height: 0.92 !important;
+  letter-spacing: 0.035em !important;
+  white-space: normal !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  text-wrap: balance !important;
+  transform: none !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .win-layout {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  grid-template-rows: minmax(0, 1fr) 286px !important;
+  gap: 16px !important;
+  align-items: stretch !important;
+  justify-items: stretch !important;
+  overflow: hidden !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .winner-panel,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .round-summary-panel {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  min-height: 0 !important;
+  border-radius: 18px !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .winner-panel::before,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .round-summary-panel::before {
+  inset: 7px !important;
+  border-radius: 13px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .winner-panel::after,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .round-summary-panel::after {
+  right: 18px !important;
+  top: 12px !important;
+  font-size: 34px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .winner-panel {
+  display: grid !important;
+  grid-template-rows: 244px minmax(0, 1fr) !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .winner-main-row {
+  height: auto !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+  padding: 18px 32px 16px !important;
+  display: grid !important;
+  grid-template-columns: 158px minmax(0, 1fr) !important;
+  gap: 22px !important;
+  align-items: center !important;
+  overflow: hidden !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .winner-avatar {
+  width: 134px !important;
+  height: 134px !important;
+  justify-self: center !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .winner-info {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  justify-items: start !important;
+  align-content: center !important;
+  gap: 10px !important;
+  overflow: hidden !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .winner-name {
+  width: 100% !important;
+  max-width: 100% !important;
+  font-size: 34px !important;
+  line-height: 1.05 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  text-align: left !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .winner-score {
+  font-size: 64px !important;
+  line-height: 0.9 !important;
+  white-space: nowrap !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .winner-badge {
+  width: 176px !important;
+  height: 42px !important;
+  font-size: 26px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .loser-list {
+  height: auto !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .loser-row {
+  flex: 0 0 106px !important;
+  min-height: 106px !important;
+  box-sizing: border-box !important;
+  grid-template-columns: 82px minmax(0, 1fr) auto !important;
+  gap: 14px !important;
+  padding: 14px 30px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .loser-avatar {
+  width: 64px !important;
+  height: 64px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .loser-name {
+  min-width: 0 !important;
+  font-size: 34px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .loser-score {
+  font-size: 34px !important;
+  white-space: nowrap !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .summary-panel-content {
+  height: 100% !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+  padding: 22px 30px 20px !important;
+  grid-template-rows: 38px 1px minmax(0, 1fr) 20px 48px !important;
+  gap: 9px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .summary-panel-content h3 {
+  font-size: 28px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .summary-rows {
+  overflow: hidden !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .summary-row {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 16px !important;
+  font-size: 22px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .summary-row span,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .summary-row strong {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .summary-total {
+  font-size: 27px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .summary-coin {
+  width: 38px !important;
+  height: 38px !important;
+  font-size: 22px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .win-actions {
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 16px !important;
+  align-items: center !important;
+  justify-items: stretch !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .win-image-button {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  height: 82px !important;
+  border-radius: 18px !important;
+  font-size: 31px !important;
+  line-height: 0.95 !important;
+  white-space: normal !important;
+  overflow: visible !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .win-image-button.lobby,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .win-image-button.again {
+  width: 100% !important;
+  height: 82px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'][data-browser='chrome'] .app-shell[data-device='mobile'] .win-content,
+html[data-device='mobile'][data-orientation='portrait'][data-browser='safari'] .app-shell[data-device='mobile'] .win-content {
+  padding-bottom: 54px !important;
+  grid-template-rows: 168px minmax(0, 1fr) 104px !important;
+}
