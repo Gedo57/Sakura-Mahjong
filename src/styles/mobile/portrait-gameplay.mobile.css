@@ -23,7 +23,9 @@ html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='
   --gp-right-player-x: 548px;
   --gp-right-player-y: 130px;
   --gp-hand-x: 50%;
-  --gp-hand-y: 450px;
+  /* Single source of truth for the portrait player hand position.
+     Move this up/down here only; browser-specific rules below no longer override it. */
+  --gp-hand-y: 842px;
   --gp-hand-scale: 1;
   --gp-actions-x: 50%;
   --gp-actions-y: 840px;
@@ -395,8 +397,9 @@ html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='
 /* Chrome/Safari visible viewport polish for portrait gameplay. */
 html[data-device='mobile'][data-orientation='portrait'][data-browser='chrome'] .app-shell[data-device='mobile'] .gameplay-screen,
 html[data-device='mobile'][data-orientation='portrait'][data-browser='safari'] .app-shell[data-device='mobile'] .gameplay-screen {
-  --gp-hand-y: 650x;
-  --gp-actions-y: 840px;
+  /* Keep browser-specific polish for actions only. The hand position must stay controlled
+     by --gp-hand-y above so manual tuning is not ignored on Chrome/Safari. */
+  --gp-actions-y: 1122px;
 }
 
 /* Mock route marker. Keeps every gameplay control visible for UI work. */
