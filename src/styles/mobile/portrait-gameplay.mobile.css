@@ -395,7 +395,7 @@ html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='
 /* Chrome/Safari visible viewport polish for portrait gameplay. */
 html[data-device='mobile'][data-orientation='portrait'][data-browser='chrome'] .app-shell[data-device='mobile'] .gameplay-screen,
 html[data-device='mobile'][data-orientation='portrait'][data-browser='safari'] .app-shell[data-device='mobile'] .gameplay-screen {
-  --gp-hand-y: 450x;
+  --gp-hand-y: 650x;
   --gp-actions-y: 840px;
 }
 
