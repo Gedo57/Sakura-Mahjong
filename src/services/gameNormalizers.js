@@ -65,6 +65,7 @@ export function normalizePlayer(player = {}, index = 0) {
     discardTiles: player.discardTiles || player.discards || player.discardPile || player.discardedTiles || [],
     discards: player.discards || player.discardTiles || player.discardPile || player.discardedTiles || [],
     openMelds: player.openMelds || player.melds || [],
+    bonusTiles: player.bonusTiles || player.bonus || [],
   };
 }
 
@@ -415,8 +416,8 @@ export function normalizeGameResult(response = {}) {
     players,
     winningHand: result.winningHand || [],
     winningTile: result.winningTile,
-    yaku: result.yaku || [],
-    han: result.han,
+    yaku: result.yaku || result.fan || [],
+    han: result.han ?? result.totalFan,
     isTsumo: result.isTsumo,
     payouts: result.payouts || {},
     finalScores: result.finalScores || {},

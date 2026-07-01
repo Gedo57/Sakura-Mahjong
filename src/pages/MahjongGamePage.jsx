@@ -477,7 +477,7 @@ const tileIdToAssetName = (tileId) => {
   const suit = parts[0];
   const rank = parts[1];
 
-  // Backend tile ids include a copy index, e.g. m_1_0 / p_7_2 / d_g_0.
+  // Backend tile ids include a copy index, e.g. p_7_2 / d_g_0.
   // The asset files are shared per tile face, so the copy index is intentionally ignored.
   if ((suit === 'm' || suit === 'p' || suit === 's') && /^\d+$/.test(rank)) {
     return `${suit}_${rank}.png`;
@@ -489,6 +489,22 @@ const tileIdToAssetName = (tileId) => {
 
   if (suit === 'd' && ['r', 'w', 'g'].includes(rank)) {
     return `d_${rank}.png`;
+  }
+
+  if (suit === 'fl' && ['spring', 'summer', 'autumn', 'winter'].includes(rank)) {
+    return `${withoutExtension}.png`; // placeholders or actual assets
+  }
+
+  if (suit === 'sn' && ['plum', 'orchid', 'chrysanthemum', 'bamboo'].includes(rank)) {
+    return `${withoutExtension}.png`;
+  }
+
+  if (suit === 'an' && ['cat', 'mouse', 'chicken', 'centipede'].includes(rank)) {
+    return `${withoutExtension}.png`;
+  }
+
+  if (suit === 'fei') {
+    return 'fei.png'; // Ignore copy index (e.g. fei_0 -> fei.png)
   }
 
   if (/\.(png|jpe?g|webp|gif|svg)$/i.test(value)) return value;
@@ -1324,6 +1340,10 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   const leftDiscardTiles = getVisibleDiscardTilesByPosition(gameState, leftPlayer, 'left');
   const topDiscardTiles = getVisibleDiscardTilesByPosition(gameState, topPlayer, 'top');
   const rightDiscardTiles = hasRightPlayer ? getVisibleDiscardTilesByPosition(gameState, rightPlayer, 'right') : [];
+  
+  const leftBonusTiles = getFirstTileList(leftPlayer?.bonusTiles);
+  const topBonusTiles = getFirstTileList(topPlayer?.bonusTiles);
+  const rightBonusTiles = hasRightPlayer ? getFirstTileList(rightPlayer?.bonusTiles) : [];
   const centerDiscardTiles = getCircularTableTiles(getFirstTileList(
     gameState.centerTiles,
     gameState.centerDiscardTiles,
@@ -1568,13 +1588,29 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
             <GameplayTile name={tile} key={`${tile}-${index}`} />
           ))}
         </div>
-
-        {hasRightPlayer ? (
-          <div className="gameplay-right-discard" aria-label="Right discard tiles">
-            {rightDiscardTiles.map((tile, index) => (
-              <GameplayTile name={tile} key={`${tile}-${index}`} />
+        {topBonusTiles.length > 0 && (
+          <div className="gameplay-upper-bonus" aria-label="Top bonus tiles" style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '4px', scale: '0.8' }}>
+            {topBonusTiles.map((tile, index) => (
+              <GameplayTile name={tile} key={`bonus-top-${tile}-${index}`} />
             ))}
           </div>
+        )}
+
+        {hasRightPlayer ? (
+          <>
+            <div className="gameplay-right-discard" aria-label="Right discard tiles">
+              {rightDiscardTiles.map((tile, index) => (
+                <GameplayTile name={tile} key={`${tile}-${index}`} />
+              ))}
+            </div>
+            {rightBonusTiles.length > 0 && (
+              <div className="gameplay-right-bonus" aria-label="Right bonus tiles" style={{ position: 'absolute', right: '10px', bottom: '20%', display: 'flex', flexDirection: 'column', gap: '4px', scale: '0.8' }}>
+                {rightBonusTiles.map((tile, index) => (
+                  <GameplayTile name={tile} key={`bonus-right-${tile}-${index}`} />
+                ))}
+              </div>
+            )}
+          </>
         ) : null}
 
         <div className="gameplay-center-discard" aria-label="Center meld tiles">
@@ -1588,6 +1624,13 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
             <GameplayTile name={tile} key={`${tile}-${index}`} />
           ))}
         </div>
+        {leftBonusTiles.length > 0 && (
+          <div className="gameplay-left-bonus" aria-label="Your bonus tiles" style={{ position: 'absolute', bottom: '110px', right: '5%', display: 'flex', gap: '4px', scale: '0.9' }}>
+            {leftBonusTiles.map((tile, index) => (
+              <GameplayTile name={tile} key={`bonus-left-${tile}-${index}`} />
+            ))}
+          </div>
+        )}
 
         <div className="gameplay-hand" aria-label="Player hand tiles">
           {playerHandTiles.map((tile, index) => (
