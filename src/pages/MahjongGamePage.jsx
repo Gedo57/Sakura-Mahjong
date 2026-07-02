@@ -1850,15 +1850,12 @@ function getMeldDisplayLabel(type = '') {
 
 function PlayerMeldRack({ position = 'left', melds = [] }) {
   const meldList = normalizeMeldList(melds);
-  const hasMelds = meldList.length > 0;
+
+  if (!meldList.length) return null;
 
   return (
-    <div
-      className={`gameplay-meld-rack gameplay-meld-rack--${position} ${hasMelds ? 'has-melds' : 'is-empty'}`}
-      aria-label={`${position} open melds`}
-      data-meld-count={meldList.length}
-    >
-      {hasMelds ? meldList.map((meld, meldIndex) => {
+    <div className={`gameplay-meld-rack gameplay-meld-rack--${position}`} aria-label={`${position} open melds`}>
+      {meldList.map((meld, meldIndex) => {
         const meldType = normalizeActionForUi(meld.type) || 'meld';
 
         return (
@@ -1871,16 +1868,7 @@ function PlayerMeldRack({ position = 'left', melds = [] }) {
             </div>
           </div>
         );
-      }) : (
-        <div className="gameplay-meld-placeholder" aria-hidden="true">
-          <span className="gameplay-meld-label gameplay-meld-label--placeholder">MELDS</span>
-          <div className="gameplay-meld-empty-slots">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <span className="gameplay-meld-empty-slot" key={`meld-empty-${position}-${index}`} />
-            ))}
-          </div>
-        </div>
-      )}
+      })}
     </div>
   );
 }
