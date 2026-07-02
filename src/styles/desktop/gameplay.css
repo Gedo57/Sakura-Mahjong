@@ -1233,8 +1233,8 @@ animation: none;
 }
 
 .app-shell[data-device='desktop'] .gameplay-bonus-rack--right {
-  top: 20%;
-  right: 22.8%;
+  top: 40%;
+  right: 16.8%;
    transform: scale(0.95);
   transform-origin: top right;
 }
@@ -1313,8 +1313,8 @@ animation: none;
    Layout tuned so exposed melds stay attached to each player zone and do not cover
    the compass or the local hand. Move these x/y knobs only when manual tuning. */
 .app-shell[data-device='desktop'] .gameplay-screen {
-  --gp-meld-top-x: 30%;
-  --gp-meld-top-y: 20.2%;
+  --gp-meld-top-x: 22%;
+  --gp-meld-top-y: 30.2%;
   --gp-meld-left-x: 30%;
   --gp-meld-left-bottom: 31.4%;
   --gp-meld-right-x: 64.2%;
@@ -1407,4 +1407,185 @@ animation: none;
 
 .app-shell[data-device='desktop'] .gameplay-meld-rack--right .gameplay-meld-tiles .gameplay-tile:first-child {
   margin-top: 0;
+}
+
+/* Patch 2 — Malaysian 3P gameplay info HUD: wall count + Fan display. */
+.app-shell[data-device='desktop'] .gameplay-info-panel {
+  position: absolute;
+  z-index: 12;
+  top: clamp(50px, 5vw, 72px);
+  left: clamp(14px, 2.1vw, 32px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.app-shell[data-device='desktop'] .gameplay-info-item {
+  min-width: 82px;
+  padding: 6px 12px 7px;
+  border: 1px solid rgba(255, 218, 114, .32);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(13, 19, 35, .9), rgba(8, 11, 20, .96));
+  box-shadow: 0 10px 22px rgba(0, 0, 0, .28), inset 0 0 0 1px rgba(255, 240, 170, .06);
+  text-align: center;
+}
+
+.app-shell[data-device='desktop'] .gameplay-info-item span {
+  display: block;
+  color: rgba(245, 224, 168, .82);
+  font-size: clamp(9px, .72vw, 11px);
+  font-weight: 800;
+  letter-spacing: .09em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.app-shell[data-device='desktop'] .gameplay-info-item strong {
+  display: block;
+  margin-top: 3px;
+  color: #fff1a6;
+  font-size: clamp(14px, 1.15vw, 18px);
+  font-weight: 950;
+  line-height: 1;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, .45);
+}
+
+/* Patch 3 — Reclaim Fei UI state. */
+.app-shell[data-device='desktop'] .gameplay-fei-reclaim {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  background: rgba(3, 7, 16, .36);
+  backdrop-filter: blur(2px);
+  pointer-events: auto;
+}
+
+.app-shell[data-device='desktop'] .gameplay-fei-reclaim-card {
+  width: min(430px, 42vw);
+  padding: 18px 22px 20px;
+  border: 1px solid rgba(255, 220, 116, .46);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(33, 25, 39, .96), rgba(9, 13, 25, .98));
+  box-shadow: 0 24px 55px rgba(0, 0, 0, .46), inset 0 0 0 1px rgba(255, 240, 170, .08);
+  text-align: center;
+}
+
+.app-shell[data-device='desktop'] .gameplay-fei-reclaim-kicker {
+  display: inline-grid;
+  place-items: center;
+  min-width: 54px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255, 219, 91, .18);
+  color: #ffe47e;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: .14em;
+}
+
+.app-shell[data-device='desktop'] .gameplay-fei-reclaim-card h2 {
+  margin: 8px 0 6px;
+  color: #fff1a6;
+  font-size: 24px;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.app-shell[data-device='desktop'] .gameplay-fei-reclaim-card p {
+  margin: 0 auto 14px;
+  max-width: 360px;
+  color: rgba(255, 239, 196, .88);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.app-shell[data-device='desktop'] .gameplay-fei-reclaim-tiles {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 10px 0 16px;
+}
+
+.app-shell[data-device='desktop'] .gameplay-fei-reclaim-tile-group {
+  display: grid;
+  gap: 6px;
+  min-width: 118px;
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(3, 7, 14, .45);
+  border: 1px solid rgba(255, 215, 100, .18);
+}
+
+.app-shell[data-device='desktop'] .gameplay-fei-reclaim-tile-group span {
+  color: rgba(255, 229, 150, .78);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.app-shell[data-device='desktop'] .gameplay-fei-reclaim-tile-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 54px;
+}
+
+.app-shell[data-device='desktop'] .gameplay-fei-reclaim-tile-row .gameplay-tile {
+  width: 34px;
+  height: 54px;
+  margin-left: -4px;
+}
+
+.app-shell[data-device='desktop'] .gameplay-fei-reclaim-tile-row .gameplay-tile:first-child {
+  margin-left: 0;
+}
+
+.app-shell[data-device='desktop'] .gameplay-fei-reclaim-arrow {
+  color: #ffe27a;
+  font-size: 26px;
+  font-weight: 950;
+  text-shadow: 0 5px 13px rgba(0, 0, 0, .5);
+}
+
+.app-shell[data-device='desktop'] .gameplay-fei-reclaim-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.app-shell[data-device='desktop'] .gameplay-fei-reclaim-button {
+  min-width: 126px;
+  height: 38px;
+  border: 0;
+  border-radius: 999px;
+  color: #251202;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.app-shell[data-device='desktop'] .gameplay-fei-reclaim-button.confirm {
+  background: linear-gradient(180deg, #ffe27d, #d9931e);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, .32), inset 0 2px 0 rgba(255, 255, 255, .32);
+}
+
+.app-shell[data-device='desktop'] .gameplay-fei-reclaim-button.skip {
+  color: #ffe9b3;
+  background: rgba(5, 9, 17, .78);
+  border: 1px solid rgba(255, 218, 114, .28);
+}
+
+.app-shell[data-device='desktop'] .gameplay-fei-reclaim-button:disabled {
+  opacity: .55;
+  cursor: wait;
 }

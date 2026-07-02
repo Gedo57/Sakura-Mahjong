@@ -68,6 +68,9 @@ export function normalizePlayer(player = {}, index = 0) {
     discards: player.discards || player.discardTiles || player.discardPile || player.discardedTiles || [],
     openMelds: player.openMelds || player.melds || player.exposedMelds || player.declaredMelds || player.openSets || player.sets || [],
     bonusTiles: player.bonusTiles || player.revealedBonusTiles || player.revealedBonus || player.bonus || player.flowers || player.seasons || player.animals || [],
+    currentFan: player.currentFan ?? player.totalFan ?? player.fanCount ?? player.fanValue,
+    minimumFan: player.minimumFan ?? player.minFan ?? player.requiredFan,
+    fanInfo: player.fanInfo || player.fanSummary || player.handEvaluation || null,
   };
 }
 
@@ -110,7 +113,18 @@ export function normalizeGameState(response = {}) {
     round: state.round || state.windRound || state.roundWind || 'East 1',
     roundWind: state.roundWind || state.windRound,
     turnNumber: state.turnNumber ?? state.turn?.number,
-    wallRemaining: state.wallRemaining ?? state.wall?.remaining,
+    wallRemaining: state.wallRemaining
+      ?? state.remainingWall
+      ?? state.remainingWallTiles
+      ?? state.wallTilesRemaining
+      ?? state.tilesRemaining
+      ?? state.wallCount
+      ?? state.wall?.remaining
+      ?? state.wall?.remainingTiles
+      ?? state.wall?.count,
+    currentFan: state.currentFan ?? state.totalFan ?? state.fanCount ?? state.fanValue,
+    minimumFan: state.minimumFan ?? state.minFan ?? state.requiredFan ?? state.requiredFans,
+    fanInfo: state.fanInfo || state.fanSummary || state.handEvaluation || state.winPreview || state.scoring || null,
     currentDiscard: state.currentDiscard ?? state.discardedTile ?? state.lastDiscard,
     timer: state.timer ?? state.remainingSeconds ?? state.timeLimit ?? 18,
     handTiles: state.handTiles || state.playerHand || state.myHand || state.currentPlayerHand || privateHand || [],

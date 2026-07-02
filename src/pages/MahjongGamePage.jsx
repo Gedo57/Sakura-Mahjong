@@ -13,6 +13,8 @@ import {
   getActiveGameSocket,
   getBufferedGameSocketMessages,
   passClaimWindow,
+  reclaimFei,
+  skipFeiReclaim,
 } from '../services/socket.js';
 import { clearActiveMatch, clearMatchmakingContext, getActiveMatch, saveActiveMatch } from '../store/gameStore.js';
 import { useLanguage } from '../i18n/useLanguage.js';
@@ -362,11 +364,30 @@ const EMPTY_SOCKET_GAME_STATE = {
   centerTiles: [],
   availableActions: [],
   claimWindow: null,
+  reclaimFei: null,
   timer: 0,
   room: { name: 'Live Match' },
 };
 const toArray = (value) => (Array.isArray(value) ? value : []);
 const MAX_TABLE_DISCARD_TILES = 7;
+const MINIMUM_FAN_TO_WIN = 5;
+const FEI_RECLAIM_AVAILABLE_ACTIONS = new Set([
+  'fei_reclaim_available',
+  'reclaim_fei_available',
+  'fei_reclaim_window',
+  'reclaim_fei_window',
+  'can_reclaim_fei',
+  'replace_fei_available',
+]);
+const FEI_RECLAIM_COMPLETE_ACTIONS = new Set([
+  'fei_reclaimed',
+  'reclaim_fei',
+  'reclaim_fei_confirmed',
+  'replace_fei',
+  'fei_reclaim_skipped',
+  'skip_fei_reclaim',
+]);
+
 
 const getCircularTableTiles = (tiles = [], maxTiles = MAX_TABLE_DISCARD_TILES) => {
   const list = toArray(tiles).filter(Boolean);
@@ -713,6 +734,270 @@ const getFirstTileList = (...values) => {
   return [];
 };
 
+const appendUniqueTileList = (...values) => {
+  const nextTiles = [];
+  const seenTiles = new Set();
+
+  values.forEach((value) => {
+    normalizeTileList(value).forEach((tile) => {
+      if (!tile || seenTiles.has(tile)) return;
+      seenTiles.add(tile);
+      nextTiles.push(tile);
+    });
+  });
+
+  return nextTiles;
+};
+
+const getFirstNumber = (...values) => {
+  for (const value of values) {
+    if (Array.isArray(value) || (value && typeof value === 'object')) continue;
+    if (value === undefined || value === null || value === '') continue;
+    const numberValue = Number(value);
+    if (Number.isFinite(numberValue)) return numberValue;
+  }
+
+  return null;
+};
+
+const getWallRemainingValue = (state = {}) => {
+  const wallRemaining = getFirstNumber(
+    state.wallRemaining,
+    state.remainingWall,
+    state.remainingWallTiles,
+    state.wallTilesRemaining,
+    state.tilesRemaining,
+    state.wallCount,
+    state.wall?.remaining,
+    state.wall?.remainingTiles,
+    state.wall?.count
+  );
+
+  return wallRemaining !== null && wallRemaining >= 0 ? wallRemaining : null;
+};
+
+const getFanDisplayInfo = (...sources) => {
+  const flattenedSources = [];
+
+  sources.filter(Boolean).forEach((source) => {
+    flattenedSources.push(source);
+    [
+      source.fanInfo,
+      source.fanSummary,
+      source.handEvaluation,
+      source.winPreview,
+      source.scoring,
+      source.scoreSummary,
+      source.result,
+    ].filter(Boolean).forEach((nestedSource) => flattenedSources.push(nestedSource));
+  });
+
+  let currentFan = null;
+  let minimumFan = null;
+
+  flattenedSources.forEach((source) => {
+    if (!source || typeof source !== 'object') return;
+
+    if (currentFan === null) {
+      currentFan = getFirstNumber(
+        source.currentFan,
+        source.totalFan,
+        source.fanCount,
+        source.fanValue,
+        source.fans,
+        source.fan
+      );
+    }
+
+    if (minimumFan === null) {
+      minimumFan = getFirstNumber(
+        source.minimumFan,
+        source.minFan,
+        source.requiredFan,
+        source.requiredFans,
+        source.minimumFans,
+        source.winMinFan
+      );
+    }
+  });
+
+  return {
+    currentFan,
+    minimumFan: minimumFan ?? MINIMUM_FAN_TO_WIN,
+    hasCurrentFan: currentFan !== null,
+  };
+};
+
+const isMinimumFanErrorPayload = (payload = {}) => {
+  const searchable = [
+    payload.code,
+    payload.errorCode,
+    payload.reason,
+    payload.type,
+    payload.message,
+    payload.error,
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  return Boolean(searchable) && (
+    searchable.includes('min_fan')
+    || searchable.includes('minimum_fan')
+    || searchable.includes('insufficient_fan')
+    || searchable.includes('fan_required')
+    || (searchable.includes('fan') && searchable.includes('minimum'))
+    || (searchable.includes('fan') && searchable.includes('required'))
+  );
+};
+
+const getGameplayErrorMessage = (payload = {}, t = (key) => key) => {
+  if (isMinimumFanErrorPayload(payload)) return t('minimumFanRequired');
+  return payload.message || payload.error || 'Gameplay socket error.';
+};
+
+const RECLAIM_FEI_WINDOW_KEYS = [
+  'reclaimFeiWindow',
+  'feiReclaimWindow',
+  'reclaimFei',
+  'feiReclaim',
+  'pendingFeiReclaim',
+  'pendingFeiReplacement',
+  'feiReplacement',
+  'replaceFei',
+];
+const RECLAIM_FEI_OPTIONS_KEYS = [
+  'options',
+  'reclaimFeiOptions',
+  'availableFeiReclaims',
+  'availableReclaims',
+  'feiReclaimOptions',
+  'replacements',
+];
+
+const looksLikeFeiReclaimPayload = (payload = {}) => {
+  if (!payload || typeof payload !== 'object') return false;
+  const action = String(payload.action || payload.type || payload.event || payload.name || '').toLowerCase();
+  return Boolean(
+    payload.canReclaimFei
+    || payload.canReplaceFei
+    || payload.hasFeiReclaim
+    || payload.available === true
+    || payload.active === true
+    || payload.pending === true
+    || (action.includes('fei') && (action.includes('reclaim') || action.includes('replace')))
+    || RECLAIM_FEI_OPTIONS_KEYS.some((key) => Array.isArray(payload[key]) && payload[key].length)
+  );
+};
+
+const getRawReclaimFeiWindow = (payload = {}) => {
+  if (!payload) return null;
+  if (payload === true) return { active: true };
+  if (Array.isArray(payload)) return payload.length ? { active: true, options: payload } : null;
+  if (typeof payload !== 'object') return null;
+
+  for (const key of RECLAIM_FEI_WINDOW_KEYS) {
+    const value = payload[key];
+    if (!value) continue;
+    if (value === true) return { ...payload, active: true };
+    if (Array.isArray(value)) return value.length ? { ...payload, active: true, options: value } : null;
+    if (typeof value === 'object') return { ...payload, ...value, active: value.active ?? true };
+  }
+
+  const optionArrayKey = RECLAIM_FEI_OPTIONS_KEYS.find((key) => Array.isArray(payload[key]) && payload[key].length);
+  if (optionArrayKey) return { ...payload, active: true, options: payload[optionArrayKey] };
+
+  return looksLikeFeiReclaimPayload(payload) ? { ...payload, active: true } : null;
+};
+
+const normalizeFeiReclaimOption = (option = {}, index = 0) => {
+  const raw = option && typeof option === 'object' && !Array.isArray(option)
+    ? option
+    : { replacementTile: option };
+
+  const replacementSource = raw.replacementTile
+    || raw.actualTile
+    || raw.naturalTile
+    || raw.drawnTile
+    || raw.tile
+    || raw.tileId
+    || raw.replacementTileId
+    || raw.actualTileId
+    || raw.naturalTileId
+    || raw.drawnTileId;
+  const feiSource = raw.feiTile
+    || raw.jokerTile
+    || raw.wildcardTile
+    || raw.feiTileId
+    || raw.jokerTileId
+    || raw.wildcardTileId
+    || raw.removedFeiTile;
+  const meldSource = raw.meld
+    || raw.openMeld
+    || raw.exposedMeld
+    || raw.meldData
+    || {};
+
+  const replacementTileId = getTileId(replacementSource);
+  const feiTileId = getTileId(feiSource) || 'fei';
+  const replacementTile = normalizeTileName(replacementSource) || normalizeTileName(replacementTileId);
+  const feiTile = normalizeTileName(feiSource) || normalizeTileName(feiTileId) || 'fei.png';
+  const meldTiles = getFirstTileList(
+    raw.meldTiles,
+    raw.tiles,
+    raw.exposedTiles,
+    raw.setTiles,
+    raw.groupTiles,
+    meldSource.tiles,
+    meldSource.meldTiles,
+    meldSource.exposedTiles,
+    meldSource.setTiles
+  );
+
+  return {
+    ...raw,
+    id: raw.id || raw.optionId || raw.reclaimId || raw.meldId || meldSource.id || meldSource.meldId || `fei-reclaim-${index}`,
+    optionId: raw.optionId || raw.id || raw.reclaimId || `fei-reclaim-${index}`,
+    reclaimId: raw.reclaimId || raw.id || raw.optionId || '',
+    meldId: raw.meldId || meldSource.id || meldSource.meldId || '',
+    replacementTileId,
+    replacementTile,
+    feiTileId,
+    feiTile,
+    meldTiles,
+    raw,
+  };
+};
+
+const normalizeReclaimFeiWindow = (payload = {}) => {
+  const source = getRawReclaimFeiWindow(payload);
+  if (!source) return null;
+
+  const rawOptions = RECLAIM_FEI_OPTIONS_KEYS
+    .map((key) => source[key])
+    .find((value) => Array.isArray(value) && value.length)
+    || (Array.isArray(source) ? source : []);
+  const options = (rawOptions.length ? rawOptions : [source])
+    .map((option, index) => normalizeFeiReclaimOption(option, index))
+    .filter(Boolean);
+
+  if (!options.length) return null;
+
+  return {
+    ...source,
+    active: true,
+    options,
+    message: source.message || source.description || payload.message || '',
+  };
+};
+
+const buildFeiReclaimPayload = (windowState = {}, option = {}) => ({
+  optionId: option.optionId || option.id || windowState.optionId || windowState.id,
+  reclaimId: option.reclaimId || windowState.reclaimId || windowState.id,
+  meldId: option.meldId || windowState.meldId,
+  tileId: option.replacementTileId || windowState.replacementTileId,
+  replacementTileId: option.replacementTileId || windowState.replacementTileId,
+  actualTileId: option.replacementTileId || windowState.actualTileId,
+  feiTileId: option.feiTileId || windowState.feiTileId,
+});
+
 const removeOneTileFromHand = (tiles = [], rawTileId = '', renderedTileName = '') => {
   const list = toArray(tiles);
   if (!list.length) return [];
@@ -983,6 +1268,57 @@ function GameplayTile({ name, className = '', label = '' }) {
   return <img className={`gameplay-tile ${className}`} src={asset(name)} alt={label} draggable="false" />;
 }
 
+function ReclaimFeiPrompt({ windowState, t, onConfirm, onSkip, isPending = false }) {
+  if (!windowState?.active) return null;
+
+  const option = toArray(windowState.options)[0] || {};
+  const meldTiles = toArray(option.meldTiles).filter(Boolean);
+  const replacementTile = option.replacementTile || '';
+  const feiTile = option.feiTile || 'fei.png';
+
+  return (
+    <div className="gameplay-fei-reclaim" role="dialog" aria-modal="true" aria-label={t('reclaimFeiTitle')}>
+      <div className="gameplay-fei-reclaim-card">
+        <span className="gameplay-fei-reclaim-kicker">FEI</span>
+        <h2>{t('reclaimFeiTitle')}</h2>
+        <p>{windowState.message || t('reclaimFeiBody')}</p>
+
+        <div className="gameplay-fei-reclaim-tiles" aria-label={t('reclaimFeiMeld')}>
+          <div className="gameplay-fei-reclaim-tile-group">
+            <span>{t('reclaimFeiMeld')}</span>
+            <div className="gameplay-fei-reclaim-tile-row">
+              {meldTiles.length ? meldTiles.map((tile, index) => (
+                <GameplayTile name={tile} key={`fei-reclaim-meld-${tile}-${index}`} />
+              )) : (
+                <GameplayTile name={feiTile} className="gameplay-tile--fei" />
+              )}
+            </div>
+          </div>
+
+          <div className="gameplay-fei-reclaim-arrow" aria-hidden="true">→</div>
+
+          <div className="gameplay-fei-reclaim-tile-group">
+            <span>{t('reclaimFeiReplacement')}</span>
+            <div className="gameplay-fei-reclaim-tile-row">
+              {replacementTile ? <GameplayTile name={replacementTile} /> : null}
+              <GameplayTile name={feiTile} className="gameplay-tile--fei" />
+            </div>
+          </div>
+        </div>
+
+        <div className="gameplay-fei-reclaim-actions">
+          <button type="button" className="gameplay-fei-reclaim-button confirm" onClick={() => onConfirm(option)} disabled={isPending}>
+            {t('reclaimFeiConfirm')}
+          </button>
+          <button type="button" className="gameplay-fei-reclaim-button skip" onClick={() => onSkip(option)} disabled={isPending}>
+            {t('reclaimFeiSkip')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BonusTileRack({ position = 'left', tiles = [], label = 'BONUS', visible = false }) {
   const tileList = toArray(tiles).filter(Boolean);
 
@@ -1178,11 +1514,12 @@ function mergeTurnStart(current, payload = {}) {
     timer: timerDeadlineMs ? getSecondsRemaining(timerDeadlineMs) : nextTimeLimit,
     timeLimit: nextTimeLimit || current.timeLimit,
     timerDeadlineMs,
-    wallRemaining: payload.wallRemaining ?? current.wallRemaining,
+    wallRemaining: getWallRemainingValue(payload) ?? current.wallRemaining,
     turnStartedAt: Date.now(),
     availableActions: [],
     validActions: [],
     claimWindow: null,
+    reclaimFei: null,
     pendingDiscardTileId: null,
   };
 }
@@ -1202,6 +1539,7 @@ function mergeDrawnTile(current, payload = {}) {
     drawnTile: tile,
     handTiles: nextHandTiles,
     myHand: nextHandTiles,
+    wallRemaining: getWallRemainingValue(payload) ?? current.wallRemaining,
   };
 }
 
@@ -1221,6 +1559,23 @@ function mergeClaimWindow(current, payload = {}) {
     status: 'resolving',
     claimWindow: payload,
     availableActions: validActions,
+    timer: timerDeadlineMs ? getSecondsRemaining(timerDeadlineMs) : nextTimeLimit,
+    timeLimit: nextTimeLimit || current.timeLimit,
+    timerDeadlineMs,
+  };
+}
+
+function mergeFeiReclaimWindow(current, payload = {}) {
+  const reclaimFei = normalizeReclaimFeiWindow(payload);
+  if (!reclaimFei) return current;
+
+  const nextTimeLimit = Number(payload.timeLimit ?? payload.timer ?? payload.remainingSeconds ?? current.timer ?? 0) || 0;
+  const timerDeadlineMs = resolveTimerDeadlineMs(payload, nextTimeLimit);
+
+  return {
+    ...current,
+    status: 'resolving',
+    reclaimFei,
     timer: timerDeadlineMs ? getSecondsRemaining(timerDeadlineMs) : nextTimeLimit,
     timeLimit: nextTimeLimit || current.timeLimit,
     timerDeadlineMs,
@@ -1254,22 +1609,67 @@ function mergeActionBroadcast(current, payload = {}) {
     pendingDiscardTileId: null,
   };
 
+  if (FEI_RECLAIM_AVAILABLE_ACTIONS.has(action)) {
+    return mergeFeiReclaimWindow(next, payload);
+  }
+
+  if (FEI_RECLAIM_COMPLETE_ACTIONS.has(action)) {
+    next.reclaimFei = null;
+    next.pendingReclaimFei = null;
+    const payloadHandTiles = getFirstRawTileList(payload.handTiles, payload.myHand, payload.playerHand, payload.remainingHand, payload.currentPlayerHand, payload.hand);
+    if (payloadHandTiles.length) {
+      next.handTiles = payloadHandTiles;
+      next.myHand = payloadHandTiles;
+      next.playerHand = payloadHandTiles;
+    }
+  }
+
   if (action === 'draw') {
-    next.wallRemaining = payload.wallRemaining ?? current.wallRemaining;
+    next.wallRemaining = getWallRemainingValue(payload) ?? current.wallRemaining;
   }
 
   if (action === 'bonus_tile_revealed') {
-    const revealedTiles = normalizeTileList(payload.bonusTiles?.length ? payload.bonusTiles : [payload.tileId || payload.tile]);
-    next.wallRemaining = payload.wallRemaining ?? current.wallRemaining;
+    const revealedSource = [
+      payload.revealedBonusTiles,
+      payload.revealedBonus,
+      payload.bonusTiles,
+      payload.tiles,
+    ].find((value) => Array.isArray(value) && value.length)
+      || [payload.tileId || payload.tile || payload.bonusTile || payload.revealedTile].filter(Boolean);
+    const revealedTiles = normalizeTileList(revealedSource);
+    const positionToUpdate = normalizePosition(seatPosition);
+    next.wallRemaining = getWallRemainingValue(payload) ?? current.wallRemaining;
 
-    if (actionIds.length && Array.isArray(current.players)) {
+    if ((actionIds.length || positionToUpdate) && Array.isArray(current.players)) {
       next.players = current.players.map((player) => {
-        if (!playerMatchesAnyId(player, actionIds)) return player;
+        const isBonusPlayer = (actionIds.length && playerMatchesAnyId(player, actionIds))
+          || (positionToUpdate && normalizePosition(player.position) === positionToUpdate);
+
+        if (!isBonusPlayer) return player;
+
+        const currentBonusTiles = getFirstTileList(
+          player.bonusTiles,
+          player.revealedBonusTiles,
+          player.revealedBonus,
+          player.bonus,
+          player.flowers,
+          player.seasons,
+          player.animals
+        );
+
         return {
           ...player,
-          bonusTiles: revealedTiles.length ? revealedTiles : normalizeTileList(player.bonusTiles),
+          bonusTiles: revealedTiles.length
+            ? appendUniqueTileList(currentBonusTiles, revealedTiles)
+            : currentBonusTiles,
         };
       });
+    }
+
+    if (positionToUpdate && revealedTiles.length) {
+      const bonusTilesByPosition = { ...(current.bonusTiles || {}) };
+      bonusTilesByPosition[positionToUpdate] = appendUniqueTileList(bonusTilesByPosition[positionToUpdate], revealedTiles);
+      next.bonusTiles = bonusTilesByPosition;
     }
   }
 
@@ -1478,7 +1878,11 @@ function normalizeInitialSocketState(payload = {}, fallbackMatchId = '') {
     players,
     handTiles,
     myHand: handTiles,
-    wallRemaining: payload.wallRemaining ?? normalized.wallRemaining,
+    wallRemaining: getWallRemainingValue(payload) ?? getWallRemainingValue(normalized) ?? normalized.wallRemaining,
+    currentFan: payload.currentFan ?? payload.totalFan ?? payload.fanCount ?? normalized.currentFan,
+    minimumFan: payload.minimumFan ?? payload.minFan ?? payload.requiredFan ?? normalized.minimumFan,
+    fanInfo: payload.fanInfo || payload.fanSummary || payload.handEvaluation || payload.winPreview || normalized.fanInfo,
+    reclaimFei: normalizeReclaimFeiWindow(payload) || normalizeReclaimFeiWindow(normalized),
     currentDiscard: payload.currentDiscard ?? normalized.currentDiscard,
     playerCount: payload.playerCount ?? normalized.playerCount ?? players.length,
     maxPlayers: payload.maxPlayers ?? payload.room?.maxPlayers ?? normalized.maxPlayers ?? normalized.room?.maxPlayers,
@@ -1537,6 +1941,10 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
       timerDeadlineMs: 0,
       activeTurnPosition: 'left',
       availableActions: DEFAULT_ACTIONS,
+      wallRemaining: 52,
+      currentFan: MINIMUM_FAN_TO_WIN,
+      minimumFan: MINIMUM_FAN_TO_WIN,
+      reclaimFei: null,
     } : {}),
     matchId: resolvedMatchId,
   }));
@@ -1573,7 +1981,11 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         timerDeadlineMs: 0,
         activeTurnPosition: 'left',
         availableActions: DEFAULT_ACTIONS,
+        wallRemaining: normalizedMock.wallRemaining ?? 52,
+        currentFan: normalizedMock.currentFan ?? MINIMUM_FAN_TO_WIN,
+        minimumFan: normalizedMock.minimumFan ?? MINIMUM_FAN_TO_WIN,
         claimWindow: null,
+        reclaimFei: null,
         matchId: normalizedMock.matchId || resolvedMatchId,
       });
       setGameError('');
@@ -1660,6 +2072,10 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         case 'claim_window':
           setGameState((current) => mergeClaimWindow(current || {}, payload));
           break;
+        case 'fei_reclaim_window':
+          setGameState((current) => mergeFeiReclaimWindow(current || {}, payload));
+          setGameError('');
+          break;
         case 'action_broadcast':
         case 'tile_discarded':
           setGameState((current) => mergeActionBroadcast(current || {}, payload));
@@ -1689,7 +2105,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           break;
         case 'error':
           setGameState((current) => ({ ...(current || {}), pendingDiscardTileId: null }));
-          setGameError(payload.message || payload.error || 'Gameplay socket error.');
+          setGameError(getGameplayErrorMessage(payload, t));
           break;
         default:
           break;
@@ -1714,6 +2130,12 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
       ['game:turn_start', (payload) => handleSocketMessage({ type: 'turn_changed', payload })],
       ['player:drawn_tile', (payload) => handleSocketMessage({ type: 'drawn_tile', payload })],
       ['game:claim_window', (payload) => handleSocketMessage({ type: 'claim_window', payload })],
+      ['game:fei_reclaim_window', (payload) => handleSocketMessage({ type: 'fei_reclaim_window', payload })],
+      ['game:reclaim_fei_window', (payload) => handleSocketMessage({ type: 'fei_reclaim_window', payload })],
+      ['game:fei_reclaim_available', (payload) => handleSocketMessage({ type: 'fei_reclaim_window', payload })],
+      ['player:fei_reclaim_available', (payload) => handleSocketMessage({ type: 'fei_reclaim_window', payload })],
+      ['player:reclaim_fei_available', (payload) => handleSocketMessage({ type: 'fei_reclaim_window', payload })],
+      ['player:fei_reclaim_window', (payload) => handleSocketMessage({ type: 'fei_reclaim_window', payload })],
       ['game:action_broadcast', (payload) => handleSocketMessage({ type: 'action_broadcast', payload })],
       ['game:over', (payload) => handleSocketMessage({ type: 'game_finished', payload })],
       ['error', (payload) => handleSocketMessage({ type: 'error', payload })],
@@ -1823,10 +2245,13 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   const topDiscardTiles = getVisibleDiscardTilesByPosition(gameState, topPlayer, 'top');
   const rightDiscardTiles = hasRightPlayer ? getVisibleDiscardTilesByPosition(gameState, rightPlayer, 'right') : [];
   
-  const leftBonusTiles = getFirstTileList(leftPlayer?.bonusTiles);
-  const topBonusTiles = getFirstTileList(topPlayer?.bonusTiles);
-  const rightBonusTiles = hasRightPlayer ? getFirstTileList(rightPlayer?.bonusTiles) : [];
+  const leftBonusTiles = getFirstTileList(leftPlayer?.bonusTiles, gameState.bonusTiles?.left);
+  const topBonusTiles = getFirstTileList(topPlayer?.bonusTiles, gameState.bonusTiles?.top);
+  const rightBonusTiles = hasRightPlayer ? getFirstTileList(rightPlayer?.bonusTiles, gameState.bonusTiles?.right) : [];
   const shouldShowBonusRacks = isMockGameplay || leftBonusTiles.length || topBonusTiles.length || rightBonusTiles.length;
+  const wallRemaining = getWallRemainingValue(gameState);
+  const fanInfo = getFanDisplayInfo(gameState, leftPlayer);
+  const shouldShowGameplayInfo = wallRemaining !== null || fanInfo.hasCurrentFan;
   const leftOpenMelds = getOpenMeldsByPosition(gameState, leftPlayer, 'left');
   const topOpenMelds = getOpenMeldsByPosition(gameState, topPlayer, 'top');
   const rightOpenMelds = hasRightPlayer ? getOpenMeldsByPosition(gameState, rightPlayer, 'right') : [];
@@ -1841,6 +2266,8 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   ));
   const isClaimWindowOpen = Boolean(gameState.claimWindow);
   const availableActions = getAvailableActions(gameState, false);
+  const reclaimFeiWindow = normalizeReclaimFeiWindow(gameState.reclaimFei);
+  const isReclaimFeiPending = Boolean(gameState.pendingReclaimFei);
 
 
   useEffect(() => {
@@ -2008,6 +2435,11 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     }
 
     if (actionKey === 'hu') {
+      if (fanInfo.hasCurrentFan && fanInfo.currentFan < fanInfo.minimumFan) {
+        setGameError(t('minimumFanRequired'));
+        return;
+      }
+
       const sent = isClaimWindowOpen ? claimDiscard('ron') : declareWin('tsumo');
       if (!sent) setGameError('Unable to declare Hu. Waiting for gameplay socket connection.');
       return;
@@ -2024,6 +2456,42 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     const sent = claimDiscard(claimAction);
     if (!sent) {
       setGameError('Unable to send claim action. Waiting for gameplay socket connection.');
+    }
+  };
+
+  const handleConfirmReclaimFei = (option = {}) => {
+    const payload = buildFeiReclaimPayload(reclaimFeiWindow, option);
+
+    if (isMockGameplay) {
+      setGameState((current) => ({ ...(current || {}), reclaimFei: null, pendingReclaimFei: null }));
+      setGameError('');
+      return;
+    }
+
+    const sent = reclaimFei(payload);
+    if (sent) {
+      setGameState((current) => ({ ...(current || {}), pendingReclaimFei: payload }));
+      setGameError('');
+    } else {
+      setGameError(t('unableReclaimFei'));
+    }
+  };
+
+  const handleSkipReclaimFei = (option = {}) => {
+    const payload = buildFeiReclaimPayload(reclaimFeiWindow, option);
+
+    if (isMockGameplay) {
+      setGameState((current) => ({ ...(current || {}), reclaimFei: null, pendingReclaimFei: null }));
+      setGameError('');
+      return;
+    }
+
+    const sent = skipFeiReclaim(payload);
+    if (sent) {
+      setGameState((current) => ({ ...(current || {}), reclaimFei: null, pendingReclaimFei: null }));
+      setGameError('');
+    } else {
+      setGameError(t('unableSkipReclaimFei'));
     }
   };
 
@@ -2044,10 +2512,35 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         </div>
       ) : null}
 
+      <ReclaimFeiPrompt
+        windowState={reclaimFeiWindow}
+        t={t}
+        onConfirm={handleConfirmReclaimFei}
+        onSkip={handleSkipReclaimFei}
+        isPending={isReclaimFeiPending}
+      />
+
       <header className="gameplay-room-title">
         <span>{t('room')}</span>
         <strong>{gameState.room?.name || 'My Sakura Room'}</strong>
       </header>
+
+      {shouldShowGameplayInfo ? (
+        <div className="gameplay-info-panel" aria-label="Gameplay information">
+          {wallRemaining !== null ? (
+            <div className="gameplay-info-item">
+              <span>{t('wallRemaining')}</span>
+              <strong>{wallRemaining}</strong>
+            </div>
+          ) : null}
+          {fanInfo.hasCurrentFan ? (
+            <div className="gameplay-info-item">
+              <span>{t('fan')}</span>
+              <strong>{fanInfo.currentFan}/{fanInfo.minimumFan}</strong>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {topPlayer ? (
         <PlayerBadge

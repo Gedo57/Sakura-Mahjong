@@ -31,6 +31,8 @@ export const GAME_SOCKET_EVENTS = {
   actionBroadcast: 'game:action_broadcast',
   syncState: 'game:sync_state',
   gameOver: 'game:over',
+  feiReclaimWindow: 'game:fei_reclaim_window',
+  playerFeiReclaimAvailable: 'player:fei_reclaim_available',
   error: 'error',
   gameError: 'game:error',
   roomError: 'room:error',
@@ -53,6 +55,8 @@ const SERVER_EVENTS_TO_LISTEN = [
   GAME_SOCKET_EVENTS.actionBroadcast,
   GAME_SOCKET_EVENTS.syncState,
   GAME_SOCKET_EVENTS.gameOver,
+  GAME_SOCKET_EVENTS.feiReclaimWindow,
+  GAME_SOCKET_EVENTS.playerFeiReclaimAvailable,
   GAME_SOCKET_EVENTS.error,
   GAME_SOCKET_EVENTS.gameError,
   GAME_SOCKET_EVENTS.roomError,
@@ -72,6 +76,10 @@ const SERVER_EVENTS_TO_LISTEN = [
   'tileDiscarded',
   'game_finished',
   'gameFinished',
+  'game:reclaim_fei_window',
+  'game:fei_reclaim_available',
+  'player:reclaim_fei_available',
+  'player:fei_reclaim_window',
 ];
 
 let activeSocket = null;
@@ -91,6 +99,7 @@ function rememberGameSocketMessage(message) {
     'action_broadcast',
     'tile_discarded',
     'game_finished',
+    'fei_reclaim_window',
     'match_found',
     'player_disconnected',
     'error',
@@ -234,6 +243,17 @@ export function normalizeSocketMessage(message) {
 
   if (originalEvent === GAME_SOCKET_EVENTS.actionBroadcast) {
     return { type: 'action_broadcast', payload, originalEvent };
+  }
+
+  if (
+    originalEvent === GAME_SOCKET_EVENTS.feiReclaimWindow
+    || originalEvent === GAME_SOCKET_EVENTS.playerFeiReclaimAvailable
+    || originalEvent === 'game:reclaim_fei_window'
+    || originalEvent === 'game:fei_reclaim_available'
+    || originalEvent === 'player:reclaim_fei_available'
+    || originalEvent === 'player:fei_reclaim_window'
+  ) {
+    return { type: 'fei_reclaim_window', payload, originalEvent };
   }
 
   if (originalEvent === 'tile_discarded' || originalEvent === 'tileDiscarded') {
@@ -567,6 +587,14 @@ export function claimDiscard(action) {
 
 export function passClaimWindow() {
   return emitOnActiveSocket('player:pass', {});
+}
+
+export function reclaimFei(payload = {}) {
+  return emitOnActiveSocket('player:reclaim_fei', payload);
+}
+
+export function skipFeiReclaim(payload = {}) {
+  return emitOnActiveSocket('player:skip_fei_reclaim', payload);
 }
 
 export function declareWin(type = 'tsumo') {
