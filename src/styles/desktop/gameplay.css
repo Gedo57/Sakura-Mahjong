@@ -1233,8 +1233,8 @@ animation: none;
 }
 
 .app-shell[data-device='desktop'] .gameplay-bonus-rack--right {
-  top: 40%;
-  right: 16.8%;
+  top: 20%;
+  right: 22.8%;
    transform: scale(0.95);
   transform-origin: top right;
 }

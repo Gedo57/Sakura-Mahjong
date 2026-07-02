@@ -7,7 +7,6 @@ import { normalizeGameState } from '../services/gameNormalizers.js';
 import {
   claimDiscard,
   connectGameSocket,
-  declareRiichi,
   declareWin,
   discardTile,
   disconnectGameSocket,
@@ -116,7 +115,6 @@ const normalizeGameplayPlayer = (player = {}, index = 0) => {
     seat: player.seat,
     seatLabel: player.seatLabel || player.seatName || '',
     isDealer: Boolean(player.isDealer ?? player.dealer),
-    isRiichi: Boolean(player.isRiichi ?? player.riichi),
     isDisconnected: Boolean(player.isDisconnected ?? player.disconnected),
     handTiles,
     hand: player.hand || player.handTiles || [],
@@ -335,7 +333,6 @@ const ACTION_TO_UI = {
   hule: 'hu',
   win: 'hu',
   tsumo: 'hu',
-  riichi: 'riichi',
   pass: 'pass',
 };
 const CLAIM_ACTION_ALIASES = {
@@ -351,7 +348,11 @@ const CLAIM_ACTION_ALIASES = {
   hule: 'ron',
   win: 'ron',
 };
-const normalizeActionForUi = (action) => ACTION_TO_UI[String(action || '').toLowerCase()] || String(action || '').toLowerCase();
+const MALAYSIAN_DISABLED_ACTIONS = new Set(['riichi']);
+const normalizeActionForUi = (action) => {
+  const normalized = ACTION_TO_UI[String(action || '').toLowerCase()] || String(action || '').toLowerCase();
+  return MALAYSIAN_DISABLED_ACTIONS.has(normalized) ? '' : normalized;
+};
 const EMPTY_SOCKET_GAME_STATE = {
   status: 'waiting',
   players: [],
@@ -473,6 +474,11 @@ const TILE_ASSET_ALIASES = {
   Animal_Cat: 'an_cat.png',
   Animal_Mouse: 'an_mouse.png',
   Animal_Chicken: 'an_chicken.png',
+  Animal_Rooster: 'an_chicken.png',
+  Animal_Rooster_1: 'an_chicken.png',
+  Rooster: 'an_chicken.png',
+  rooster: 'an_chicken.png',
+  an_rooster: 'an_chicken.png',
   Animal_Centipede: 'an_centipede.png',
   Joker_Clown: 'joker_clown.png',
   Joker: 'joker_clown.png',
@@ -556,8 +562,8 @@ const tileIdToAssetName = (tileId) => {
     return `sn_${rank}.png`;
   }
 
-  if (suit === 'an' && ['cat', 'mouse', 'chicken', 'centipede'].includes(rank)) {
-    return `an_${rank}.png`;
+  if (suit === 'an' && ['cat', 'mouse', 'chicken', 'rooster', 'centipede'].includes(rank)) {
+    return rank === 'rooster' ? 'an_chicken.png' : `an_${rank}.png`;
   }
 
   if (suit === 'joker' && rank === 'clown') {
@@ -971,7 +977,6 @@ const actionDefinitions = {
   pass: { labelKey: 'pass', className: 'black' },
   ron: { labelKey: 'win', className: 'orange' },
   tsumo: { labelKey: 'win', className: 'orange' },
-  riichi: { labelKey: 'riichi', className: 'blue' },
 };
 
 function GameplayTile({ name, className = '', label = '' }) {
@@ -2014,12 +2019,6 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
       return;
     }
 
-    if (actionKey === 'riichi') {
-      const drawnTile = gameState.drawnTile || rawPlayerHandTiles[rawPlayerHandTiles.length - 1];
-      const sent = declareRiichi(getTileId(drawnTile));
-      if (!sent) setGameError('Unable to declare Riichi. Waiting for gameplay socket connection.');
-      return;
-    }
 
     const claimAction = CLAIM_ACTION_ALIASES[actionKey] || actionKey;
     const sent = claimDiscard(claimAction);

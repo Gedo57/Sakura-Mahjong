@@ -28,11 +28,14 @@ function getPrivateHandTilesFromPlayers(players = []) {
   return privatePlayer?.hand || privatePlayer?.handTiles || privatePlayer?.tiles || [];
 }
 
+const MALAYSIAN_DISABLED_ACTIONS = new Set(['riichi']);
+
 function normalizeActionList(actions) {
   return toArray(actions)
     .map((action) => (typeof action === 'string' ? action : action?.type || action?.key || action?.name || action?.action))
     .map((action) => String(action || '').trim())
     .filter(Boolean)
+    .filter((action) => !MALAYSIAN_DISABLED_ACTIONS.has(String(action || '').toLowerCase()))
     .filter((action, index, list) => list.indexOf(action) === index);
 }
 
@@ -56,7 +59,6 @@ export function normalizePlayer(player = {}, index = 0) {
     seat: player.seat,
     seatLabel: player.seatLabel || player.seatName || player.seatTitle || '',
     isDealer: Boolean(player.isDealer ?? player.dealer),
-    isRiichi: Boolean(player.isRiichi ?? player.riichi),
     isDisconnected: Boolean(player.isDisconnected ?? player.disconnected),
     handTiles,
     hand: player.hand || player.handTiles || [],

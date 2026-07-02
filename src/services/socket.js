@@ -573,14 +573,6 @@ export function declareWin(type = 'tsumo') {
   return emitOnActiveSocket('player:declare_win', { type });
 }
 
-export function declareRiichi(tileId) {
-  if (!tileId) {
-    console.warn('[game-socket] declareRiichi called without tileId.');
-    return false;
-  }
-
-  return emitOnActiveSocket('player:declare_riichi', { tileId });
-}
 
 export function leaveLobby(roomId) {
   if (!roomId) {
