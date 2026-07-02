@@ -239,7 +239,7 @@ const collectGameplayPlayers = (...sources) => {
 };
 
 const seatPlayersForGameplay = (sourcePlayers, expectedPlayerCount = 3, currentIds = [], currentSeat = '') => {
-  const allowedPositions = expectedPlayerCount <= 2 ? ['left', 'top'] : ['left', 'top', 'right'];
+  const allowedPositions = expectedPlayerCount <= 2 ? ['bottom', 'top'] : ['bottom', 'top', 'left'];
   const normalizedPlayers = toArray(sourcePlayers)
     .filter(Boolean)
     .map(normalizeGameplayPlayer)
@@ -247,32 +247,30 @@ const seatPlayersForGameplay = (sourcePlayers, expectedPlayerCount = 3, currentI
 
   if (!normalizedPlayers.length) return [];
 
-  const playersWithPosition = normalizedPlayers.map((player, index) => {
-    const requestedPosition = normalizePosition(player.position);
+  const playersWithPosition = normalizedPlayers.map((player) => {
     const seatPosition = player.seat && currentSeat
       ? getRelativeSeatPosition(player.seat, currentSeat, expectedPlayerCount)
       : '';
+    const requestedPosition = normalizePosition(player.position);
     const isCurrent = player.isCurrentPlayer || player.isMe || player.isSelf || playerMatchesAnyId(player, currentIds);
 
     return {
       ...player,
-      position: isCurrent ? 'left' : (requestedPosition || seatPosition || ''),
+      position: isCurrent ? 'bottom' : (seatPosition || requestedPosition || ''),
     };
   });
 
-  // Find the true local player first, ignoring the default 'left' string which might be misassigned
   let currentIndex = playersWithPosition.findIndex((player) => player.isCurrentPlayer || player.isMe || player.isSelf || playerMatchesAnyId(player, currentIds));
-  
-  // If not found, fallback to 'left'
+
   if (currentIndex === -1) {
-    currentIndex = playersWithPosition.findIndex((player) => player.position === 'left');
+    currentIndex = playersWithPosition.findIndex((player) => player.position === 'bottom');
   }
 
   if (currentIndex > 0) {
     const [currentPlayer] = playersWithPosition.splice(currentIndex, 1);
-    playersWithPosition.unshift({ ...currentPlayer, position: 'left' });
+    playersWithPosition.unshift({ ...currentPlayer, position: 'bottom' });
   } else if (currentIndex === 0) {
-    playersWithPosition[0] = { ...playersWithPosition[0], position: 'left' };
+    playersWithPosition[0] = { ...playersWithPosition[0], position: 'bottom' };
   }
 
   const usedPositions = new Set();
@@ -1070,7 +1068,7 @@ const dedupeMeldRacksByOwnership = (meldsByPosition = {}, state = {}) => {
   const next = {};
   const seenOwnerless = new Set();
 
-  ['left', 'top', 'right'].forEach((position) => {
+  ['bottom', 'top', 'left'].forEach((position) => {
     next[position] = dedupeMeldListBySignature(meldsByPosition[position] || []).filter((meld) => {
       const signature = getMeldSignature(meld);
       if (!signature) return false;
@@ -1703,8 +1701,12 @@ const getCurrentPlayerSeat = (...sources) => {
 
 const normalizePosition = (value) => {
   const position = String(value || '').toLowerCase();
-  return ['left', 'top', 'right'].includes(position) ? position : '';
+  if (position === 'self' || position === 'me' || position === 'mine') return 'bottom';
+  if (position === 'right') return '';
+  return ['bottom', 'top', 'left', 'center'].includes(position) ? position : '';
 };
+
+const isBottomPosition = (position) => normalizePosition(position) === 'bottom';
 
 const resolveActiveTurnPosition = ({ state, players, locationState, storedMatch, useMockFallback = false }) => {
   const explicitPosition = normalizePosition(state.activeTurnPosition || state.currentTurnPosition || state.turnPosition);
@@ -1723,15 +1725,15 @@ const resolveActiveTurnPosition = ({ state, players, locationState, storedMatch,
     if (activePlayer?.position) return activePlayer.position;
 
     const currentIds = getCurrentPlayerIdCandidates(state, locationState, storedMatch);
-    if (activeIds.some((id) => currentIds.includes(id))) return 'left';
+    if (activeIds.some((id) => currentIds.includes(id))) return 'bottom';
   }
 
   const currentSeat = getCurrentPlayerSeat(state, locationState, storedMatch);
   if (currentSeat && activeSeat && String(currentSeat).toLowerCase() === String(activeSeat).toLowerCase()) {
-    return 'left';
+    return 'bottom';
   }
 
-  return useMockFallback ? 'left' : '';
+  return useMockFallback ? 'bottom' : '';
 };
 
 const actionDefinitions = {
@@ -1950,7 +1952,7 @@ function getRelativeSeatPosition(activeSeat, ownSeat, playerCount = 3) {
   const own = normalizeSeat(ownSeat);
 
   if (!active || !own) return '';
-  if (active === own) return 'left';
+  if (active === own) return 'bottom';
 
   const seats = playerCount > 3 ? ['e', 's', 'w', 'n'] : ['e', 's', 'w'];
   const activeIndex = seats.indexOf(active);
@@ -1960,9 +1962,8 @@ function getRelativeSeatPosition(activeSeat, ownSeat, playerCount = 3) {
   if (playerCount <= 2) return 'top';
 
   const offset = (activeIndex - ownIndex + seats.length) % seats.length;
-  if (offset === 1) return 'right';
-  if (offset === 2) return 'top';
-  if (offset === 3) return 'top';
+  if (offset === 1) return 'top';
+  if (offset === 2) return 'left';
 
   return '';
 }
@@ -2048,7 +2049,7 @@ function mergeDrawnTile(current, payload = {}) {
     payload,
     rawTileId: tile,
     tileName: renderedTile,
-    position: 'left',
+    position: 'bottom',
     visibility: 'private',
     label: 'DRAW',
   });
@@ -2125,7 +2126,7 @@ function mergeActionBroadcast(current, payload = {}) {
   if (!action) return current;
 
   const currentIds = getCurrentPlayerIdCandidates(current);
-  const isLocalActionPlayer = seatPosition === 'left' || (actionIds.length && actionIds.some((id) => currentIds.includes(id)));
+  const isLocalActionPlayer = isBottomPosition(seatPosition) || (actionIds.length && actionIds.some((id) => currentIds.includes(id)));
   const isLocalDiscard = action === 'discard' && isLocalActionPlayer;
 
   const next = {
@@ -2155,7 +2156,7 @@ function mergeActionBroadcast(current, payload = {}) {
     next.pendingReclaimFei = null;
     const payloadHandTiles = getFirstRawTileList(payload.handTiles, payload.myHand, payload.playerHand, payload.remainingHand, payload.currentPlayerHand, payload.hand);
     const isReclaimConfirm = ['fei_reclaimed', 'reclaim_fei', 'reclaim_fei_confirmed', 'replace_fei'].includes(action);
-    const isLocalReclaimPlayer = seatPosition === 'left' || (actionIds.length && actionIds.some((id) => currentIds.includes(id)));
+    const isLocalReclaimPlayer = isBottomPosition(seatPosition) || (actionIds.length && actionIds.some((id) => currentIds.includes(id)));
     const replacementTileId = payload.replacementTileId || payload.actualTileId || payload.tileId;
     const feiTileId = payload.feiTileId || payload.feiTile || 'fei';
     const nextMeldTiles = getFirstTileList(payload.meldTiles, payload.tiles, payload.openMeld?.tiles, payload.meld?.tiles);
@@ -2212,7 +2213,7 @@ function mergeActionBroadcast(current, payload = {}) {
         payload,
         rawTileId: payload.tileVisibility === 'hidden' ? '' : tileId,
         tileName: payload.tileVisibility === 'hidden' ? (payload.tileBack || 'tile_back.png') : tileIdToAssetName(tileId),
-        position: seatPosition || (isLocalActionPlayer ? 'left' : 'center'),
+        position: seatPosition || (isLocalActionPlayer ? 'bottom' : 'center'),
         visibility: payload.tileVisibility || 'hidden',
         label: 'DRAW',
       });
@@ -2282,8 +2283,8 @@ function mergeActionBroadcast(current, payload = {}) {
     const renderedTile = tileIdToAssetName(tileId);
     const discards = { ...(current.discards || {}) };
     const currentIds = getCurrentPlayerIdCandidates(current);
-    const isLocalDiscard = seatPosition === 'left' || (actionIds.length && actionIds.some((id) => currentIds.includes(id)));
-    const key = seatPosition || (isLocalDiscard ? 'left' : 'center');
+    const isLocalDiscard = isBottomPosition(seatPosition) || (actionIds.length && actionIds.some((id) => currentIds.includes(id)));
+    const key = seatPosition || (isLocalDiscard ? 'bottom' : 'center');
 
     discards[key] = [...normalizeTileList(discards[key]), renderedTile];
     next.discards = discards;
@@ -2378,7 +2379,7 @@ function mergeActionBroadcast(current, payload = {}) {
       };
       const hasActionIdentity = Boolean(actionIds.length || positionToUpdate);
       const currentIds = getCurrentPlayerIdCandidates(current);
-      const isLocalActionPlayer = positionToUpdate === 'left'
+      const isLocalActionPlayer = isBottomPosition(positionToUpdate)
         || (actionIds.length && actionIds.some((id) => currentIds.includes(id)));
       const payloadHandTiles = getFirstRawTileList(
         payload.handTiles,
@@ -2470,7 +2471,7 @@ function mergeActionBroadcast(current, payload = {}) {
 
       if ((tileId || renderedClaimedTile) && !isSelfDeclaredKong) {
         const discards = { ...(current.discards || {}) };
-        const priorityPositions = [sourcePosition, 'center', 'left', 'top', 'right'].filter(Boolean);
+        const priorityPositions = [sourcePosition, 'center', 'bottom', 'top', 'left'].filter(Boolean);
         const uniquePositions = priorityPositions.filter((position, index, list) => list.indexOf(position) === index);
         let removedFromStateDiscard = false;
 
@@ -2593,7 +2594,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
       timer: 999,
       timeLimit: 999,
       timerDeadlineMs: 0,
-      activeTurnPosition: 'left',
+      activeTurnPosition: 'bottom',
       availableActions: DEFAULT_ACTIONS,
       wallRemaining: 52,
       currentFan: MINIMUM_FAN_TO_WIN,
@@ -2633,7 +2634,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         timer: 999,
         timeLimit: 999,
         timerDeadlineMs: 0,
-        activeTurnPosition: 'left',
+        activeTurnPosition: 'bottom',
         availableActions: DEFAULT_ACTIONS,
         wallRemaining: normalizedMock.wallRemaining ?? 52,
         currentFan: normalizedMock.currentFan ?? MINIMUM_FAN_TO_WIN,
@@ -2867,12 +2868,12 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
 
   const fallbackCurrentPlayer = normalizeGameplayPlayer(getGameplayCurrentIdentity(gameState, location.state, storedMatch, initialSocketPayload), 0);
   const topPlayer = players.find((player) => player.position === 'top') || null;
-  const leftPlayer = players.find((player) => player.position === 'left') || { ...fallbackCurrentPlayer, position: 'left' };
-  const rightPlayer = players.find((player) => player.position === 'right') || null;
+  const sidePlayer = players.find((player) => player.position === 'left') || null;
+  const bottomPlayer = players.find((player) => player.position === 'bottom') || { ...fallbackCurrentPlayer, position: 'bottom' };
   const realPlayerCount = players.filter((player) => !isGameplayPlaceholderPlayer(player)).length;
   const isLiveGameStateIncomplete = socketGameplayEnabled && !gameApiAvailable && realPlayerCount < expectedPlayerCount;
   const shouldShowSyncWarning = isLiveGameStateIncomplete && !gameState.activeUserId && !gameState.activeSeat && !gameState.claimWindow;
-  const hasRightPlayer = expectedPlayerCount >= 3 && Boolean(rightPlayer);
+  const hasSidePlayer = expectedPlayerCount >= 3 && Boolean(sidePlayer);
 
   const activeTurnPosition = resolveActiveTurnPosition({
     state: gameState,
@@ -2881,11 +2882,11 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     storedMatch,
     useMockFallback: gameApiAvailable || isMockGameplay,
   });
-  const isUserTurn = activeTurnPosition === 'left';
+  const isUserTurn = activeTurnPosition === 'bottom';
   const activeTurnName = activeTurnPosition === 'top'
     ? (topPlayer?.name === 'BUNBUN' ? 'Bunbun' : topPlayer?.name || 'Waiting')
-    : activeTurnPosition === 'right'
-      ? (rightPlayer?.name || 'Waiting')
+    : activeTurnPosition === 'left'
+      ? (sidePlayer?.name || 'Waiting')
       : 'Your';
   const activeTurnLabel = activeTurnPosition
     ? (isUserTurn ? t('yourTurn') : `${activeTurnName}${t('turnSuffix')}`)
@@ -2896,30 +2897,30 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     gameState.playerHand,
     gameState.myHand,
     gameState.currentPlayerHand,
-    ...(gameApiAvailable ? [getPlayerTileList(leftPlayer, 'handTiles', 'hand', 'tiles')] : [])
+    ...(gameApiAvailable ? [getPlayerTileList(bottomPlayer, 'handTiles', 'hand', 'tiles')] : [])
   );
   const playerHandTiles = rawPlayerHandTiles
     .map((tile, index) => normalizeHandTileEntry(tile, index))
     .filter(Boolean);
-  const leftDiscardTiles = getVisibleDiscardTilesByPosition(gameState, leftPlayer, 'left');
+  const bottomDiscardTiles = getVisibleDiscardTilesByPosition(gameState, bottomPlayer, 'bottom');
   const topDiscardTiles = getVisibleDiscardTilesByPosition(gameState, topPlayer, 'top');
-  const rightDiscardTiles = hasRightPlayer ? getVisibleDiscardTilesByPosition(gameState, rightPlayer, 'right') : [];
+  const sideDiscardTiles = hasSidePlayer ? getVisibleDiscardTilesByPosition(gameState, sidePlayer, 'left') : [];
   
-  const leftBonusTiles = getFirstTileList(leftPlayer?.bonusTiles, gameState.bonusTiles?.left);
+  const bottomBonusTiles = getFirstTileList(bottomPlayer?.bonusTiles, gameState.bonusTiles?.bottom, gameState.bonusTiles?.left);
   const topBonusTiles = getFirstTileList(topPlayer?.bonusTiles, gameState.bonusTiles?.top);
-  const rightBonusTiles = hasRightPlayer ? getFirstTileList(rightPlayer?.bonusTiles, gameState.bonusTiles?.right) : [];
-  const shouldShowBonusRacks = isMockGameplay || leftBonusTiles.length || topBonusTiles.length || rightBonusTiles.length;
+  const sideBonusTiles = hasSidePlayer ? getFirstTileList(sidePlayer?.bonusTiles, gameState.bonusTiles?.left) : [];
+  const shouldShowBonusRacks = isMockGameplay || bottomBonusTiles.length || topBonusTiles.length || sideBonusTiles.length;
   const wallRemaining = getWallRemainingValue(gameState);
-  const fanInfo = getFanDisplayInfo(gameState, leftPlayer);
+  const fanInfo = getFanDisplayInfo(gameState, bottomPlayer);
   const shouldShowGameplayInfo = wallRemaining !== null || fanInfo.hasCurrentFan;
   const openMeldsByPosition = dedupeMeldRacksByOwnership({
-    left: getOpenMeldsByPosition(gameState, leftPlayer, 'left'),
+    bottom: getOpenMeldsByPosition(gameState, bottomPlayer, 'bottom'),
     top: getOpenMeldsByPosition(gameState, topPlayer, 'top'),
-    right: hasRightPlayer ? getOpenMeldsByPosition(gameState, rightPlayer, 'right') : [],
+    left: hasSidePlayer ? getOpenMeldsByPosition(gameState, sidePlayer, 'left') : [],
   }, gameState);
-  const leftOpenMelds = openMeldsByPosition.left;
+  const bottomOpenMelds = openMeldsByPosition.bottom;
   const topOpenMelds = openMeldsByPosition.top;
-  const rightOpenMelds = openMeldsByPosition.right;
+  const sideOpenMelds = openMeldsByPosition.left;
   const centerDiscardTiles = getCircularTableTiles(getFirstTileList(
     gameState.centerTiles,
     gameState.centerDiscardTiles,
@@ -2943,7 +2944,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   const claimAvailableActions = isClaimWindowOpen && !isFeiReclaimBlocking
     ? baseAvailableActions.filter((action) => CLAIM_WINDOW_ONLY_ACTIONS.has(action) || action === 'hu')
     : [];
-  const localKongPayload = getLocalKongCandidatePayload(playerHandTiles, leftOpenMelds);
+  const localKongPayload = getLocalKongCandidatePayload(playerHandTiles, bottomOpenMelds);
   const localKongAvailable = Boolean(isUserTurn && !hasUserDiscardedThisTurn && !isClaimWindowOpen && !isFeiReclaimBlocking && localKongPayload);
   const availableActions = localKongAvailable && !turnAvailableActions.includes('kong')
     ? [...turnAvailableActions, 'kong']
@@ -3185,7 +3186,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         setGameState((current) => ({
           ...(current || {}),
           players: toArray(current?.players).map((player) => {
-            if (normalizePosition(player.position) !== 'left') return player;
+            if (!isBottomPosition(player.position)) return player;
             const currentOpenMelds = normalizeMeldList(player.openMelds || player.melds || []);
             return {
               ...player,
@@ -3363,28 +3364,28 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
       ) : null}
 
       <PlayerBadge
-        className="left-player"
-        variant="left"
-        avatar={leftPlayer.avatar}
-        name={leftPlayer.name === 'STEIVE' ? 'Stevie' : leftPlayer.name}
-        title={leftPlayer.title}
-        seatLabel={leftPlayer.seatLabel}
-        coins={leftPlayer.coins}
-        isActiveTurn={activeTurnPosition === 'left'}
-        turnLabel={activeTurnPosition === 'left' ? activeTurnLabel : ''}
+        className="bottom-player"
+        variant="bottom"
+        avatar={bottomPlayer.avatar}
+        name={bottomPlayer.name === 'STEIVE' ? 'Stevie' : bottomPlayer.name}
+        title={bottomPlayer.title}
+        seatLabel={bottomPlayer.seatLabel}
+        coins={bottomPlayer.coins}
+        isActiveTurn={activeTurnPosition === 'bottom'}
+        turnLabel={activeTurnPosition === 'bottom' ? activeTurnLabel : ''}
       />
 
-      {hasRightPlayer ? (
+      {hasSidePlayer ? (
         <PlayerBadge
-          className="right-player"
-          variant="right"
-          avatar={rightPlayer.avatar}
-          name={rightPlayer.name}
-          title={rightPlayer.title}
-          seatLabel={rightPlayer.seatLabel}
-          coins={rightPlayer.coins}
-          isActiveTurn={activeTurnPosition === 'right'}
-          turnLabel={activeTurnPosition === 'right' ? activeTurnLabel : ''}
+          className="left-opponent-player"
+          variant="left"
+          avatar={sidePlayer.avatar}
+          name={sidePlayer.name}
+          title={sidePlayer.title}
+          seatLabel={sidePlayer.seatLabel}
+          coins={sidePlayer.coins}
+          isActiveTurn={activeTurnPosition === 'left'}
+          turnLabel={activeTurnPosition === 'left' ? activeTurnLabel : ''}
         />
       ) : null}
 
@@ -3407,15 +3408,15 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         <BonusTileRack position="top" tiles={topBonusTiles} label={t('bonusTiles')} visible={shouldShowBonusRacks} />
         <PlayerMeldRack position="top" melds={topOpenMelds} />
 
-        {hasRightPlayer ? (
+        {hasSidePlayer ? (
           <>
-            <div className="gameplay-right-discard" aria-label="Right discard tiles">
-              {rightDiscardTiles.map((tile, index) => (
-                <GameplayTile name={tile} className={getDiscardTileClassName(tile, index, rightDiscardTiles, 'right')} key={`${tile}-${index}`} />
+            <div className="gameplay-side-discard" aria-label="Left opponent discard tiles">
+              {sideDiscardTiles.map((tile, index) => (
+                <GameplayTile name={tile} className={getDiscardTileClassName(tile, index, sideDiscardTiles, 'left')} key={`${tile}-${index}`} />
               ))}
             </div>
-            <BonusTileRack position="right" tiles={rightBonusTiles} label={t('bonusTiles')} visible={shouldShowBonusRacks} />
-            <PlayerMeldRack position="right" melds={rightOpenMelds} />
+            <BonusTileRack position="left" tiles={sideBonusTiles} label={t('bonusTiles')} visible={shouldShowBonusRacks} />
+            <PlayerMeldRack position="left" melds={sideOpenMelds} />
           </>
         ) : null}
 
@@ -3425,13 +3426,13 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           ))}
         </div>
 
-        <div className="gameplay-left-discard" aria-label="Your discard tiles">
-          {leftDiscardTiles.map((tile, index) => (
-            <GameplayTile name={tile} className={getDiscardTileClassName(tile, index, leftDiscardTiles, 'left')} key={`${tile}-${index}`} />
+        <div className="gameplay-bottom-discard" aria-label="Your discard tiles">
+          {bottomDiscardTiles.map((tile, index) => (
+            <GameplayTile name={tile} className={getDiscardTileClassName(tile, index, bottomDiscardTiles, 'bottom')} key={`${tile}-${index}`} />
           ))}
         </div>
-        <BonusTileRack position="left" tiles={leftBonusTiles} label={t('bonusTiles')} visible={shouldShowBonusRacks} />
-        <PlayerMeldRack position="left" melds={leftOpenMelds} />
+        <BonusTileRack position="bottom" tiles={bottomBonusTiles} label={t('bonusTiles')} visible={shouldShowBonusRacks} />
+        <PlayerMeldRack position="bottom" melds={bottomOpenMelds} />
 
         <div className="gameplay-hand" aria-label="Player hand tiles">
           {playerHandTiles.map((tile, index) => {

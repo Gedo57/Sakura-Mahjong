@@ -2219,3 +2219,170 @@ animation: none;
 .app-shell[data-device='desktop'] .gameplay-tile-focus--top { top: 37%; }
 .app-shell[data-device='desktop'] .gameplay-tile-focus--left { top: 57%; }
 .app-shell[data-device='desktop'] .gameplay-tile-focus--right { left: 60%; top: 48%; }
+
+/* Patch — 3P seat authority: no right-side player. Positions are bottom/top/left. */
+.app-shell[data-device='desktop'] .gameplay-player-badge.bottom {
+  left: 34px !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: 76px !important;
+  width: 228px !important;
+  min-height: 84px !important;
+  padding: 10px 12px 10px 94px !important;
+  border-radius: 15px !important;
+  flex-direction: row !important;
+  text-align: left !important;
+  transform: none !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-player-badge.bottom .gameplay-player-avatar {
+  position: absolute !important;
+  left: -13px !important;
+  top: 50% !important;
+  width: 102px !important;
+  height: 102px !important;
+  margin: 0 !important;
+  transform: translateY(-56%) !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-player-badge.bottom .gameplay-player-info strong { font-size: 24px !important; }
+.app-shell[data-device='desktop'] .gameplay-player-badge.bottom .gameplay-player-info small { font-size: 12px !important; }
+.app-shell[data-device='desktop'] .gameplay-player-badge.bottom .gameplay-player-info span { font-size: 23px !important; }
+
+.app-shell[data-device='desktop'] .gameplay-player-badge.bottom .gameplay-turn-badge {
+  top: -24px !important;
+  left: 92px !important;
+  right: auto !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-player-badge.bottom .gameplay-turn-arrow {
+  right: -34px !important;
+  left: auto !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+}
+
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left {
+  left: 62px !important;
+  right: auto !important;
+  top: 318px !important;
+  bottom: auto !important;
+  width: 132px !important;
+  min-height: 184px !important;
+  padding: 10px 8px 12px !important;
+  border-radius: 16px !important;
+  flex-direction: column !important;
+  text-align: center !important;
+  transform: none !important;
+}
+
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left::before { content: none !important; }
+
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left .gameplay-player-avatar {
+  position: static !important;
+  width: 96px !important;
+  height: 96px !important;
+  margin: 0 auto 8px !important;
+  transform: none !important;
+}
+
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left .gameplay-player-info {
+  width: 100% !important;
+  text-align: center !important;
+}
+
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left .gameplay-player-info strong { font-size: 21px !important; }
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left .gameplay-player-info small { font-size: 11px !important; }
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left .gameplay-player-info span { justify-content: center !important; font-size: 20px !important; }
+
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left .gameplay-turn-badge {
+  left: -8px !important;
+  right: auto !important;
+  top: -28px !important;
+}
+
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left .gameplay-turn-arrow {
+  left: -30px !important;
+  right: auto !important;
+  top: 50% !important;
+  transform: translateY(-50%) rotate(180deg) !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bottom-discard {
+  position: absolute !important;
+  left: 50% !important;
+  bottom: 196px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transform: translateX(-50%) scale(.62) !important;
+  z-index: 14 !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-side-discard {
+  position: absolute !important;
+  left: 27.5% !important;
+  top: 36% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  transform: scale(.62) !important;
+  transform-origin: top left !important;
+  z-index: 14 !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-side-discard .gameplay-tile {
+  margin-top: 3px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bonus-rack--bottom {
+  right: 84.5% !important;
+  bottom: 20% !important;
+  transform: scale(1) !important;
+  transform-origin: bottom right !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bonus-rack--left {
+  left: 11.5% !important;
+  right: auto !important;
+  top: 40% !important;
+  bottom: auto !important;
+  transform: scale(0.85) !important;
+  transform-origin: top left !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bonus-rack--left .gameplay-bonus-rack-body {
+  flex-direction: column !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--bottom {
+  left: var(--gp-meld-left-x) !important;
+  bottom: var(--gp-meld-left-bottom) !important;
+  max-width: 460px !important;
+  flex-wrap: wrap !important;
+  transform: translateX(-50%) scale(.68) !important;
+  transform-origin: bottom center !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--left {
+  top: 35% !important;
+  left: 20% !important;
+  right: auto !important;
+  bottom: auto !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  max-height: 250px !important;
+  transform: scale(.8) !important;
+  transform-origin: top left !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--left .gameplay-meld-tiles {
+  flex-direction: column !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--left .gameplay-meld-tiles .gameplay-tile {
+  margin-left: 0 !important;
+  margin-top: 2px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-tile-focus--bottom { top: 57% !important; }
+.app-shell[data-device='desktop'] .gameplay-tile-focus--left { left: 40% !important; top: 50% !important; }

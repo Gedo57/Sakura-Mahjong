@@ -30,6 +30,12 @@ function getPrivateHandTilesFromPlayers(players = []) {
 
 const MALAYSIAN_DISABLED_ACTIONS = new Set(['riichi']);
 
+const normalizeLayoutPosition = (value) => {
+  const position = String(value || '').toLowerCase();
+  if (position === 'self' || position === 'me' || position === 'mine') return 'bottom';
+  return ['bottom', 'top', 'left'].includes(position) ? position : '';
+};
+
 function normalizeActionList(actions) {
   return toArray(actions)
     .map((action) => (typeof action === 'string' ? action : action?.type || action?.key || action?.name || action?.action))
@@ -40,7 +46,7 @@ function normalizeActionList(actions) {
 }
 
 export function normalizePlayer(player = {}, index = 0) {
-  const fallbackPositions = ['left', 'top', 'right'];
+  const fallbackPositions = ['bottom', 'top', 'left'];
   const handTiles = player.handTiles || player.hand || player.tiles || [];
   const score = player.score ?? player.points ?? player.balance ?? player.coins ?? '0';
 
@@ -54,7 +60,7 @@ export function normalizePlayer(player = {}, index = 0) {
     title: player.title || player.rankTitle || player.profileTitle || '',
     coins: score,
     score,
-    position: player.position || fallbackPositions[index] || 'left',
+    position: normalizeLayoutPosition(player.position) || fallbackPositions[index] || 'bottom',
     ready: Boolean(player.ready ?? player.isReady ?? true),
     seat: player.seat,
     seatLabel: player.seatLabel || player.seatName || player.seatTitle || '',
