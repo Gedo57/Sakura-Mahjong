@@ -14,15 +14,13 @@ const PROFILE_AVATAR_STORAGE_KEY = 'sakura_profile_avatar';
 const DEFAULT_PROFILE_AVATAR = 'ICO.png';
 const GUEST_PLAYER_ID_STORAGE_KEY = 'sakura_guest_player_id';
 
-const clampMatchPlayerCount = (value, fallback = 3) => {
-  const numberValue = Number(value);
-  if (!Number.isFinite(numberValue)) return fallback;
-  return Math.max(2, Math.min(numberValue, 3));
-};
+const STRICT_MATCH_PLAYER_COUNT = 3;
+
+const clampMatchPlayerCount = () => STRICT_MATCH_PLAYER_COUNT;
 
 const getPlayerCountFromId = (value) => {
   const match = String(value || '').match(/(\d+)p/i);
-  return match ? clampMatchPlayerCount(match[1]) : null;
+  return match ? clampMatchPlayerCount() : null;
 };
 
 function getExpectedMatchPlayerCount(...sources) {
@@ -44,7 +42,7 @@ function getExpectedMatchPlayerCount(...sources) {
     }
   }
 
-  return 3;
+  return STRICT_MATCH_PLAYER_COUNT;
 }
 
 function getStableGuestPlayerId() {
@@ -643,7 +641,11 @@ export default function MatchmakingPage() {
   }, [location.state, navigate]);
 
   const currentContext = getRequestedMatchmakingContext(location.state);
-  const canStartPrivateGame = Boolean(currentContext.isHost && (session.roomId || currentContext.roomId));
+  const canStartPrivateGame = Boolean(
+    currentContext.isHost
+    && (session.roomId || currentContext.roomId)
+    && getRealLobbyPlayers(session.players).length === STRICT_MATCH_PLAYER_COUNT
+  );
 
   const handleStartPrivateGame = () => {
     const roomId = session.roomId || currentContext.roomId;

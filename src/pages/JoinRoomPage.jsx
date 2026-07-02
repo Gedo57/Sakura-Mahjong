@@ -17,7 +17,7 @@ export default function JoinRoomPage() {
   const joinRoom = async (room) => {
     const requestedCode = room?.code || normalizedRoomCode;
     const fallbackRoomId = room?.id || requestedCode || 'joined_room';
-    const maxPlayers = room?.maxPlayers || MAX_ROOM_PLAYERS;
+    const maxPlayers = MAX_ROOM_PLAYERS;
 
     setErrorMessage('');
     setIsJoining(true);

@@ -29,11 +29,12 @@ export default function CreateRoomPage() {
     getRoomTiers()
       .then((roomTiers) => {
         if (!isMounted) return;
-        setTiers(roomTiers || []);
+        const threePlayerTiers = (roomTiers || []).filter((tier) => Number(tier?.maxPlayers || 3) === 3 && !/_2p$/i.test(String(tier?.tierId || tier?.id || '')));
+        setTiers(threePlayerTiers);
 
-        if (roomTiers?.[0]?.tierId) {
-          setSelectedTierId(roomTiers[0].tierId);
-          setMaxPlayers(Number(roomTiers[0].maxPlayers) || 3);
+        if (threePlayerTiers?.[0]?.tierId) {
+          setSelectedTierId(threePlayerTiers[0].tierId);
+          setMaxPlayers(3);
         }
       })
       .catch((error) => {
@@ -56,9 +57,8 @@ export default function CreateRoomPage() {
   );
 
   const selectTier = (tierId) => {
-    const tier = roomTierOptions.find((item) => item.tierId === tierId);
     setSelectedTierId(tierId);
-    setMaxPlayers(Number(tier?.maxPlayers) || 3);
+    setMaxPlayers(3);
     setIsTierDropdownOpen(false);
   };
 
@@ -82,7 +82,7 @@ export default function CreateRoomPage() {
         throw new Error('No backend room tier is selected.');
       }
 
-      const requestedMaxPlayers = Number(selectedTier?.maxPlayers || maxPlayers) || 3;
+      const requestedMaxPlayers = 3;
       const room = await createPrivateRoom({
         tierId,
         maxPlayers: requestedMaxPlayers,
@@ -206,12 +206,12 @@ export default function CreateRoomPage() {
           <div className="create-form-row players-row">
             <label>{t('maxPlayers')}</label>
             <div className="segmented-options">
-              {[Number(selectedTier?.maxPlayers || maxPlayers) || 3].map((value) => (
+              {[3].map((value) => (
                 <button
                   type="button"
                   key={value}
                   className="active"
-                  onClick={() => setMaxPlayers(Number(selectedTier?.maxPlayers || value) || 3)}
+                  onClick={() => setMaxPlayers(3)}
                 >
                   {value} {t('players')}
                 </button>

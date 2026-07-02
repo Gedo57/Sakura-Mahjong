@@ -36,15 +36,13 @@ const PLAYER_AVATAR_FALLBACKS = {
   'Panda.png': avatarPanda,
 };
 
-const clampGameplayPlayerCount = (value, fallback = 3) => {
-  const numberValue = Number(value);
-  if (!Number.isFinite(numberValue)) return fallback;
-  return Math.max(2, Math.min(numberValue, 3));
-};
+const STRICT_GAMEPLAY_PLAYER_COUNT = 3;
+
+const clampGameplayPlayerCount = () => STRICT_GAMEPLAY_PLAYER_COUNT;
 
 const getGameplayPlayerCountFromId = (value) => {
   const match = String(value || '').match(/(\d+)p/i);
-  return match ? clampGameplayPlayerCount(match[1]) : null;
+  return match ? clampGameplayPlayerCount() : null;
 };
 
 const getExpectedGameplayPlayerCount = (...sources) => {
@@ -66,12 +64,12 @@ const getExpectedGameplayPlayerCount = (...sources) => {
       return clampGameplayPlayerCount(explicitCount);
     }
 
-    if (Array.isArray(source.players) && source.players.length >= 2 && source.players.length <= 3) {
-      return clampGameplayPlayerCount(source.players.length);
+    if (Array.isArray(source.players) && source.players.length === STRICT_GAMEPLAY_PLAYER_COUNT) {
+      return STRICT_GAMEPLAY_PLAYER_COUNT;
     }
   }
 
-  return 3;
+  return STRICT_GAMEPLAY_PLAYER_COUNT;
 };
 
 

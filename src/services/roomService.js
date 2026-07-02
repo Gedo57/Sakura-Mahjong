@@ -27,7 +27,7 @@ export async function createPrivateRoom(payload = {}) {
 
   const requestPayload = {
     tierId,
-    maxPlayers: Number(payload.maxPlayers) || 3,
+    maxPlayers: 3,
   };
 
   const response = await apiRequest('/rooms/private', {

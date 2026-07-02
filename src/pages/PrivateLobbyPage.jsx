@@ -36,7 +36,7 @@ export default function PrivateLobbyPage() {
   const roomIdRef = useRef(ctx.roomId || '');
   const roomCodeRef = useRef(ctx.roomCode || '');
   const isHostRef = useRef(Boolean(ctx.isHost));
-  const maxPlayersRef = useRef(Number(ctx.maxPlayers) || 2);
+  const maxPlayersRef = useRef(3);
 
   const [roomId, setRoomId] = useState(roomIdRef.current);
   const [roomCode, setRoomCode] = useState(roomCodeRef.current);
@@ -89,8 +89,8 @@ export default function PrivateLobbyPage() {
             setRoomCode(payload.roomCode);
           }
           if (payload.maxPlayers) {
-            maxPlayersRef.current = payload.maxPlayers;
-            setMaxPlayers(payload.maxPlayers);
+            maxPlayersRef.current = 3;
+            setMaxPlayers(3);
           }
           if (payload.hostUserId) {
             const amHost = payload.hostUserId.toString() === currentUser.id;
@@ -235,7 +235,7 @@ export default function PrivateLobbyPage() {
     navigate(ROUTES.mainMenu);
   };
 
-  const canStart = isHost && players.length >= 2 && !gameStarting;
+  const canStart = isHost && players.length === 3 && !gameStarting;
   const emptySlots = Math.max(0, maxPlayers - players.length);
 
   return (
@@ -327,7 +327,7 @@ export default function PrivateLobbyPage() {
               onClick={handleStartGame}
               disabled={!canStart}
             >
-              {gameStarting ? 'Starting...' : players.length < 2 ? 'Waiting for players...' : 'START GAME'}
+              {gameStarting ? 'Starting...' : players.length < 3 ? 'Waiting for 3 players...' : 'START GAME'}
             </button>
           )}
 

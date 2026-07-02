@@ -246,7 +246,7 @@ export function normalizeRoomTier(tier = {}, index = 0) {
   ]);
   const skin = ROOM_TIER_SKINS[index % ROOM_TIER_SKINS.length];
   const name = firstDefined(tier, ['name', 'title', 'roomName', 'displayName', 'label']) || titleFromTierId(tierId);
-  const maxPlayers = Number(firstDefined(tier, ['maxPlayers', 'playersCount', 'playerLimit', 'capacity']) || String(tierId).match(/(\d+)p/i)?.[1] || 3);
+  const maxPlayers = 3;
   const onlinePlayers = firstDefined(tier, [
     'playersOnline',
     'onlinePlayers',
@@ -291,7 +291,16 @@ export function normalizeRoomTierList(response = {}) {
     || response.results
     || response.data
     || response;
-  return Array.isArray(list) ? list.map(normalizeRoomTier) : [];
+
+  if (!Array.isArray(list)) return [];
+
+  return list
+    .filter((tier) => {
+      const id = String(firstDefined(tier, ['tierId', 'id', '_id', 'roomId', 'slug', 'key']) || '');
+      const rawMaxPlayers = Number(firstDefined(tier, ['maxPlayers', 'playersCount', 'playerLimit', 'capacity']) || String(id).match(/(\d+)p/i)?.[1] || 3);
+      return rawMaxPlayers === 3 && !/_2p$/i.test(id);
+    })
+    .map(normalizeRoomTier);
 }
 
 export function normalizePrivateRoom(response = {}, requestPayload = {}) {
@@ -302,7 +311,7 @@ export function normalizePrivateRoom(response = {}, requestPayload = {}) {
     roomId: room.roomId || room.id || requestPayload.tierId,
     roomCode: room.roomCode || room.code || '',
     tierId: room.tierId || requestPayload.tierId,
-    maxPlayers: Number(room.maxPlayers || requestPayload.maxPlayers || 3),
+    maxPlayers: 3,
     status: room.status || 'created',
   };
 }
@@ -315,6 +324,7 @@ export function normalizeRoom(room = {}) {
     name: room.name || room.title || room.roomName || 'Sakura Room',
     level: room.level || room.tier || room.difficulty || 'Beginner',
     players: room.players ?? room.onlinePlayers ?? room.playerCount ?? '0',
+    maxPlayers: 3,
     fee: room.fee ?? room.bet ?? room.entryFee ?? '500',
     prize: room.prize ?? room.prizePool ?? '2,000',
     bg: room.bg || room.background || 'room-card-green.png',
