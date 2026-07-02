@@ -2,34 +2,37 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../router/routes.js';
 import { getBalances } from '../services/economyService.js';
+import { getShopCatalog, purchaseShopItem } from '../services/shopService.js';
 import { useLanguage } from '../i18n/useLanguage.js';
 
 const shopAsset = (name) => `/assets/shop/${name}`;
 const mainMenuAsset = (name) => `/assets/main-menu/${name}`;
 
 const coinPacks = [
-  { id: 'coins-10k', image: '1.png', amount: '10,000 COINS', price: '120', currency: 'diamonds', badge: 'POPULAR' },
-  { id: 'coins-50k', image: '2.png', amount: '50,000 COINS', price: '500', currency: 'diamonds' },
-  { id: 'coins-120k', image: '4.png', amount: '120,000 COINS', price: '1,050', currency: 'diamonds', badge: 'BEST VALUE' },
-  { id: 'coins-300k', image: '3.png', amount: '300,000 COINS', price: '2,400', currency: 'diamonds' },
+  { id: 'coin_pack_1', itemId: 'coin_pack_1', type: 'coins', image: '1.png', amount: '10,000 COINS', price: '120', currency: 'diamonds', badge: 'POPULAR' },
+  { id: 'coin_pack_2', itemId: 'coin_pack_2', type: 'coins', image: '2.png', amount: '50,000 COINS', price: '500', currency: 'diamonds' },
+  { id: 'coin_pack_3', itemId: 'coin_pack_3', type: 'coins', image: '4.png', amount: '120,000 COINS', price: '1,050', currency: 'diamonds', badge: 'BEST VALUE' },
+  { id: 'coin_pack_4', itemId: 'coin_pack_4', type: 'coins', image: '3.png', amount: '300,000 COINS', price: '2,400', currency: 'diamonds' },
 ];
 
 const gemPacks = [
-  { id: 'gems-260', image: '5.png', amount: '260 GEMS', price: '$1.99', currency: 'usd', badge: 'POPULAR' },
-  { id: 'gems-1300', image: '6.png', amount: '1,300 GEMS', price: '$8.99', currency: 'usd' },
-  { id: 'gems-2800', image: '7.png', amount: '2,800 GEMS', price: '$17.99', currency: 'usd', badge: 'BEST VALUE' },
-  { id: 'gems-7500', image: '8.png', amount: '7,500 GEMS', price: '$44.99', currency: 'usd' },
+  { id: 'gem_pack_1', itemId: 'gem_pack_1', type: 'diamonds', backendCurrency: 'fiat', image: '5.png', amount: '260 GEMS', price: '$1.99', currency: 'usd', badge: 'POPULAR' },
+  { id: 'gem_pack_2', itemId: 'gem_pack_2', type: 'diamonds', backendCurrency: 'fiat', image: '6.png', amount: '1,300 GEMS', price: '$8.99', currency: 'usd' },
+  { id: 'gem_pack_3', itemId: 'gem_pack_3', type: 'diamonds', backendCurrency: 'fiat', image: '7.png', amount: '2,800 GEMS', price: '$17.99', currency: 'usd', badge: 'BEST VALUE' },
+  { id: 'gem_pack_4', itemId: 'gem_pack_4', type: 'diamonds', backendCurrency: 'fiat', image: '8.png', amount: '7,500 GEMS', price: '$44.99', currency: 'usd' },
 ];
 
 const boxPack = {
-  id: 'basic-box',
+  id: 'basic_box',
+  itemId: 'basic_box',
+  type: 'chest',
   image: '9.png',
   amount: 'BASIC BOX',
   price: '25',
   currency: 'diamonds',
 };
 
-const topRowItems = [...coinPacks, boxPack];
+const fallbackShopItems = [...coinPacks, boxPack, ...gemPacks];
 
 function formatBalance(value) {
   const numericValue = Number(value);
@@ -56,18 +59,18 @@ function BalancePill({ icon, value, label }) {
   );
 }
 
-function ShopPrice({ item, onPurchase }) {
+function ShopPrice({ item, onPurchase, disabled = false }) {
   const isDiamondPrice = item.currency === 'diamonds';
 
   return (
-    <button className="shop-price-button" type="button" onClick={() => onPurchase(item)} style={{ backgroundImage: `url(${shopAsset('66.png')})` }}>
+    <button className="shop-price-button" type="button" onClick={() => onPurchase(item)} disabled={disabled} style={{ backgroundImage: `url(${shopAsset('66.png')})` }}>
       {isDiamondPrice && <img src={mainMenuAsset('gem.png')} alt="" />}
       <span>{item.price}</span>
     </button>
   );
 }
 
-function ShopCard({ item, variant = 'coin', onPurchase }) {
+function ShopCard({ item, variant = 'coin', onPurchase, disabled = false }) {
   return (
     <article className={`shop-item-card shop-item-card--${variant}`} aria-label={item.amount}>
       <img className="shop-card-art" src={shopAsset(item.image)} alt="" />
@@ -76,7 +79,7 @@ function ShopCard({ item, variant = 'coin', onPurchase }) {
           {item.badge}
         </span>
       )}
-      <ShopPrice item={item} onPurchase={onPurchase} />
+      <ShopPrice item={item} onPurchase={onPurchase} disabled={disabled} />
     </article>
   );
 }
@@ -85,24 +88,34 @@ export default function ShopPage() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const [balances, setBalances] = useState({ coins: 0, diamonds: 0 });
+  const [shopItems, setShopItems] = useState(fallbackShopItems);
+  const [isPurchasingItemId, setIsPurchasingItemId] = useState('');
   const [shopMessage, setShopMessage] = useState('');
 
   useEffect(() => {
     let isMounted = true;
 
-    getBalances()
-      .then((economyBalances) => {
+    Promise.allSettled([getBalances(), getShopCatalog()])
+      .then(([balancesResult, catalogResult]) => {
         if (!isMounted) {
           return;
         }
 
-        setBalances({
-          coins: economyBalances?.coins ?? 0,
-          diamonds: economyBalances?.diamonds ?? economyBalances?.gems ?? 0,
-        });
-      })
-      .catch((error) => {
-        console.error('Failed to load shop balances:', error);
+        if (balancesResult.status === 'fulfilled') {
+          const economyBalances = balancesResult.value;
+          setBalances({
+            coins: economyBalances?.coins ?? 0,
+            diamonds: economyBalances?.diamonds ?? economyBalances?.gems ?? 0,
+          });
+        } else {
+          console.error('Failed to load shop balances:', balancesResult.reason);
+        }
+
+        if (catalogResult.status === 'fulfilled' && catalogResult.value?.length) {
+          setShopItems(catalogResult.value);
+        } else if (catalogResult.status === 'rejected') {
+          console.error('Failed to load shop catalog:', catalogResult.reason);
+        }
       });
 
     return () => {
@@ -111,19 +124,48 @@ export default function ShopPage() {
   }, []);
 
 
-  const handlePurchase = (item) => {
+  const setTimedShopMessage = (message) => {
+    setShopMessage(message);
+    window.clearTimeout(window.__sakuraShopMessageTimer);
+    window.__sakuraShopMessageTimer = window.setTimeout(() => setShopMessage(''), 2200);
+  };
+
+  const handlePurchase = async (item) => {
+    if (!item?.itemId && !item?.id) return;
+
     if (item.currency === 'diamonds') {
       const requiredDiamonds = parsePrice(item.price);
       const currentDiamonds = Number(balances.diamonds || 0);
 
       if (currentDiamonds < requiredDiamonds) {
-        setShopMessage(t('insufficientDiamonds'));
-        window.clearTimeout(window.__sakuraShopMessageTimer);
-        window.__sakuraShopMessageTimer = window.setTimeout(() => setShopMessage(''), 2200);
+        setTimedShopMessage(t('insufficientDiamonds'));
         return;
       }
     }
+
+    const itemId = item.itemId || item.id;
+    setIsPurchasingItemId(itemId);
+
+    try {
+      await purchaseShopItem(itemId);
+      const nextBalances = await getBalances();
+      setBalances({
+        coins: nextBalances?.coins ?? 0,
+        diamonds: nextBalances?.diamonds ?? nextBalances?.gems ?? 0,
+      });
+      setTimedShopMessage(t('purchaseSuccessful'));
+
+    } catch (error) {
+      console.error('Shop purchase failed:', error);
+      const message = /insufficient/i.test(error.message || '') ? t('insufficientDiamonds') : (error.message || 'Purchase failed');
+      setTimedShopMessage(message);
+    } finally {
+      setIsPurchasingItemId('');
+    }
   };
+
+  const topRowItems = shopItems.filter((item) => item.type === 'coins' || item.type === 'chest').slice(0, 5);
+  const bottomRowItems = shopItems.filter((item) => item.type === 'diamonds' || item.backendCurrency === 'fiat' || item.currency === 'usd').slice(0, 4);
 
   return (
     <section className="shop-page" style={{ backgroundImage: `url(${shopAsset('552134.png')})` }}>
@@ -141,13 +183,13 @@ export default function ShopPage() {
       <div className="shop-content-frame">
         <div className="shop-row shop-row--top">
           {topRowItems.map((item) => (
-            <ShopCard key={item.id} item={item} variant={item.id === 'basic-box' ? 'box' : 'coin'} onPurchase={handlePurchase} />
+            <ShopCard key={item.id} item={item} variant={item.type === 'chest' ? 'box' : 'coin'} onPurchase={handlePurchase} disabled={isPurchasingItemId === (item.itemId || item.id)} />
           ))}
         </div>
 
         <div className="shop-row shop-row--bottom">
-          {gemPacks.map((item) => (
-            <ShopCard key={item.id} item={item} variant="gem" onPurchase={handlePurchase} />
+          {bottomRowItems.map((item) => (
+            <ShopCard key={item.id} item={item} variant="gem" onPurchase={handlePurchase} disabled={isPurchasingItemId === (item.itemId || item.id)} />
           ))}
         </div>
       </div>

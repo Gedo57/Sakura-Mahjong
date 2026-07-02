@@ -35,10 +35,15 @@ export const GAME_SOCKET_EVENTS = {
   gameError: 'game:error',
   roomError: 'room:error',
   actionRejected: 'player:action_rejected',
+  matchFound: 'match_found',
+  queueLeft: 'queue_left',
+  playerDisconnected: 'player_disconnected',
 };
 
 const SERVER_EVENTS_TO_LISTEN = [
   GAME_SOCKET_EVENTS.queueJoined,
+  GAME_SOCKET_EVENTS.queueLeft,
+  GAME_SOCKET_EVENTS.matchFound,
   GAME_SOCKET_EVENTS.privateJoined,
   GAME_SOCKET_EVENTS.roomStateUpdate,
   GAME_SOCKET_EVENTS.gameStart,
@@ -52,6 +57,7 @@ const SERVER_EVENTS_TO_LISTEN = [
   GAME_SOCKET_EVENTS.gameError,
   GAME_SOCKET_EVENTS.roomError,
   GAME_SOCKET_EVENTS.actionRejected,
+  GAME_SOCKET_EVENTS.playerDisconnected,
   'action:rejected',
   'player:error',
   // Legacy / fallback names kept so older backend builds do not silently break.
@@ -85,6 +91,8 @@ function rememberGameSocketMessage(message) {
     'action_broadcast',
     'tile_discarded',
     'game_finished',
+    'match_found',
+    'player_disconnected',
     'error',
   ]);
 
@@ -249,6 +257,18 @@ export function normalizeSocketMessage(message) {
 
   if (originalEvent === GAME_SOCKET_EVENTS.queueJoined) {
     return { type: 'queue_joined', payload, originalEvent };
+  }
+
+  if (originalEvent === GAME_SOCKET_EVENTS.queueLeft) {
+    return { type: 'queue_left', payload, originalEvent };
+  }
+
+  if (originalEvent === GAME_SOCKET_EVENTS.matchFound) {
+    return { type: 'match_found', payload: { ...payload, players: normalizeRoomPlayers(payload?.players) }, originalEvent };
+  }
+
+  if (originalEvent === GAME_SOCKET_EVENTS.playerDisconnected) {
+    return { type: 'player_disconnected', payload, originalEvent };
   }
 
   if (originalEvent === GAME_SOCKET_EVENTS.privateJoined) {

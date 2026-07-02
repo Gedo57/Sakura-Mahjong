@@ -2,7 +2,6 @@ export const mockPlayers = [
   { id: 'you', name: 'You', status: 'Current turn' },
   { id: 'luca', name: 'Luca', status: 'Ready' },
   { id: 'noah', name: 'Noah', status: 'Ready' },
-  { id: 'mia', name: 'Mia', status: 'Ready' },
 ];
 
 export const mockTiles = [

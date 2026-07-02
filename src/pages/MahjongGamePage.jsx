@@ -124,6 +124,7 @@ const normalizeGameplayPlayer = (player = {}, index = 0) => {
     discardTiles: player.discardTiles || player.discards || player.discardPile || player.discardedTiles || [],
     discards: player.discards || player.discardTiles || player.discardPile || player.discardedTiles || [],
     openMelds: player.openMelds || player.melds || [],
+    bonusTiles: player.bonusTiles || player.revealedBonusTiles || player.revealedBonus || player.bonus || player.flowers || player.seasons || player.animals || [],
   };
 };
 
@@ -318,7 +319,7 @@ function resolvePlayerAvatar(avatar, fallbackAvatar = 'Stevie.png') {
     || avatarStevie;
 }
 
-const DEFAULT_ACTIONS = ['chow', 'pong', 'kong', 'pass'];
+const DEFAULT_ACTIONS = ['chow', 'pong', 'kong', 'hu', 'pass'];
 const ACTION_TO_UI = {
   pung: 'pong',
   pon: 'pong',
@@ -327,9 +328,11 @@ const ACTION_TO_UI = {
   chow: 'chow',
   kan: 'kong',
   kong: 'kong',
-  ron: 'ron',
-  win: 'ron',
-  tsumo: 'tsumo',
+  ron: 'hu',
+  hu: 'hu',
+  hule: 'hu',
+  win: 'hu',
+  tsumo: 'hu',
   riichi: 'riichi',
   pass: 'pass',
 };
@@ -342,6 +345,8 @@ const CLAIM_ACTION_ALIASES = {
   kong: 'kong',
   kan: 'kong',
   ron: 'ron',
+  hu: 'ron',
+  hule: 'ron',
   win: 'ron',
 };
 const normalizeActionForUi = (action) => ACTION_TO_UI[String(action || '').toLowerCase()] || String(action || '').toLowerCase();
@@ -430,15 +435,6 @@ const resolveTimerDeadlineMs = (payload = {}, fallbackSeconds = 0) => {
 const TILE_ASSET_ALIASES = {
   back: 'tile_back.png',
   tile_back: 'tile_back.png',
-  Characters_1: 'm_1.png',
-  Characters_2: 'm_2.png',
-  Characters_3: 'm_3.png',
-  Characters_4: 'm_4.png',
-  Characters_5: 'm_5.png',
-  Characters_6: 'm_6.png',
-  Characters_7: 'm_7.png',
-  Characters_8: 'm_8.png',
-  Characters_9: 'm_9.png',
   'Circles-Dots_1': 'p_1.png',
   'Circles-Dots_2': 'p_2.png',
   'Circles-Dots_3': 'p_3.png',
@@ -448,15 +444,15 @@ const TILE_ASSET_ALIASES = {
   'Circles-Dots_7': 'p_7.png',
   'Circles-Dots_8': 'p_8.png',
   'Circles-Dots_9': 'p_9.png',
-  Bamboo_1: 's_1.png',
-  Bamboo_2: 's_2.png',
-  Bamboo_3: 's_3.png',
-  Bamboo_4: 's_4.png',
-  Bamboo_5: 's_5.png',
-  Bamboo_6: 's_6.png',
-  Bamboo_7: 's_7.png',
-  Bamboo_8: 's_8.png',
-  Bamboo_9: 's_9.png',
+  Dots_1: 'p_1.png',
+  Dots_2: 'p_2.png',
+  Dots_3: 'p_3.png',
+  Dots_4: 'p_4.png',
+  Dots_5: 'p_5.png',
+  Dots_6: 'p_6.png',
+  Dots_7: 'p_7.png',
+  Dots_8: 'p_8.png',
+  Dots_9: 'p_9.png',
   Wind_East: 'w_e.png',
   Wind_South: 'w_s.png',
   Wind_West: 'w_w.png',
@@ -464,6 +460,60 @@ const TILE_ASSET_ALIASES = {
   Dragon_Red: 'd_r.png',
   Dragon_White: 'd_w.png',
   Dragon_Green: 'd_g.png',
+  Flower_Spring: 'fl_spring.png',
+  Flower_Summer: 'fl_summer.png',
+  Flower_Autumn: 'fl_autumn.png',
+  Flower_Winter: 'fl_winter.png',
+  Season_Plum: 'sn_plum.png',
+  Season_Orchid: 'sn_orchid.png',
+  Season_Chrysanthemum: 'sn_chrysanthemum.png',
+  Season_Bamboo: 'sn_bamboo.png',
+  Animal_Cat: 'an_cat.png',
+  Animal_Mouse: 'an_mouse.png',
+  Animal_Chicken: 'an_chicken.png',
+  Animal_Centipede: 'an_centipede.png',
+  Joker_Clown: 'joker_clown.png',
+  Joker: 'joker_clown.png',
+  Fei: 'fei.png',
+};
+
+const AVAILABLE_TILE_ASSET_NAMES = new Set([
+  'tile_back.png',
+  'p_1.png',
+  'p_2.png',
+  'p_3.png',
+  'p_4.png',
+  'p_5.png',
+  'p_6.png',
+  'p_7.png',
+  'p_8.png',
+  'p_9.png',
+  'w_e.png',
+  'w_s.png',
+  'w_w.png',
+  'w_n.png',
+  'd_r.png',
+  'd_w.png',
+  'd_g.png',
+  'fl_spring.png',
+  'fl_summer.png',
+  'fl_autumn.png',
+  'fl_winter.png',
+  'sn_plum.png',
+  'sn_orchid.png',
+  'sn_chrysanthemum.png',
+  'sn_bamboo.png',
+  'an_cat.png',
+  'an_mouse.png',
+  'an_chicken.png',
+  'an_centipede.png',
+  'joker_clown.png',
+  'fei.png',
+]);
+
+const getSupportedTileAsset = (name) => {
+  const assetName = String(name || '').trim();
+  return AVAILABLE_TILE_ASSET_NAMES.has(assetName) ? assetName : '';
 };
 
 const tileIdToAssetName = (tileId) => {
@@ -473,14 +523,19 @@ const tileIdToAssetName = (tileId) => {
   const withoutExtension = value.replace(/\.(png|jpe?g|webp|gif|svg)$/i, '');
   if (TILE_ASSET_ALIASES[withoutExtension]) return TILE_ASSET_ALIASES[withoutExtension];
 
-  const parts = withoutExtension.split('_');
+  const normalized = withoutExtension.toLowerCase();
+  const compactDotsMatch = normalized.match(/^p([1-9])(?:_\d+)?$/);
+  if (compactDotsMatch) return `p_${compactDotsMatch[1]}.png`;
+
+  const parts = normalized.split('_');
   const suit = parts[0];
   const rank = parts[1];
 
-  // Backend tile ids include a copy index, e.g. p_7_2 / d_g_0.
+  // Backend tile ids may include a copy index, e.g. p_7_2 / d_g_0.
   // The asset files are shared per tile face, so the copy index is intentionally ignored.
-  if ((suit === 'm' || suit === 'p' || suit === 's') && /^\d+$/.test(rank)) {
-    return `${suit}_${rank}.png`;
+  // Only the supplied tile asset set is rendered; unsupported suit assets are ignored.
+  if (suit === 'p' && /^\d+$/.test(rank)) {
+    return getSupportedTileAsset(`p_${rank}.png`);
   }
 
   if (suit === 'w' && ['e', 's', 'w', 'n'].includes(rank)) {
@@ -492,23 +547,27 @@ const tileIdToAssetName = (tileId) => {
   }
 
   if (suit === 'fl' && ['spring', 'summer', 'autumn', 'winter'].includes(rank)) {
-    return `${withoutExtension}.png`; // placeholders or actual assets
+    return `fl_${rank}.png`;
   }
 
   if (suit === 'sn' && ['plum', 'orchid', 'chrysanthemum', 'bamboo'].includes(rank)) {
-    return `${withoutExtension}.png`;
+    return `sn_${rank}.png`;
   }
 
   if (suit === 'an' && ['cat', 'mouse', 'chicken', 'centipede'].includes(rank)) {
-    return `${withoutExtension}.png`;
+    return `an_${rank}.png`;
+  }
+
+  if (suit === 'joker' && rank === 'clown') {
+    return 'joker_clown.png';
   }
 
   if (suit === 'fei') {
     return 'fei.png'; // Ignore copy index (e.g. fei_0 -> fei.png)
   }
 
-  if (/\.(png|jpe?g|webp|gif|svg)$/i.test(value)) return value;
-  return `${withoutExtension}.png`;
+  if (/\.(png|jpe?g|webp|gif|svg)$/i.test(value)) return getSupportedTileAsset(`${withoutExtension}.png`);
+  return getSupportedTileAsset(`${withoutExtension}.png`);
 };
 
 const getTileId = (tile) => {
@@ -518,6 +577,15 @@ const getTileId = (tile) => {
 };
 
 const normalizeTileName = (tile) => tileIdToAssetName(getTileId(tile));
+
+const isFeiOrJokerTileName = (tile) => {
+  const assetName = normalizeTileName(tile) || String(tile || '').trim().toLowerCase();
+  return assetName === 'fei.png'
+    || assetName === 'joker_clown.png'
+    || /^fei(?:[_.-]|$)/i.test(assetName)
+    || assetName.includes('joker')
+    || assetName.includes('clown');
+};
 
 const normalizeTileList = (value) => toArray(value).map(normalizeTileName).filter(Boolean);
 const getRawTileList = (value) => toArray(value).map(getTileId).filter(Boolean);
@@ -706,14 +774,34 @@ const actionDefinitions = {
   chow: { labelKey: 'chow', className: 'blue' },
   pong: { labelKey: 'pong', className: 'green' },
   kong: { labelKey: 'kong', className: 'purple' },
+  hu: { labelKey: 'win', className: 'orange' },
   pass: { labelKey: 'pass', className: 'black' },
-  ron: { labelKey: 'win', className: 'purple' },
-  tsumo: { labelKey: 'win', className: 'purple' },
+  ron: { labelKey: 'win', className: 'orange' },
+  tsumo: { labelKey: 'win', className: 'orange' },
   riichi: { labelKey: 'riichi', className: 'blue' },
 };
 
 function GameplayTile({ name, className = '', label = '' }) {
   return <img className={`gameplay-tile ${className}`} src={asset(name)} alt={label} draggable="false" />;
+}
+
+function BonusTileRack({ position = 'left', tiles = [], label = 'BONUS', visible = false }) {
+  const tileList = toArray(tiles).filter(Boolean);
+
+  if (!visible && !tileList.length) return null;
+
+  return (
+    <div className={`gameplay-bonus-rack gameplay-bonus-rack--${position} ${tileList.length ? 'has-tiles' : 'empty'}`} aria-label={`${label} ${position}`}>
+      <span className="gameplay-bonus-rack-label">{label}</span>
+      <div className="gameplay-bonus-rack-body">
+        {tileList.length ? tileList.map((tile, index) => (
+          <GameplayTile name={tile} key={`bonus-${position}-${tile}-${index}`} />
+        )) : Array.from({ length: 4 }).map((_, index) => (
+          <span className="gameplay-bonus-empty-slot" key={`bonus-empty-${position}-${index}`} aria-hidden="true" />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function TileWall({ count = 14, direction = 'horizontal', className = '' }) {
@@ -930,6 +1018,25 @@ function mergeActionBroadcast(current, payload = {}) {
     pendingDiscardTileId: null,
   };
 
+  if (action === 'draw') {
+    next.wallRemaining = payload.wallRemaining ?? current.wallRemaining;
+  }
+
+  if (action === 'bonus_tile_revealed') {
+    const revealedTiles = normalizeTileList(payload.bonusTiles?.length ? payload.bonusTiles : [payload.tileId || payload.tile]);
+    next.wallRemaining = payload.wallRemaining ?? current.wallRemaining;
+
+    if (actionIds.length && Array.isArray(current.players)) {
+      next.players = current.players.map((player) => {
+        if (!playerMatchesAnyId(player, actionIds)) return player;
+        return {
+          ...player,
+          bonusTiles: revealedTiles.length ? revealedTiles : normalizeTileList(player.bonusTiles),
+        };
+      });
+    }
+  }
+
   if (action === 'discard' && tileId) {
     const renderedTile = tileIdToAssetName(tileId);
     const discards = { ...(current.discards || {}) };
@@ -1057,7 +1164,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
       timeLimit: 999,
       timerDeadlineMs: 0,
       activeTurnPosition: 'left',
-      availableActions: ['chow', 'pong', 'kong', 'pass'],
+      availableActions: DEFAULT_ACTIONS,
     } : {}),
     matchId: resolvedMatchId,
   }));
@@ -1093,7 +1200,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         timeLimit: 999,
         timerDeadlineMs: 0,
         activeTurnPosition: 'left',
-        availableActions: ['chow', 'pong', 'kong', 'pass'],
+        availableActions: DEFAULT_ACTIONS,
         claimWindow: null,
         matchId: normalizedMock.matchId || resolvedMatchId,
       });
@@ -1344,6 +1451,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   const leftBonusTiles = getFirstTileList(leftPlayer?.bonusTiles);
   const topBonusTiles = getFirstTileList(topPlayer?.bonusTiles);
   const rightBonusTiles = hasRightPlayer ? getFirstTileList(rightPlayer?.bonusTiles) : [];
+  const shouldShowBonusRacks = isMockGameplay || leftBonusTiles.length || topBonusTiles.length || rightBonusTiles.length;
   const centerDiscardTiles = getCircularTableTiles(getFirstTileList(
     gameState.centerTiles,
     gameState.centerDiscardTiles,
@@ -1440,6 +1548,11 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   const handleTileDiscard = (visualTile) => {
     if (!isUserTurn || gameState.pendingDiscardTileId) return;
 
+    if (isFeiOrJokerTileName(visualTile)) {
+      setGameError(t('feiLocked'));
+      return;
+    }
+
     const rawList = getFirstRawTileList(gameState.handTiles, gameState.myHand, gameState.playerHand);
     const rawTileId = rawList.find(t => tileIdToAssetName(t) === visualTile) || visualTile;
 
@@ -1490,6 +1603,12 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     if (actionKey === 'pass') {
       const sent = passClaimWindow();
       if (!sent) setGameError('Unable to pass. Waiting for gameplay socket connection.');
+      return;
+    }
+
+    if (actionKey === 'hu') {
+      const sent = isClaimWindowOpen ? claimDiscard('ron') : declareWin('tsumo');
+      if (!sent) setGameError('Unable to declare Hu. Waiting for gameplay socket connection.');
       return;
     }
 
@@ -1588,13 +1707,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
             <GameplayTile name={tile} key={`${tile}-${index}`} />
           ))}
         </div>
-        {topBonusTiles.length > 0 && (
-          <div className="gameplay-upper-bonus" aria-label="Top bonus tiles" style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '4px', scale: '0.8' }}>
-            {topBonusTiles.map((tile, index) => (
-              <GameplayTile name={tile} key={`bonus-top-${tile}-${index}`} />
-            ))}
-          </div>
-        )}
+        <BonusTileRack position="top" tiles={topBonusTiles} label={t('bonusTiles')} visible={shouldShowBonusRacks} />
 
         {hasRightPlayer ? (
           <>
@@ -1603,13 +1716,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
                 <GameplayTile name={tile} key={`${tile}-${index}`} />
               ))}
             </div>
-            {rightBonusTiles.length > 0 && (
-              <div className="gameplay-right-bonus" aria-label="Right bonus tiles" style={{ position: 'absolute', right: '10px', bottom: '20%', display: 'flex', flexDirection: 'column', gap: '4px', scale: '0.8' }}>
-                {rightBonusTiles.map((tile, index) => (
-                  <GameplayTile name={tile} key={`bonus-right-${tile}-${index}`} />
-                ))}
-              </div>
-            )}
+            <BonusTileRack position="right" tiles={rightBonusTiles} label={t('bonusTiles')} visible={shouldShowBonusRacks} />
           </>
         ) : null}
 
@@ -1624,27 +1731,27 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
             <GameplayTile name={tile} key={`${tile}-${index}`} />
           ))}
         </div>
-        {leftBonusTiles.length > 0 && (
-          <div className="gameplay-left-bonus" aria-label="Your bonus tiles" style={{ position: 'absolute', bottom: '110px', right: '5%', display: 'flex', gap: '4px', scale: '0.9' }}>
-            {leftBonusTiles.map((tile, index) => (
-              <GameplayTile name={tile} key={`bonus-left-${tile}-${index}`} />
-            ))}
-          </div>
-        )}
+        <BonusTileRack position="left" tiles={leftBonusTiles} label={t('bonusTiles')} visible={shouldShowBonusRacks} />
 
         <div className="gameplay-hand" aria-label="Player hand tiles">
-          {playerHandTiles.map((tile, index) => (
-            <button
-              className="gameplay-hand-tile"
-              type="button"
-              key={`${tile}-${index}`}
-              aria-label={`Tile ${index + 1}`}
-              disabled={!isUserTurn || Boolean(gameState.pendingDiscardTileId)}
-              onClick={() => handleTileDiscard(tile)}
-            >
-              <GameplayTile name={tile} />
-            </button>
-          ))}
+          {playerHandTiles.map((tile, index) => {
+            const isLockedFei = isFeiOrJokerTileName(tile);
+
+            return (
+              <button
+                className={`gameplay-hand-tile ${isLockedFei ? 'gameplay-hand-tile--fei' : ''}`}
+                type="button"
+                key={`${tile}-${index}`}
+                aria-label={isLockedFei ? `${t('feiLocked')} ${index + 1}` : `Tile ${index + 1}`}
+                title={isLockedFei ? t('feiLocked') : undefined}
+                disabled={!isUserTurn || Boolean(gameState.pendingDiscardTileId) || isLockedFei}
+                onClick={() => handleTileDiscard(tile)}
+              >
+                <GameplayTile name={tile} className={isLockedFei ? 'gameplay-tile--fei' : ''} />
+                {isLockedFei ? <span className="gameplay-fei-lock" aria-hidden="true">FEI</span> : null}
+              </button>
+            );
+          })}
         </div>
       </main>
 

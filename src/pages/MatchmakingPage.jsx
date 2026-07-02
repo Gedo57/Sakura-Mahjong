@@ -491,6 +491,9 @@ export default function MatchmakingPage() {
         case 'queue_joined':
           updateLobbySession({ ...payload, status: payload.status || 'searching' });
           break;
+        case 'match_found':
+          updateLobbySession({ ...payload, status: 'starting' });
+          break;
         case 'private_joined':
           updateLobbySession({ ...payload, status: payload.status || 'waiting' });
           break;

@@ -65,7 +65,7 @@ export function normalizePlayer(player = {}, index = 0) {
     discardTiles: player.discardTiles || player.discards || player.discardPile || player.discardedTiles || [],
     discards: player.discards || player.discardTiles || player.discardPile || player.discardedTiles || [],
     openMelds: player.openMelds || player.melds || [],
-    bonusTiles: player.bonusTiles || player.bonus || [],
+    bonusTiles: player.bonusTiles || player.revealedBonusTiles || player.revealedBonus || player.bonus || player.flowers || player.seasons || player.animals || [],
   };
 }
 

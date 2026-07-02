@@ -1,8 +1,6 @@
 import { apiRequest } from './api.js';
 import { normalizeRoomList, normalizeRoom, normalizeRoomTierList, normalizePrivateRoom } from './gameNormalizers.js';
 
-const MISSING_JOIN_ROOM_ENDPOINT_MESSAGE = 'Join room is unavailable right now. Please try again later.';
-
 export async function getRoomTiers() {
   // Room tiers must always come from the real backend. Do not fall back to mock room cards.
   const response = await apiRequest('/rooms/tiers');
@@ -43,12 +41,48 @@ export async function createRoom(payload = {}) {
   return createPrivateRoom(payload);
 }
 
+export async function joinPublicQueue(tierId) {
+  if (!tierId) {
+    throw new Error('tierId is required to join a public queue.');
+  }
+
+  const response = await apiRequest('/rooms/join', {
+    method: 'POST',
+    body: JSON.stringify({ tierId }),
+  });
+
+  return {
+    ...response,
+    tierId,
+    status: response?.status || 'searching',
+    socketMode: true,
+  };
+}
+
+export async function leavePublicQueue(tierId) {
+  const response = await apiRequest('/rooms/leave', {
+    method: 'POST',
+    body: JSON.stringify(tierId ? { tierId } : {}),
+  });
+
+  return response;
+}
+
 export async function joinRoom(roomIdOrCode) {
   if (!roomIdOrCode) {
     throw new Error('Room id or room code is required.');
   }
 
-  throw new Error(MISSING_JOIN_ROOM_ENDPOINT_MESSAGE);
+  const value = String(roomIdOrCode).trim();
+
+  // Private room joining is intentionally socket-first. The backend exposes
+  // room:join { roomCode } over Socket.io, not a REST /rooms/private/join route.
+  return normalizePrivateRoom({
+    roomId: value,
+    roomCode: value,
+    status: 'pending_socket_join',
+    socketMode: true,
+  });
 }
 
 export async function joinRoomByCode(roomCode) {
@@ -56,5 +90,5 @@ export async function joinRoomByCode(roomCode) {
     throw new Error('Room code is required.');
   }
 
-  throw new Error(MISSING_JOIN_ROOM_ENDPOINT_MESSAGE);
+  return joinRoom(roomCode);
 }
