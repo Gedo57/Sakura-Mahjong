@@ -1103,7 +1103,7 @@ animation: none;
 
 .app-shell[data-device='desktop'] .gameplay-right-discard {
   top: 29.5%;
-  left: 62.6%;
+  left: 58.6%;
   transform: scale(.62);
 }
 
@@ -1226,16 +1226,16 @@ animation: none;
 }
 
 .app-shell[data-device='desktop'] .gameplay-bonus-rack--top {
-  top: 18.8%;
-  right: 25.8%;
-  transform: scale(1);
+  top: 16.8%;
+  right: 39.8%;
+   transform: scale(0.85);
   transform-origin: top right;
 }
 
 .app-shell[data-device='desktop'] .gameplay-bonus-rack--right {
-  top: 43.5%;
+  top: 40%;
   right: 16.8%;
-  transform: scale(1);
+   transform: scale(0.95);
   transform-origin: top right;
 }
 
@@ -1245,8 +1245,8 @@ animation: none;
 
 .app-shell[data-device='desktop'] .gameplay-bonus-rack--left {
   right: 20.5%;
-  bottom: 31.8%;
-  transform: scale(1);
+  bottom: 33%;
+  transform: scale(0.85);
   transform-origin: bottom right;
 }
 
@@ -1307,4 +1307,104 @@ animation: none;
 .app-shell[data-device='desktop'] .gameplay-action.orange {
   background: linear-gradient(180deg, #ffb327, #b75a00);
   border: 2px solid #ffc249;
+}
+
+/* Patch — Per player open meld racks for Chow / Pong / Kong
+   Layout tuned so exposed melds stay attached to each player zone and do not cover
+   the compass or the local hand. Move these x/y knobs only when manual tuning. */
+.app-shell[data-device='desktop'] .gameplay-screen {
+  --gp-meld-top-x: 30%;
+  --gp-meld-top-y: 20.2%;
+  --gp-meld-left-x: 30%;
+  --gp-meld-left-bottom: 31.4%;
+  --gp-meld-right-x: 64.2%;
+  --gp-meld-right-y: 35%;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack {
+  position: absolute;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-group {
+  display: grid;
+  gap: 2px;
+  padding: 4px 6px 5px;
+  border-radius: 10px;
+  background: rgba(5, 11, 18, .66);
+  border: 1px solid rgba(255, 214, 92, .24);
+  box-shadow: 0 7px 16px rgba(0, 0, 0, .3), inset 0 0 10px rgba(255, 211, 92, .07);
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-label {
+  color: #ffd45b;
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: .08em;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, .65);
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-tiles {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-tiles .gameplay-tile {
+  width: 29px;
+  height: 47px;
+  margin-left: -3px;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-tiles .gameplay-tile:first-child {
+  margin-left: 0;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--top {
+  top: var(--gp-meld-top-y);
+  left: var(--gp-meld-top-x);
+  max-width: 360px;
+  flex-wrap: wrap;
+  transform: translateX(-50%) scale(.68);
+  transform-origin: top center;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--left {
+  left: var(--gp-meld-left-x);
+  bottom: var(--gp-meld-left-bottom);
+  max-width: 460px;
+  flex-wrap: wrap;
+  transform: translateX(-50%) scale(.68);
+  transform-origin: bottom center;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--right {
+  top: var(--gp-meld-right-y);
+  left: var(--gp-meld-right-x);
+  flex-direction: column;
+  align-items: flex-start;
+  max-height: 250px;
+  transform: scale(.66);
+  transform-origin: top left;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--right .gameplay-meld-tiles {
+  flex-direction: column;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--right .gameplay-meld-tiles .gameplay-tile {
+  margin-left: 0;
+  margin-top: -7px;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--right .gameplay-meld-tiles .gameplay-tile:first-child {
+  margin-top: 0;
 }
