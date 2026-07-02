@@ -40,7 +40,7 @@ function normalizeActionList(actions) {
 }
 
 export function normalizePlayer(player = {}, index = 0) {
-  const fallbackPositions = ['top', 'left', 'right', 'bottom'];
+  const fallbackPositions = ['left', 'top', 'right'];
   const handTiles = player.handTiles || player.hand || player.tiles || [];
   const score = player.score ?? player.points ?? player.balance ?? player.coins ?? '0';
 
@@ -58,6 +58,7 @@ export function normalizePlayer(player = {}, index = 0) {
     ready: Boolean(player.ready ?? player.isReady ?? true),
     seat: player.seat,
     seatLabel: player.seatLabel || player.seatName || player.seatTitle || '',
+    seatIndex: player.seatIndex,
     isDealer: Boolean(player.isDealer ?? player.dealer),
     isDisconnected: Boolean(player.isDisconnected ?? player.disconnected),
     handTiles,
@@ -124,7 +125,21 @@ export function normalizeGameState(response = {}) {
     activeSeat: state.activeSeat || state.currentTurnSeat || state.turnSeat || state.turn?.seat,
     round: state.round || state.windRound || state.roundWind || 'East 1',
     roundWind: state.roundWind || state.windRound,
+    seatOrder: state.seatOrder || safeResponse.seatOrder || [],
+    rotation: state.rotation || safeResponse.rotation || 'counterclockwise',
+    hasNorthPlayer: Boolean(state.hasNorthPlayer ?? safeResponse.hasNorthPlayer ?? false),
+    dealerUserId: state.dealerUserId || state.dealer || safeResponse.dealerUserId || safeResponse.dealer,
+    dealerRolls: state.dealerRolls || safeResponse.dealerRolls || [],
+    dealerSelectionMethod: state.dealerSelectionMethod || safeResponse.dealerSelectionMethod,
     turnNumber: state.turnNumber ?? state.turn?.number,
+    turnState: state.turnState || state.turn || null,
+    turnHasDiscarded: Boolean(state.turnHasDiscarded ?? state.hasDiscardedThisTurn ?? state.myTurnHasDiscarded ?? false),
+    discardCountThisTurn: Number(state.discardCountThisTurn ?? state.turnState?.discardCount ?? state.turn?.discardCount ?? 0) || 0,
+    turnEndedByDiscard: Boolean(state.turnEndedByDiscard ?? false),
+    myTurnHasDiscarded: Boolean(state.myTurnHasDiscarded ?? state.hasDiscardedThisTurn ?? false),
+    canDiscard: state.canDiscard ?? state.turn?.canDiscard,
+    canPlayBonus: state.canPlayBonus ?? state.turn?.canPlayBonus,
+    playableBonusTiles: state.playableBonusTiles || state.bonusTilesInHand || state.turn?.playableBonusTiles || [],
     wallRemaining: state.wallRemaining
       ?? state.remainingWall
       ?? state.remainingWallTiles

@@ -580,6 +580,15 @@ export function declareKong(payload = {}) {
   return emitOnActiveSocket('player:declare_kong', payload || {});
 }
 
+export function playBonusTile(tileId) {
+  if (!tileId) {
+    console.warn('[game-socket] playBonusTile called without tileId.');
+    return false;
+  }
+
+  return emitOnActiveSocket('player:play_bonus', { tileId });
+}
+
 export function claimDiscard(action) {
   if (!action) {
     console.warn('[game-socket] claimDiscard called without action.');

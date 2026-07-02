@@ -14,6 +14,7 @@ import {
   getActiveGameSocket,
   getBufferedGameSocketMessages,
   passClaimWindow,
+  playBonusTile,
   reclaimFei,
   skipFeiReclaim,
 } from '../services/socket.js';
@@ -115,6 +116,7 @@ const normalizeGameplayPlayer = (player = {}, index = 0) => {
     score,
     seat: player.seat,
     seatLabel: player.seatLabel || player.seatName || '',
+    seatIndex: player.seatIndex,
     isDealer: Boolean(player.isDealer ?? player.dealer),
     isDisconnected: Boolean(player.isDisconnected ?? player.disconnected),
     handTiles,
@@ -365,6 +367,10 @@ const EMPTY_SOCKET_GAME_STATE = {
   claimWindow: null,
   reclaimFei: null,
   timer: 0,
+  pendingDiscardTileId: null,
+  hasDiscardedThisTurn: false,
+  turnEndedByDiscard: false,
+  discardCountThisTurn: 0,
   room: { name: 'Live Match' },
 };
 const toArray = (value) => (Array.isArray(value) ? value : []);
@@ -625,6 +631,53 @@ const normalizeTileName = (tile) => {
   return tileIdToAssetName(getTileId(tile));
 };
 
+const buildTileFocus = ({ kind, payload = {}, rawTileId = '', tileName = '', position = '', visibility = 'public', label = '' } = {}) => {
+  const animation = payload.animation || {};
+  const resolvedRawTileId = rawTileId || payload.tileId || payload.tile || payload.drawnTile || animation.tileId || '';
+  const resolvedTileName = tileName
+    || tileIdToAssetName(resolvedRawTileId)
+    || payload.tileBack
+    || animation.tileBack
+    || 'tile_back.png';
+
+  if (!resolvedTileName) return null;
+
+  return {
+    id: payload.animationId || animation.id || `${kind || 'tile'}_${position || 'center'}_${resolvedRawTileId || resolvedTileName}_${Date.now()}`,
+    kind: kind || animation.type || 'tile',
+    rawTileId: resolvedRawTileId,
+    tileName: resolvedTileName,
+    position: normalizePosition(position || payload.position || animation.position || ''),
+    visibility: visibility || payload.tileVisibility || animation.visibility || 'public',
+    label: label || (kind === 'draw' ? 'DRAW' : kind === 'discard' ? 'DISCARD' : 'TILE'),
+    createdAt: Date.now(),
+  };
+};
+
+const tileMatchesHighlight = (tile, highlight = {}) => {
+  if (!tile || !highlight) return false;
+  const tileRaw = String(getTileId(tile) || '').trim();
+  const tileRendered = normalizeTileName(tile) || String(tile || '').trim();
+  const highlightRaw = String(highlight.rawTileId || highlight.tileId || '').trim();
+  const highlightRendered = String(highlight.tileName || highlight.assetName || '').trim();
+
+  return Boolean(
+    (highlightRaw && tileRaw && highlightRaw === tileRaw)
+    || (highlightRendered && tileRendered && highlightRendered === tileRendered)
+  );
+};
+
+const isLastHighlightedTile = (tile, index, tiles = [], position = '', highlight = {}) => {
+  if (!highlight || (highlight.position && normalizePosition(highlight.position) !== normalizePosition(position))) return false;
+  if (!tileMatchesHighlight(tile, highlight)) return false;
+
+  const lastMatchingIndex = toArray(tiles).reduce((latest, candidate, candidateIndex) => (
+    tileMatchesHighlight(candidate, highlight) ? candidateIndex : latest
+  ), -1);
+
+  return lastMatchingIndex === index;
+};
+
 const normalizeHandTileEntry = (tile, index = 0) => {
   const rawId = getTileId(tile);
   const assetName = normalizeTileName(tile);
@@ -646,6 +699,13 @@ const isFeiOrJokerTileName = (tile) => {
     || /^fei(?:[_.-]|$)/i.test(assetName)
     || assetName.includes('joker')
     || assetName.includes('clown');
+};
+
+const isBonusTileName = (tile) => {
+  const rawId = String(getTileId(tile) || '').trim().toLowerCase().replace(/\.(png|jpe?g|webp|gif|svg)$/i, '');
+  const assetName = String(normalizeTileName(tile) || '').trim().toLowerCase().replace(/\.(png|jpe?g|webp|gif|svg)$/i, '');
+  const value = rawId || assetName;
+  return value.startsWith('fl_') || value.startsWith('sn_') || value.startsWith('an_');
 };
 
 
@@ -1166,6 +1226,20 @@ const getGameplayErrorMessage = (payload = {}, t = (key) => key) => {
     .join(' ')
     .toLowerCase();
 
+  if (searchable.includes('bonus') && searchable.includes('win')) {
+    return t('playBonusBeforeWin');
+  }
+
+  if (
+    searchable.includes('4 melds')
+    || searchable.includes('1 pair')
+    || searchable.includes('winning hand shape')
+    || searchable.includes('invalid hand')
+    || searchable.includes('invalid_winning_hand')
+  ) {
+    return t('invalidWinningHand');
+  }
+
   if (searchable.includes('not your turn') || searchable.includes('turn_player') || searchable.includes('turnplayer')) {
     return t('notYourTurn');
   }
@@ -1180,6 +1254,14 @@ const getGameplayErrorMessage = (payload = {}, t = (key) => key) => {
 
   if (searchable.includes('fei') && searchable.includes('discard')) {
     return t('feiLocked');
+  }
+
+  if (searchable.includes('bonus') && searchable.includes('discard')) {
+    return t('bonusTileDiscardLocked');
+  }
+
+  if (searchable.includes('bonus') && (searchable.includes('play') || searchable.includes('flower') || searchable.includes('season') || searchable.includes('animal'))) {
+    return t('bonusTileUnavailable');
   }
 
   return rawMessage || 'Gameplay socket error.';
@@ -1666,6 +1748,25 @@ function GameplayTile({ name, className = '', label = '' }) {
   return <img className={`gameplay-tile ${className}`} src={asset(name)} alt={label} draggable="false" />;
 }
 
+function TileFocusOverlay({ focus }) {
+  if (!focus?.tileName) return null;
+
+  const kind = String(focus.kind || 'tile').toLowerCase();
+  const position = normalizePosition(focus.position || 'center') || 'center';
+  const visibility = String(focus.visibility || 'public').toLowerCase();
+
+  return (
+    <div
+      className={`gameplay-tile-focus gameplay-tile-focus--${kind} gameplay-tile-focus--${position} gameplay-tile-focus--${visibility}`}
+      key={focus.id}
+      aria-hidden="true"
+    >
+      <span className="gameplay-tile-focus-label">{focus.label || (kind === 'draw' ? 'DRAW' : 'DISCARD')}</span>
+      <GameplayTile name={focus.tileName} className="gameplay-tile--focus" />
+    </div>
+  );
+}
+
 function ReclaimFeiPrompt({ windowState, t, onConfirm, onSkip, isPending = false }) {
   if (!windowState?.active) return null;
 
@@ -1828,7 +1929,6 @@ function Compass({ round = 'East 1', timer = 18, turnLabel = 'YOUR TURN' }) {
   return (
     <div className="gameplay-center-compass" aria-label={`Round ${round}. ${turnLabel}`}>
       <span className="timer">{timer}</span>
-      <span className="north">N</span>
       <span className="east">E</span>
       <strong>{round}</strong>
       <em>{turnLabel}</em>
@@ -1841,7 +1941,7 @@ function Compass({ round = 'East 1', timer = 18, turnLabel = 'YOUR TURN' }) {
 
 function normalizeSeat(value) {
   const seat = String(value || '').trim().toLowerCase();
-  const aliases = { east: 'e', south: 's', west: 'w', north: 'n' };
+  const aliases = { east: 'e', south: 's', west: 'w' };
   return aliases[seat] || seat;
 }
 
@@ -1852,7 +1952,7 @@ function getRelativeSeatPosition(activeSeat, ownSeat, playerCount = 3) {
   if (!active || !own) return '';
   if (active === own) return 'left';
 
-  const seats = ['e', 's', 'w', 'n'];
+  const seats = playerCount > 3 ? ['e', 's', 'w', 'n'] : ['e', 's', 'w'];
   const activeIndex = seats.indexOf(active);
   const ownIndex = seats.indexOf(own);
 
@@ -1919,9 +2019,16 @@ function mergeTurnStart(current, payload = {}) {
     claimWindow: null,
     reclaimFei: null,
     pendingDiscardTileId: null,
+    hasDiscardedThisTurn: false,
+    turnEndedByDiscard: false,
+    discardCountThisTurn: Number(payload.discardCountThisTurn || 0),
+    canDiscard: payload.canDiscard ?? true,
+    canPlayBonus: payload.canPlayBonus,
+    playableBonusTiles: payload.playableBonusTiles || [],
     pendingKong: null,
     pendingClaimAction: null,
     pendingReclaimFei: null,
+    pendingBonusTileId: null,
   };
 }
 
@@ -1935,9 +2042,22 @@ function mergeDrawnTile(current, payload = {}) {
     ? handTiles
     : [...handTiles, tile];
 
+  const renderedTile = tileIdToAssetName(tile);
+  const tileFocus = buildTileFocus({
+    kind: 'draw',
+    payload,
+    rawTileId: tile,
+    tileName: renderedTile,
+    position: 'left',
+    visibility: 'private',
+    label: 'DRAW',
+  });
+
   return {
     ...current,
     drawnTile: tile,
+    highlightedDrawnTile: { rawTileId: tile, tileName: renderedTile, id: tileFocus?.id || `${tile}_${Date.now()}` },
+    tileFocus,
     handTiles: nextHandTiles,
     myHand: nextHandTiles,
     wallRemaining: getWallRemainingValue(payload) ?? current.wallRemaining,
@@ -1960,6 +2080,9 @@ function mergeClaimWindow(current, payload = {}) {
     status: 'resolving',
     claimWindow: payload,
     availableActions: validActions,
+    hasDiscardedThisTurn: current.hasDiscardedThisTurn || false,
+    turnEndedByDiscard: current.turnEndedByDiscard || false,
+    canDiscard: false,
     timer: timerDeadlineMs ? getSecondsRemaining(timerDeadlineMs) : nextTimeLimit,
     timeLimit: nextTimeLimit || current.timeLimit,
     timerDeadlineMs,
@@ -2001,14 +2124,24 @@ function mergeActionBroadcast(current, payload = {}) {
 
   if (!action) return current;
 
+  const currentIds = getCurrentPlayerIdCandidates(current);
+  const isLocalActionPlayer = seatPosition === 'left' || (actionIds.length && actionIds.some((id) => currentIds.includes(id)));
+  const isLocalDiscard = action === 'discard' && isLocalActionPlayer;
+
   const next = {
     ...current,
     lastAction: payload,
-    status: action === 'disconnected' || action === 'reconnected' ? current.status : 'playing',
+    status: action === 'disconnected' || action === 'reconnected'
+      ? current.status
+      : (action === 'discard' ? 'resolving' : 'playing'),
     claimWindow: null,
     availableActions: [],
     validActions: [],
     pendingDiscardTileId: null,
+    hasDiscardedThisTurn: isLocalDiscard ? true : (current.hasDiscardedThisTurn || false),
+    turnEndedByDiscard: isLocalDiscard ? true : (current.turnEndedByDiscard || false),
+    discardCountThisTurn: isLocalDiscard ? Number(payload.discardCountThisTurn || current.discardCountThisTurn || 1) : Number(current.discardCountThisTurn || 0),
+    canDiscard: isLocalDiscard ? false : current.canDiscard,
     pendingKong: null,
     pendingClaimAction: null,
   };
@@ -2022,7 +2155,6 @@ function mergeActionBroadcast(current, payload = {}) {
     next.pendingReclaimFei = null;
     const payloadHandTiles = getFirstRawTileList(payload.handTiles, payload.myHand, payload.playerHand, payload.remainingHand, payload.currentPlayerHand, payload.hand);
     const isReclaimConfirm = ['fei_reclaimed', 'reclaim_fei', 'reclaim_fei_confirmed', 'replace_fei'].includes(action);
-    const currentIds = getCurrentPlayerIdCandidates(current);
     const isLocalReclaimPlayer = seatPosition === 'left' || (actionIds.length && actionIds.some((id) => currentIds.includes(id)));
     const replacementTileId = payload.replacementTileId || payload.actualTileId || payload.tileId;
     const feiTileId = payload.feiTileId || payload.feiTile || 'fei';
@@ -2066,18 +2198,35 @@ function mergeActionBroadcast(current, payload = {}) {
     }
   }
 
-  if (action === 'draw') {
+  if (action === 'draw' || action === 'draw_dead_wall') {
     next.wallRemaining = getWallRemainingValue(payload) ?? current.wallRemaining;
+
+    const shouldKeepPrivateLocalDraw = isLocalActionPlayer
+      && current.tileFocus?.kind === 'draw'
+      && current.tileFocus?.visibility === 'private'
+      && (payload.animationId ? current.tileFocus?.id === payload.animationId : true);
+
+    if (!shouldKeepPrivateLocalDraw) {
+      next.tileFocus = buildTileFocus({
+        kind: 'draw',
+        payload,
+        rawTileId: payload.tileVisibility === 'hidden' ? '' : tileId,
+        tileName: payload.tileVisibility === 'hidden' ? (payload.tileBack || 'tile_back.png') : tileIdToAssetName(tileId),
+        position: seatPosition || (isLocalActionPlayer ? 'left' : 'center'),
+        visibility: payload.tileVisibility || 'hidden',
+        label: 'DRAW',
+      });
+    }
   }
 
-  if (action === 'bonus_tile_revealed') {
+  if (action === 'bonus_tile_revealed' || action === 'bonus_tile_played' || action === 'play_bonus') {
     const revealedSource = [
       payload.revealedBonusTiles,
       payload.revealedBonus,
       payload.bonusTiles,
       payload.tiles,
     ].find((value) => Array.isArray(value) && value.length)
-      || [payload.tileId || payload.tile || payload.bonusTile || payload.revealedTile].filter(Boolean);
+      || [payload.bonusTile || payload.revealedTile || payload.tileId || payload.tile].filter(Boolean);
     const revealedTiles = normalizeTileList(revealedSource);
     const positionToUpdate = normalizePosition(seatPosition);
     next.wallRemaining = getWallRemainingValue(payload) ?? current.wallRemaining;
@@ -2113,6 +2262,20 @@ function mergeActionBroadcast(current, payload = {}) {
       bonusTilesByPosition[positionToUpdate] = appendUniqueTileList(bonusTilesByPosition[positionToUpdate], revealedTiles);
       next.bonusTiles = bonusTilesByPosition;
     }
+
+    const replacementTileId = payload.replacementTile || payload.replacementTileId || payload.drawnTile || payload.drawnTileId || payload.replacement;
+    if (action !== 'bonus_tile_revealed' && isLocalActionPlayer) {
+      const currentHandTiles = getFirstRawTileList(current.handTiles, current.myHand, current.playerHand);
+      const handWithoutBonus = removeOneTileFromHand(currentHandTiles, tileId, tileIdToAssetName(tileId));
+      next.handTiles = replacementTileId && !handWithoutBonus.some((handTile) => String(handTile) === String(replacementTileId))
+        ? [...handWithoutBonus, replacementTileId]
+        : handWithoutBonus;
+      next.myHand = next.handTiles;
+      next.playerHand = next.handTiles;
+      next.canPlayBonus = false;
+      next.playableBonusTiles = [];
+      next.pendingBonusTileId = null;
+    }
   }
 
   if (action === 'discard' && tileId) {
@@ -2124,6 +2287,24 @@ function mergeActionBroadcast(current, payload = {}) {
 
     discards[key] = [...normalizeTileList(discards[key]), renderedTile];
     next.discards = discards;
+
+    const tileFocus = buildTileFocus({
+      kind: 'discard',
+      payload,
+      rawTileId: tileId,
+      tileName: renderedTile,
+      position: key,
+      visibility: 'public',
+      label: 'DISCARD',
+    });
+
+    next.tileFocus = tileFocus;
+    next.highlightedDiscard = {
+      rawTileId: tileId,
+      tileName: renderedTile,
+      position: key,
+      id: tileFocus?.id || `${key}_${tileId}_${Date.now()}`,
+    };
 
     // Also update the per-player discards array so that getDiscardTilesByPosition
     // picks up discards from the correct player object (already positioned by seat).
@@ -2350,6 +2531,13 @@ function normalizeInitialSocketState(payload = {}, fallbackMatchId = '') {
     fanInfo: payload.fanInfo || payload.fanSummary || payload.handEvaluation || payload.winPreview || normalized.fanInfo,
     reclaimFei: normalizeReclaimFeiWindow(payload) || normalizeReclaimFeiWindow(normalized),
     currentDiscard: payload.currentDiscard ?? normalized.currentDiscard,
+    turnState: payload.turnState || normalized.turnState || null,
+    hasDiscardedThisTurn: Boolean(payload.myTurnHasDiscarded ?? normalized.myTurnHasDiscarded ?? payload.hasDiscardedThisTurn ?? normalized.hasDiscardedThisTurn ?? false),
+    turnEndedByDiscard: Boolean(payload.turnEndedByDiscard ?? normalized.turnEndedByDiscard ?? false),
+    discardCountThisTurn: Number(payload.discardCountThisTurn ?? normalized.discardCountThisTurn ?? payload.turnState?.discardCount ?? normalized.turnState?.discardCount ?? 0) || 0,
+    canDiscard: payload.canDiscard ?? normalized.canDiscard,
+    canPlayBonus: payload.canPlayBonus ?? normalized.canPlayBonus,
+    playableBonusTiles: payload.playableBonusTiles || normalized.playableBonusTiles || [],
     playerCount: payload.playerCount ?? normalized.playerCount ?? players.length,
     maxPlayers: payload.maxPlayers ?? payload.room?.maxPlayers ?? normalized.maxPlayers ?? normalized.room?.maxPlayers,
   };
@@ -2745,15 +2933,18 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   const reclaimFeiWindow = normalizeReclaimFeiWindow(gameState.reclaimFei);
   const isReclaimFeiPending = Boolean(gameState.pendingReclaimFei);
   const isFeiReclaimBlocking = Boolean(reclaimFeiWindow?.active || isReclaimFeiPending);
+  const hasUserDiscardedThisTurn = Boolean(gameState.hasDiscardedThisTurn || gameState.myTurnHasDiscarded);
+  const canUserDiscard = Boolean(isUserTurn && gameState.canDiscard !== false && !hasUserDiscardedThisTurn && !isClaimWindowOpen && !isFeiReclaimBlocking && !gameState.pendingDiscardTileId && !gameState.currentDiscard);
+  const canUserPlayBonus = Boolean(isUserTurn && gameState.canPlayBonus !== false && !hasUserDiscardedThisTurn && !isClaimWindowOpen && !isFeiReclaimBlocking && !gameState.pendingDiscardTileId && !gameState.pendingBonusTileId && !gameState.currentDiscard);
   const baseAvailableActions = getAvailableActions(gameState, false);
-  const turnAvailableActions = isUserTurn && !isClaimWindowOpen && !isFeiReclaimBlocking
+  const turnAvailableActions = isUserTurn && !hasUserDiscardedThisTurn && !isClaimWindowOpen && !isFeiReclaimBlocking
     ? baseAvailableActions.filter((action) => TURN_ONLY_ACTIONS.has(action))
     : [];
   const claimAvailableActions = isClaimWindowOpen && !isFeiReclaimBlocking
     ? baseAvailableActions.filter((action) => CLAIM_WINDOW_ONLY_ACTIONS.has(action) || action === 'hu')
     : [];
   const localKongPayload = getLocalKongCandidatePayload(playerHandTiles, leftOpenMelds);
-  const localKongAvailable = Boolean(isUserTurn && !isClaimWindowOpen && !isFeiReclaimBlocking && localKongPayload);
+  const localKongAvailable = Boolean(isUserTurn && !hasUserDiscardedThisTurn && !isClaimWindowOpen && !isFeiReclaimBlocking && localKongPayload);
   const availableActions = localKongAvailable && !turnAvailableActions.includes('kong')
     ? [...turnAvailableActions, 'kong']
     : (isClaimWindowOpen ? claimAvailableActions : turnAvailableActions);
@@ -2840,7 +3031,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   };
 
   const handleTileDiscard = (tileEntry) => {
-    if (!isUserTurn || gameState.pendingDiscardTileId) return;
+    if (!(canUserDiscard || canUserPlayBonus) || isFeiReclaimBlocking) return;
 
     if (isClaimWindowOpen) {
       setGameError(t('claimWindowOpen'));
@@ -2855,6 +3046,8 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     const entry = normalizeHandTileEntry(tileEntry, tileEntry?.index ?? 0);
     if (!entry) return;
 
+    const isBonusTile = isBonusTileName(entry);
+
     if (isFeiOrJokerTileName(entry)) {
       setGameError(t('feiLocked'));
       return;
@@ -2863,6 +3056,47 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     const tileId = getTileId(entry);
     const renderedTile = entry.assetName;
     if (!tileId) return;
+
+    if (isBonusTile) {
+      if (!canUserPlayBonus) {
+        setGameError(t('bonusTileUnavailable'));
+        return;
+      }
+
+      if (isMockGameplay) {
+        setGameState((current) => {
+          const handTiles = removeOneTileFromHand(
+            getFirstRawTileList(current.handTiles, current.myHand, current.playerHand),
+            String(tileId),
+            renderedTile
+          );
+          const bonusTiles = { ...(current.bonusTiles || {}) };
+          bonusTiles.left = appendUniqueTileList(bonusTiles.left, [renderedTile]);
+
+          return {
+            ...(current || {}),
+            handTiles,
+            myHand: handTiles,
+            playerHand: handTiles,
+            bonusTiles,
+          };
+        });
+        setGameError('');
+        return;
+      }
+
+      const sent = playBonusTile(tileId);
+      if (sent) {
+        setGameState((current) => ({
+          ...(current || {}),
+          pendingBonusTileId: tileId,
+        }));
+        setGameError('');
+      } else {
+        setGameError(t('unablePlayBonusTile'));
+      }
+      return;
+    }
 
     if (isMockGameplay) {
       setGameState((current) => {
@@ -2882,6 +3116,10 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           discards,
           currentDiscard: renderedTile,
           pendingDiscardTileId: null,
+          hasDiscardedThisTurn: true,
+          turnEndedByDiscard: true,
+          discardCountThisTurn: 1,
+          canDiscard: false,
         };
       });
       setGameError('');
@@ -2890,7 +3128,16 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
 
     const sent = discardTile(tileId);
     if (sent) {
-      setGameState((current) => ({ ...(current || {}), pendingDiscardTileId: tileId }));
+      setGameState((current) => ({
+        ...(current || {}),
+        pendingDiscardTileId: tileId,
+        hasDiscardedThisTurn: true,
+        turnEndedByDiscard: true,
+        discardCountThisTurn: 1,
+        canDiscard: false,
+        availableActions: [],
+        validActions: [],
+      }));
       setGameError('');
     } else {
       setGameError('Unable to discard tile. Waiting for gameplay socket connection.');
@@ -3048,6 +3295,12 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     }
   };
 
+  const getDiscardTileClassName = (tile, index, tiles, position) => (
+    isLastHighlightedTile(tile, index, tiles, position, gameState.highlightedDiscard)
+      ? 'gameplay-tile--highlighted gameplay-tile--discard-highlight'
+      : ''
+  );
+
   return (
     <section className={`gameplay-screen ${isMockGameplay ? 'gameplay-screen--mock' : ''}`} aria-label="Mahjong gameplay screen">
       <img className="gameplay-bg" src={asset('BG.png')} alt="" draggable="false" />
@@ -3137,15 +3390,18 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
 
       <main className="gameplay-table-zone">
         <img className="gameplay-table" src={asset('table.png')} alt="Mahjong table" draggable="false" />
+        <div className="gameplay-middle-tray" aria-hidden="true" />
+        <TileFocusOverlay key={gameState.tileFocus?.id || 'tile-focus'} focus={gameState.tileFocus} />
 
         <TileWall count={14} direction="horizontal" className="wall-top" />
-        {hasRightPlayer ? <TileWall count={13} direction="vertical" className="wall-right" /> : null}
+        <TileWall count={13} direction="vertical" className="wall-left" />
+        <TileWall count={14} direction="horizontal" className="wall-bottom" />
 
         <Compass round={gameState.round || 'East 1'} timer={displayTimer} turnLabel={activeTurnLabel} />
 
         <div className="gameplay-upper-discard" aria-label="Top discard tiles">
           {topDiscardTiles.map((tile, index) => (
-            <GameplayTile name={tile} key={`${tile}-${index}`} />
+            <GameplayTile name={tile} className={getDiscardTileClassName(tile, index, topDiscardTiles, 'top')} key={`${tile}-${index}`} />
           ))}
         </div>
         <BonusTileRack position="top" tiles={topBonusTiles} label={t('bonusTiles')} visible={shouldShowBonusRacks} />
@@ -3155,7 +3411,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           <>
             <div className="gameplay-right-discard" aria-label="Right discard tiles">
               {rightDiscardTiles.map((tile, index) => (
-                <GameplayTile name={tile} key={`${tile}-${index}`} />
+                <GameplayTile name={tile} className={getDiscardTileClassName(tile, index, rightDiscardTiles, 'right')} key={`${tile}-${index}`} />
               ))}
             </div>
             <BonusTileRack position="right" tiles={rightBonusTiles} label={t('bonusTiles')} visible={shouldShowBonusRacks} />
@@ -3165,13 +3421,13 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
 
         <div className="gameplay-center-discard" aria-label="Center meld tiles">
           {centerDiscardTiles.map((tile, index) => (
-            <GameplayTile name={tile} key={`${tile}-${index}`} />
+            <GameplayTile name={tile} className={getDiscardTileClassName(tile, index, centerDiscardTiles, 'center')} key={`${tile}-${index}`} />
           ))}
         </div>
 
         <div className="gameplay-left-discard" aria-label="Your discard tiles">
           {leftDiscardTiles.map((tile, index) => (
-            <GameplayTile name={tile} key={`${tile}-${index}`} />
+            <GameplayTile name={tile} className={getDiscardTileClassName(tile, index, leftDiscardTiles, 'left')} key={`${tile}-${index}`} />
           ))}
         </div>
         <BonusTileRack position="left" tiles={leftBonusTiles} label={t('bonusTiles')} visible={shouldShowBonusRacks} />
@@ -3180,21 +3436,25 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         <div className="gameplay-hand" aria-label="Player hand tiles">
           {playerHandTiles.map((tile, index) => {
             const isLockedFei = isFeiOrJokerTileName(tile);
+            const isBonusTile = isBonusTileName(tile);
             const assetName = tile.assetName;
+            const isDrawnTileHighlight = tileMatchesHighlight(tile, gameState.highlightedDrawnTile);
+            const isTileDisabled = isLockedFei || isFeiReclaimBlocking || (isBonusTile ? !canUserPlayBonus : !canUserDiscard);
 
             return (
               <button
-                className={`gameplay-hand-tile ${isLockedFei ? 'gameplay-hand-tile--fei' : ''}`}
+                className={`gameplay-hand-tile ${isLockedFei ? 'gameplay-hand-tile--fei' : ''} ${isBonusTile ? 'gameplay-hand-tile--bonus' : ''} ${isDrawnTileHighlight ? 'gameplay-hand-tile--drawn-highlight' : ''}`}
                 type="button"
                 key={`${tile.rawId || assetName}-${index}`}
                 data-tile-id={tile.rawId}
-                aria-label={isLockedFei ? `${t('feiLocked')} ${index + 1}` : `Tile ${index + 1}`}
-                title={isLockedFei ? t('feiLocked') : undefined}
-                disabled={!isUserTurn || isClaimWindowOpen || isFeiReclaimBlocking || Boolean(gameState.pendingDiscardTileId) || isLockedFei}
+                aria-label={isLockedFei ? `${t('feiLocked')} ${index + 1}` : isBonusTile ? `${t('playBonusTile')} ${index + 1}` : `Tile ${index + 1}`}
+                title={isLockedFei ? t('feiLocked') : isBonusTile ? t('playBonusTile') : undefined}
+                disabled={isTileDisabled}
                 onClick={() => handleTileDiscard(tile)}
               >
-                <GameplayTile name={assetName} className={isLockedFei ? 'gameplay-tile--fei' : ''} />
+                <GameplayTile name={assetName} className={`${isLockedFei ? 'gameplay-tile--fei' : ''} ${isBonusTile ? 'gameplay-tile--bonus' : ''} ${isDrawnTileHighlight ? 'gameplay-tile--drawn-highlight' : ''}`} />
                 {isLockedFei ? <span className="gameplay-fei-lock" aria-hidden="true">FEI</span> : null}
+                {isBonusTile ? <span className="gameplay-bonus-play-label" aria-hidden="true">BONUS</span> : null}
               </button>
             );
           })}
@@ -3218,7 +3478,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
               key={actionKey}
               onClick={() => handleMahjongAction(actionKey)}
               aria-pressed={isActive}
-              disabled={isFeiReclaimBlocking || !availableActions.includes(actionKey) || (!isClaimWindowOpen && !isUserTurn)}
+              disabled={isFeiReclaimBlocking || hasUserDiscardedThisTurn || !availableActions.includes(actionKey) || (!isClaimWindowOpen && !isUserTurn)}
             >
               {t(action.labelKey)}
             </button>

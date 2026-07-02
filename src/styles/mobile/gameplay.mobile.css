@@ -1361,3 +1361,298 @@ animation: none;
   opacity: .55;
   cursor: wait;
 }
+
+/* Patch 3 — Manual bonus tiles in hand */
+.app-shell[data-device='mobile'] .gameplay-hand-tile--bonus {
+  filter: drop-shadow(0 0 9px rgba(255, 214, 102, .72));
+}
+
+.app-shell[data-device='mobile'] .gameplay-hand-tile--bonus .gameplay-tile {
+  transform: translateY(-3px) scale(1.05);
+}
+
+.app-shell[data-device='mobile'] .gameplay-bonus-play-label {
+  position: absolute;
+  left: 50%;
+  bottom: -11px;
+  transform: translateX(-50%);
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(30, 12, 4, .82);
+  color: #ffe7a3;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Patch 4 — Board Layout + Middle Tiles + Bigger Timer
+   Scope: mobile landscape gameplay only. */
+.app-shell[data-device='mobile'] .gameplay-screen {
+  --gp-table-p4-x: 50%;
+  --gp-table-p4-y: 50%;
+  --gp-table-p4-width: min(94vw, 1040px);
+  --gp-middle-tray-x: 50%;
+  --gp-middle-tray-y: 47%;
+  --gp-middle-tray-w: 430px;
+  --gp-middle-tray-h: 300px;
+  --gp-bonus-mine-x: 3.2%;
+  --gp-bonus-mine-y: 4.2%;
+  --gp-timer-size: 52px;
+}
+
+.app-shell[data-device='mobile'] .gameplay-player-badge.left::before {
+  content: "";
+  display: none;
+}
+
+.app-shell[data-device='mobile'] .gameplay-table-zone {
+  left: var(--gp-table-p4-x);
+  top: var(--gp-table-p4-y);
+  width: var(--gp-table-p4-width);
+  transform: translate(-50%, -48%);
+}
+
+.app-shell[data-device='mobile'] .gameplay-middle-tray {
+  position: absolute;
+  z-index: 6;
+  left: var(--gp-middle-tray-x);
+  top: var(--gp-middle-tray-y);
+  width: var(--gp-middle-tray-w);
+  height: var(--gp-middle-tray-h);
+  border-radius: 34px;
+  background: radial-gradient(ellipse at center, rgba(12, 16, 25, .42), rgba(4, 7, 13, .18) 58%, transparent 72%);
+  border: 1px solid rgba(255, 225, 130, .08);
+  box-shadow: inset 0 0 28px rgba(0, 0, 0, .24);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.app-shell[data-device='mobile'] .gameplay-tile-wall.horizontal {
+  flex-direction: row;
+}
+
+.app-shell[data-device='mobile'] .gameplay-tile-wall.vertical {
+  flex-direction: column;
+}
+
+.app-shell[data-device='mobile'] .gameplay-tile-wall.wall-right {
+  display: none;
+}
+
+.app-shell[data-device='mobile'] .gameplay-tile-wall.wall-top {
+  top: 19.2%;
+  left: 50%;
+  transform: translateX(-50%) scaleY(.82);
+  transform-origin: top center;
+}
+
+.app-shell[data-device='mobile'] .gameplay-tile-wall.wall-left {
+  top: 45%;
+  left: 33.8%;
+  transform: translate(-50%, -50%) scaleX(.92) scaleY(.82);
+  transform-origin: center;
+}
+
+.app-shell[data-device='mobile'] .gameplay-tile-wall.wall-bottom {
+  top: 68.2%;
+  left: 50%;
+  transform: translateX(-50%) scaleY(.82);
+  transform-origin: bottom center;
+}
+
+.app-shell[data-device='mobile'] .gameplay-tile-wall.wall-left img {
+  margin-left: 0;
+  margin-top: -2px;
+}
+
+.app-shell[data-device='mobile'] .gameplay-center-compass {
+  z-index: 10;
+  top: 47%;
+  width: 146px;
+}
+
+.app-shell[data-device='mobile'] .gameplay-center-compass .timer {
+  top: -20px;
+  left: 50%;
+  width: var(--gp-timer-size);
+  height: var(--gp-timer-size);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #10220c;
+  background: linear-gradient(180deg, #dcff8c, #43dd62 58%, #15913d);
+  border: 2px solid rgba(241, 255, 185, .9);
+  box-shadow: 0 7px 16px rgba(0, 0, 0, .42), 0 0 18px rgba(78, 235, 105, .56), inset 0 2px 0 rgba(255, 255, 255, .46);
+  font-size: 29px;
+  font-weight: 1000;
+  line-height: 1;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .36);
+  transform: translateX(-50%);
+}
+
+.app-shell[data-device='mobile'] .gameplay-center-compass strong {
+  margin-top: 12px;
+}
+
+.app-shell[data-device='mobile'] .gameplay-center-compass em {
+  bottom: -32px;
+  font-size: 12px;
+}
+
+.app-shell[data-device='mobile'] .gameplay-upper-discard,
+.app-shell[data-device='mobile'] .gameplay-center-discard,
+.app-shell[data-device='mobile'] .gameplay-right-discard,
+.app-shell[data-device='mobile'] .gameplay-left-discard {
+  z-index: 11;
+  padding: 4px 7px;
+  border-radius: 12px;
+  background: rgba(5, 10, 18, .34);
+  box-shadow: 0 7px 15px rgba(0, 0, 0, .24), inset 0 0 0 1px rgba(255, 230, 150, .07);
+}
+
+.app-shell[data-device='mobile'] .gameplay-upper-discard {
+  top: 31.3%;
+  left: 50%;
+  transform: translateX(-50%) scale(.92);
+}
+
+.app-shell[data-device='mobile'] .gameplay-center-discard {
+  top: 49.5%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(.96);
+}
+
+.app-shell[data-device='mobile'] .gameplay-left-discard {
+  left: 50%;
+  bottom: 25.8%;
+  max-width: 46%;
+  transform: translateX(-50%) scale(.92);
+}
+
+.app-shell[data-device='mobile'] .gameplay-right-discard {
+  top: 41.4%;
+  left: 63.8%;
+  transform: translateY(-50%) scale(.9);
+}
+
+.app-shell[data-device='mobile'] .gameplay-upper-discard .gameplay-tile,
+.app-shell[data-device='mobile'] .gameplay-center-discard .gameplay-tile,
+.app-shell[data-device='mobile'] .gameplay-right-discard .gameplay-tile,
+.app-shell[data-device='mobile'] .gameplay-left-discard .gameplay-tile {
+  width: 42px;
+  height: 67px;
+  filter: drop-shadow(0 0 8px rgba(255, 218, 85, .54)) drop-shadow(0 4px 5px rgba(0, 0, 0, .42));
+}
+
+.app-shell[data-device='mobile'] .gameplay-bonus-rack--left {
+  left: var(--gp-bonus-mine-x);
+  top: var(--gp-bonus-mine-y);
+  right: auto;
+  bottom: auto;
+  transform: none;
+  transform-origin: top left;
+}
+
+.app-shell[data-device='mobile'] .gameplay-bonus-rack--left .gameplay-bonus-rack-label {
+  font-size: 14px;
+}
+
+.app-shell[data-device='mobile'] .gameplay-bonus-rack--left .gameplay-tile,
+.app-shell[data-device='mobile'] .gameplay-bonus-rack--left .gameplay-bonus-empty-slot {
+  width: 46px;
+  height: 73px;
+}
+
+.app-shell[data-device='mobile'] .gameplay-bonus-rack--top {
+  top: 10.5%;
+  left: 47%;
+  right: auto;
+  transform: translateX(-50%) scale(.95);
+}
+
+.app-shell[data-device='mobile'] .gameplay-bonus-rack--right {
+  top: 33%;
+  right: 5%;
+  transform: scale(.95);
+}
+
+/* Patch 5 — Draw/Discard Highlight Animation + Win Validation feedback */
+.app-shell[data-device='mobile'] .gameplay-tile-focus {
+  position: absolute;
+  z-index: 26;
+  left: 50%;
+  top: 47%;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: gameplay-tile-focus-pop-mobile 1.45s ease-out both;
+}
+
+.app-shell[data-device='mobile'] .gameplay-tile-focus--top { top: 38%; }
+.app-shell[data-device='mobile'] .gameplay-tile-focus--left { top: 54%; }
+.app-shell[data-device='mobile'] .gameplay-tile-focus--right { left: 58%; top: 48%; }
+.app-shell[data-device='mobile'] .gameplay-tile-focus--center { top: 47%; }
+
+.app-shell[data-device='mobile'] .gameplay-tile-focus .gameplay-tile--focus {
+  width: clamp(50px, 6vw, 80px);
+  height: clamp(78px, 9vw, 124px);
+  filter: drop-shadow(0 0 18px rgba(255, 222, 90, .92)) drop-shadow(0 9px 14px rgba(0, 0, 0, .48));
+}
+
+.app-shell[data-device='mobile'] .gameplay-tile-focus-label {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(19, 12, 2, .82);
+  color: #ffe98c;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: .12em;
+  transform: translateX(-50%);
+  box-shadow: 0 0 12px rgba(255, 218, 77, .42);
+}
+
+.app-shell[data-device='mobile'] .gameplay-tile--highlighted,
+.app-shell[data-device='mobile'] .gameplay-tile--discard-highlight,
+.app-shell[data-device='mobile'] .gameplay-tile--drawn-highlight {
+  filter: drop-shadow(0 0 12px rgba(255, 230, 92, .96)) drop-shadow(0 4px 5px rgba(0, 0, 0, .34));
+  animation: gameplay-tile-highlight-pulse-mobile 1.25s ease-out both;
+}
+
+.app-shell[data-device='mobile'] .gameplay-hand-tile--drawn-highlight {
+  transform: translateY(-7px);
+}
+
+.app-shell[data-device='mobile'] .gameplay-hand-tile--drawn-highlight::after {
+  content: "DRAW";
+  position: absolute;
+  left: 50%;
+  top: -18px;
+  transform: translateX(-50%);
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(22, 10, 2, .86);
+  color: #ffe98c;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: .1em;
+  pointer-events: none;
+}
+
+@keyframes gameplay-tile-focus-pop-mobile {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.72); }
+  16% { opacity: 1; transform: translate(-50%, -50%) scale(1.16); }
+  58% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(.92); }
+}
+
+@keyframes gameplay-tile-highlight-pulse-mobile {
+  0% { transform: translateY(-4px) scale(1.1); }
+  60% { transform: translateY(-2px) scale(1.04); }
+  100% { transform: translateY(0) scale(1); }
+}
