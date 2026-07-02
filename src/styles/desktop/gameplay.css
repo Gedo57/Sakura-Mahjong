@@ -2311,7 +2311,7 @@ animation: none;
 .app-shell[data-device='desktop'] .gameplay-bottom-discard {
   position: absolute !important;
   left: 50% !important;
-  bottom: 196px !important;
+  bottom: 130px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
