@@ -12,7 +12,7 @@ export const mockGameState = {
   ],
   rotation: 'counterclockwise',
   hasNorthPlayer: false,
-  timer: 18,
+  timer: 30,
   activeTurnPosition: 'left',
   availableActions: ['chow', 'pong', 'kong', 'hu', 'pass'],
   centerTiles: [

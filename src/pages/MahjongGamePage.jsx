@@ -1927,7 +1927,7 @@ function PlayerBadge({ variant = 'small', avatar, name, title = '', seatLabel = 
   );
 }
 
-function Compass({ round = 'East 1', timer = 18, turnLabel = 'YOUR TURN' }) {
+function Compass({ round = 'East 1', timer = 30, turnLabel = 'YOUR TURN' }) {
   return (
     <div className="gameplay-center-compass" aria-label={`Round ${round}. ${turnLabel}`}>
       <span className="timer">{timer}</span>

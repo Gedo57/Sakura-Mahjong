@@ -25,9 +25,21 @@ export async function createPrivateRoom(payload = {}) {
     throw new Error('tierId is required to create a private room.');
   }
 
+  const enableBots = Boolean(
+    payload.enableBots
+    || payload.botsEnabled
+    || payload.mode === 'solo'
+    || payload.type === 'solo'
+  );
+
   const requestPayload = {
     tierId,
     maxPlayers: 3,
+    roomName: payload.roomName || payload.name || '',
+    enableBots,
+    botsEnabled: enableBots,
+    mode: enableBots ? 'solo' : (payload.mode || 'private'),
+    type: enableBots ? 'solo' : (payload.type || 'private'),
   };
 
   const response = await apiRequest('/rooms/private', {

@@ -159,7 +159,7 @@ export function normalizeGameState(response = {}) {
     minimumFan: state.minimumFan ?? state.minFan ?? state.requiredFan ?? state.requiredFans,
     fanInfo: state.fanInfo || state.fanSummary || state.handEvaluation || state.winPreview || state.scoring || null,
     currentDiscard: state.currentDiscard ?? state.discardedTile ?? state.lastDiscard,
-    timer: state.timer ?? state.remainingSeconds ?? state.timeLimit ?? 18,
+    timer: state.timer ?? state.remainingSeconds ?? state.timeLimit ?? 30,
     handTiles: state.handTiles || state.playerHand || state.myHand || state.currentPlayerHand || privateHand || [],
     myHand: state.myHand || state.handTiles || state.playerHand || state.currentPlayerHand || privateHand || [],
     discards: state.discards || state.discardTiles || state.discardPiles || {},
@@ -326,6 +326,18 @@ export function normalizeRoomTierList(response = {}) {
 
 export function normalizePrivateRoom(response = {}, requestPayload = {}) {
   const room = response.room || response.privateRoom || response.data || response;
+  const isSolo = Boolean(
+    room.isSolo
+    || room.enableBots
+    || room.botsEnabled
+    || room.mode === 'solo'
+    || room.type === 'solo'
+    || requestPayload.enableBots
+    || requestPayload.botsEnabled
+    || requestPayload.mode === 'solo'
+    || requestPayload.type === 'solo'
+  );
+
   return {
     ...room,
     id: room.roomId || room.id || requestPayload.tierId,
@@ -334,6 +346,15 @@ export function normalizePrivateRoom(response = {}, requestPayload = {}) {
     tierId: room.tierId || requestPayload.tierId,
     maxPlayers: 3,
     status: room.status || 'created',
+    type: isSolo ? 'solo' : (room.type || requestPayload.type || 'private'),
+    mode: isSolo ? 'solo' : (room.mode || requestPayload.mode || 'private'),
+    enableBots: isSolo,
+    botsEnabled: isSolo,
+    isSolo,
+    botCount: Number(room.botCount || (isSolo ? 2 : 0)),
+    humanPlayerCount: Number(room.humanPlayerCount || (isSolo ? 1 : (room.players?.length || 1))),
+    players: room.players || [],
+    botPlayers: room.botPlayers || [],
   };
 }
 

@@ -500,3 +500,31 @@ display: inline-flex;
   min-height: 36px;
   line-height: 36px;
 }
+
+/* PATCH 4: Bot mode / Play Solo contract */
+.app-shell[data-device='desktop'] .create-settings-card {
+  min-height: 565px;
+}
+
+.app-shell[data-device='desktop'] .room-preview-card {
+  min-height: 565px;
+}
+
+.app-shell[data-device='desktop'] .bot-mode-row {
+  min-height: 52px;
+}
+
+.app-shell[data-device='desktop'] .bot-mode-options button {
+  min-width: 96px;
+}
+
+.app-shell[data-device='desktop'] .bot-mode-options button.active {
+  border-color: rgba(119, 223, 255, .78);
+  background: linear-gradient(180deg, #30a9d4, #1e5f9e);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.24), 0 0 13px rgba(79, 188, 255, .25);
+}
+
+.app-shell[data-device='desktop'] .room-type-options button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}

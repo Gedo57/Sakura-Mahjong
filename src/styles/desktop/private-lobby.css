@@ -396,3 +396,30 @@
   background: rgba(255, 80, 80, 0.18);
   border-color: rgba(255, 80, 80, 0.5);
 }
+
+/* PATCH 4: solo lobby / bot seat visual state */
+.lobby-room-info.lobby-room-info--solo {
+  border-color: rgba(119, 223, 255, 0.32);
+  background: linear-gradient(135deg, rgba(58, 160, 215, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+}
+
+.lobby-player-card.lobby-player-bot {
+  border-color: rgba(119, 223, 255, 0.22);
+  background: linear-gradient(135deg, rgba(58, 160, 215, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+}
+
+.lobby-bot-badge {
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  font-size: 0.55rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #021523;
+  background: linear-gradient(135deg, #80dfff, #30a9d4);
+  border-radius: 4px;
+  white-space: nowrap;
+}

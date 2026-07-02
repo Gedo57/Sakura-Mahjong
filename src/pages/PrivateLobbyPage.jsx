@@ -26,6 +26,10 @@ function getCurrentUser() {
   };
 }
 
+function isSoloPayload(payload = {}) {
+  return Boolean(payload.isSolo || payload.enableBots || payload.botsEnabled || payload.mode === 'solo' || payload.type === 'solo');
+}
+
 export default function PrivateLobbyPage() {
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -36,22 +40,61 @@ export default function PrivateLobbyPage() {
   const roomIdRef = useRef(ctx.roomId || '');
   const roomCodeRef = useRef(ctx.roomCode || '');
   const isHostRef = useRef(Boolean(ctx.isHost));
+  const isSoloRef = useRef(isSoloPayload(ctx));
   const maxPlayersRef = useRef(3);
 
   const [roomId, setRoomId] = useState(roomIdRef.current);
   const [roomCode, setRoomCode] = useState(roomCodeRef.current);
   const [isHost, setIsHost] = useState(isHostRef.current);
+  const [isSoloRoom, setIsSoloRoom] = useState(isSoloRef.current);
+  const [botCount, setBotCount] = useState(Number(ctx.botCount || (isSoloRef.current ? 2 : 0)));
   const [maxPlayers, setMaxPlayers] = useState(maxPlayersRef.current);
-  const [players, setPlayers] = useState([]);
+  const [players, setPlayers] = useState(Array.isArray(ctx.players) ? ctx.players : []);
   const [status, setStatus] = useState('connecting');
   const [errorMessage, setErrorMessage] = useState('');
   const [copied, setCopied] = useState(false);
-  const [gameStarting, setGameStarting] = useState(false);
+  const [gameStarting, setGameStarting] = useState(isSoloRef.current);
   const gameStartedRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
     gameStartedRef.current = false;
+
+    const applyRoomPayload = (payload = {}) => {
+      if (payload.roomId) {
+        roomIdRef.current = payload.roomId;
+        setRoomId(payload.roomId);
+      }
+      if (payload.roomCode !== undefined) {
+        roomCodeRef.current = payload.roomCode || '';
+        setRoomCode(payload.roomCode || '');
+      }
+      if (payload.maxPlayers) {
+        maxPlayersRef.current = 3;
+        setMaxPlayers(3);
+      }
+
+      const payloadIsSolo = isSoloPayload(payload);
+      if (payloadIsSolo) {
+        isSoloRef.current = true;
+        setIsSoloRoom(true);
+        setGameStarting(true);
+      }
+
+      if (payload.botCount !== undefined) {
+        setBotCount(Number(payload.botCount || 0));
+      }
+
+      if (payload.hostUserId) {
+        const amHost = payload.hostUserId.toString() === currentUser.id;
+        isHostRef.current = amHost;
+        setIsHost(amHost);
+      }
+
+      if (Array.isArray(payload.players)) {
+        setPlayers(payload.players);
+      }
+    };
 
     const handleSocketMessage = (message) => {
       if (!isMounted || gameStartedRef.current) return;
@@ -59,15 +102,8 @@ export default function PrivateLobbyPage() {
 
       switch (message?.type) {
         case 'private_joined':
-          if (payload.roomId) {
-            roomIdRef.current = payload.roomId;
-            setRoomId(payload.roomId);
-          }
-          if (payload.roomCode) {
-            roomCodeRef.current = payload.roomCode;
-            setRoomCode(payload.roomCode);
-          }
-          setStatus('waiting');
+          applyRoomPayload(payload);
+          setStatus(isSoloRef.current ? 'starting' : 'waiting');
           setErrorMessage('');
           break;
 
@@ -80,27 +116,8 @@ export default function PrivateLobbyPage() {
             }, 2000);
             return;
           }
-          if (payload.roomId) {
-            roomIdRef.current = payload.roomId;
-            setRoomId(payload.roomId);
-          }
-          if (payload.roomCode) {
-            roomCodeRef.current = payload.roomCode;
-            setRoomCode(payload.roomCode);
-          }
-          if (payload.maxPlayers) {
-            maxPlayersRef.current = 3;
-            setMaxPlayers(3);
-          }
-          if (payload.hostUserId) {
-            const amHost = payload.hostUserId.toString() === currentUser.id;
-            isHostRef.current = amHost;
-            setIsHost(amHost);
-          }
-          if (Array.isArray(payload.players)) {
-            setPlayers(payload.players);
-          }
-          setStatus('waiting');
+          applyRoomPayload(payload);
+          setStatus(isSoloPayload(payload) ? 'starting' : 'waiting');
           setErrorMessage('');
           break;
 
@@ -152,6 +169,7 @@ export default function PrivateLobbyPage() {
           const errorText = payload.message || payload.error || 'Socket error';
           if (/already\s+in\s+the\s+queue/i.test(errorText)) break;
           setErrorMessage(errorText);
+          if (isSoloRef.current) setGameStarting(false);
           break;
         }
 
@@ -164,11 +182,14 @@ export default function PrivateLobbyPage() {
     let roomJoinSent = false;
 
     const emitRoomJoin = (rawSocket = null) => {
-      const code = roomCodeRef.current;
-      if (!code) return;
+      const joinByRoomId = isSoloRef.current && roomIdRef.current;
+      const joinByCode = roomCodeRef.current;
+      if (!joinByRoomId && !joinByCode) return;
       if (roomJoinSent) return;
 
-      const payload = { roomCode: code };
+      const payload = joinByRoomId
+        ? { roomId: roomIdRef.current }
+        : { roomCode: roomCodeRef.current };
       let joined = false;
 
       if (rawSocket?.connected) {
@@ -192,12 +213,14 @@ export default function PrivateLobbyPage() {
       onError: (error) => {
         if (isMounted) {
           setStatus('error');
+          setGameStarting(false);
           setErrorMessage(error?.message || 'Unable to connect to gameplay server.');
         }
       },
       onClose: () => {
         if (isMounted && !gameStartedRef.current) {
           setStatus('disconnected');
+          setGameStarting(false);
         }
       },
     });
@@ -246,17 +269,17 @@ export default function PrivateLobbyPage() {
         <button type="button" className="lobby-back-btn" onClick={handleLeaveLobby} aria-label="Leave lobby">
           ←
         </button>
-        <h1>Private Lobby</h1>
+        <h1>{isSoloRoom ? t('soloLobbyTitle') : t('privateLobbyTitle')}</h1>
       </header>
 
       <main className="private-lobby-content">
         {/* Room Info Card */}
-        <div className="lobby-room-info">
+        <div className={`lobby-room-info${isSoloRoom ? ' lobby-room-info--solo' : ''}`}>
           <div className="lobby-room-code-block">
-            <span className="lobby-label">Room Code</span>
+            <span className="lobby-label">{isSoloRoom ? t('soloSession') : 'Room Code'}</span>
             <div className="lobby-code-value">
-              <strong>{roomCode || '---'}</strong>
-              {roomCode && (
+              <strong>{isSoloRoom ? t('playSolo') : roomCode || '---'}</strong>
+              {!isSoloRoom && roomCode && (
                 <button type="button" className="lobby-copy-btn" onClick={handleCopyCode}>
                   {copied ? '✓ Copied' : 'Copy'}
                 </button>
@@ -266,29 +289,42 @@ export default function PrivateLobbyPage() {
           <div className="lobby-room-meta">
             <span>{maxPlayers} Players</span>
             <span className="lobby-meta-divider">•</span>
-            <span>Private</span>
+            <span>{isSoloRoom ? t('solo') : 'Private'}</span>
+            {isSoloRoom && (
+              <>
+                <span className="lobby-meta-divider">•</span>
+                <span>{botCount || 2} {t('bots')}</span>
+              </>
+            )}
           </div>
         </div>
 
         {/* Status */}
         {errorMessage && <p className="lobby-error">{errorMessage}</p>}
         {status === 'connecting' && <p className="lobby-status">Connecting to server...</p>}
+        {isSoloRoom && gameStarting && !errorMessage && <p className="lobby-status">{t('startingSoloGame')}</p>}
 
         {/* Player Slots */}
         <div className="lobby-players-grid">
           {players.map((player, index) => {
-            const pid = player.userId || player.id || player._id || '';
+            const normalizedPlayer = typeof player === 'string'
+              ? { userId: player, id: player }
+              : (player || {});
+            const firstPlayer = typeof players[0] === 'string' ? { userId: players[0] } : (players[0] || {});
+            const pid = normalizedPlayer.userId || normalizedPlayer.id || normalizedPlayer._id || '';
             const isMe = pid === currentUser.id;
-            const isPlayerHost = player.isHost || (pid === players[0]?.userId);
+            const isBot = Boolean(normalizedPlayer.isBot || /^bot_/i.test(String(pid)));
+            const isPlayerHost = !isBot && (normalizedPlayer.isHost || (pid === firstPlayer.userId));
             return (
-              <div key={pid || index} className={`lobby-player-card ${isMe ? 'lobby-player-me' : ''}`}>
+              <div key={pid || index} className={`lobby-player-card ${isMe ? 'lobby-player-me' : ''} ${isBot ? 'lobby-player-bot' : ''}`}>
                 <div className="lobby-player-avatar-wrap">
-                  <img src={getAvatarSrc(player.avatar)} alt="" />
+                  <img src={getAvatarSrc(normalizedPlayer.avatar)} alt="" />
                   {isPlayerHost && <span className="lobby-host-badge">HOST</span>}
+                  {isBot && <span className="lobby-bot-badge">BOT</span>}
                 </div>
                 <div className="lobby-player-info">
-                  <h3>{player.username || player.name || `Player ${index + 1}`}</h3>
-                  {player.title && <span className="lobby-player-title">{player.title}</span>}
+                  <h3>{normalizedPlayer.username || normalizedPlayer.name || (isBot ? `${t('botPlayer')} ${index}` : `Player ${index + 1}`)}</h3>
+                  {normalizedPlayer.title && <span className="lobby-player-title">{normalizedPlayer.title}</span>}
                   <span className="lobby-ready-badge">✓ Ready</span>
                 </div>
               </div>
@@ -302,7 +338,7 @@ export default function PrivateLobbyPage() {
                 <span>?</span>
               </div>
               <div className="lobby-player-info">
-                <h3>Waiting for player...</h3>
+                <h3>{isSoloRoom ? t('waitingSoloGame') : 'Waiting for player...'}</h3>
                 <span className="lobby-waiting-dots">
                   <span className="dot" />
                   <span className="dot" />
@@ -320,7 +356,7 @@ export default function PrivateLobbyPage() {
 
         {/* Actions */}
         <div className="lobby-actions">
-          {isHost && (
+          {isHost && !isSoloRoom && (
             <button
               type="button"
               className="lobby-start-btn"
@@ -328,6 +364,17 @@ export default function PrivateLobbyPage() {
               disabled={!canStart}
             >
               {gameStarting ? 'Starting...' : players.length < 3 ? 'Waiting for 3 players...' : 'START GAME'}
+            </button>
+          )}
+
+          {isHost && isSoloRoom && !gameStarting && (
+            <button
+              type="button"
+              className="lobby-start-btn"
+              onClick={handleStartGame}
+              disabled={!canStart}
+            >
+              START SOLO
             </button>
           )}
 

@@ -16,6 +16,7 @@ export default function CreateRoomPage() {
   const [roomType, setRoomType] = useState('Private');
   const [roomName, setRoomName] = useState('My Sakura Room');
   const [roomCode, setRoomCode] = useState('');
+  const [enableBots, setEnableBots] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
@@ -68,8 +69,18 @@ export default function CreateRoomPage() {
     }
   };
 
+  const handleBotModeChange = (nextValue) => {
+    setEnableBots(nextValue);
+    setCreatedRoom(null);
+    setRoomCode('');
+    setSuccessMessage('');
+    setErrorMessage('');
+  };
+
   const bet = selectedTier?.entryFee?.amount ?? 100;
   const formattedBet = useMemo(() => Number(bet || 0).toLocaleString('en-US'), [bet]);
+  const isSoloMode = Boolean(enableBots);
+  const previewRoomType = isSoloMode ? t('solo') : tx(roomType);
 
   const handleCreateRoom = async () => {
     setErrorMessage('');
@@ -85,7 +96,12 @@ export default function CreateRoomPage() {
       const requestedMaxPlayers = 3;
       const room = await createPrivateRoom({
         tierId,
+        roomName,
         maxPlayers: requestedMaxPlayers,
+        enableBots: isSoloMode,
+        botsEnabled: isSoloMode,
+        mode: isSoloMode ? 'solo' : 'private',
+        type: isSoloMode ? 'solo' : 'private',
       });
 
       const nextRoomCode = room.roomCode || '';
@@ -97,13 +113,20 @@ export default function CreateRoomPage() {
         roomCode: nextRoomCode,
         tierId: room.tierId || selectedTierId,
         maxPlayers: requestedMaxPlayers,
-        source: 'private-room',
+        source: isSoloMode ? 'solo-room' : 'private-room',
         isHost: true,
+        type: room.type || (isSoloMode ? 'solo' : 'private'),
+        mode: room.mode || (isSoloMode ? 'solo' : 'private'),
+        enableBots: Boolean(room.enableBots || isSoloMode),
+        isSolo: Boolean(room.isSolo || room.enableBots || isSoloMode),
+        botCount: Number(room.botCount || (isSoloMode ? 2 : 0)),
+        players: room.players || [],
+        botPlayers: room.botPlayers || [],
       };
 
       setCreatedRoom(matchmakingState);
       saveMatchmakingContext(matchmakingState);
-      setSuccessMessage(t('roomCreatedSuccessfully'));
+      setSuccessMessage(isSoloMode ? t('soloRoomCreatedSuccessfully') : t('roomCreatedSuccessfully'));
       navigate(ROUTES.privateLobby, { state: matchmakingState });
     } catch (error) {
       console.error('Failed to create private room:', error);
@@ -131,7 +154,7 @@ export default function CreateRoomPage() {
         <button type="button" className="create-back-button" onClick={() => navigate(ROUTES.mainMenu)} aria-label={t('backToMainMenu')}>
           ←
         </button>
-        <h1>{t('createRoomTitle')}</h1>
+        <h1>{isSoloMode ? t('playSolo') : t('createRoomTitle')}</h1>
       </header>
 
       <main className="create-room-layout">
@@ -154,11 +177,10 @@ export default function CreateRoomPage() {
               id="room-code"
               value={roomCode}
               readOnly
-              placeholder="Auto generated after create"
+              placeholder={isSoloMode ? t('soloRoomCodeHint') : 'Auto generated after create'}
               aria-label={t('roomCode')}
             />
           </div>
-
 
           <div className="create-form-row">
             <label id="room-tier-label">{t('gameMode')}</label>
@@ -233,12 +255,33 @@ export default function CreateRoomPage() {
                 <button
                   type="button"
                   key={type}
-                  className={roomType === type ? 'active' : ''}
+                  className={!isSoloMode && roomType === type ? 'active' : ''}
                   onClick={() => setRoomType(type)}
+                  disabled={isSoloMode}
                 >
                   <span>●</span>{tx(type)}
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="create-form-row bot-mode-row">
+            <label>{t('botMode')}</label>
+            <div className="segmented-options bot-mode-options" role="group" aria-label={t('botMode')}>
+              <button
+                type="button"
+                className={!isSoloMode ? 'active' : ''}
+                onClick={() => handleBotModeChange(false)}
+              >
+                {t('botOff')}
+              </button>
+              <button
+                type="button"
+                className={isSoloMode ? 'active' : ''}
+                onClick={() => handleBotModeChange(true)}
+              >
+                {t('botOn')}
+              </button>
             </div>
           </div>
 
@@ -252,10 +295,10 @@ export default function CreateRoomPage() {
               onClick={handleCreateRoom}
               disabled={isCreatingRoom}
             >
-              {isCreatingRoom ? t('creatingRoom') : createdRoom ? t('createAnotherRoom') : t('createRoom')}
+              {isCreatingRoom ? t('creatingRoom') : isSoloMode ? t('playSolo') : createdRoom ? t('createAnotherRoom') : t('createRoom')}
             </button>
 
-            {roomCode && (
+            {!isSoloMode && roomCode && (
               <button type="button" className="copy-room-code-button" onClick={handleCopyRoomCode}>
                 {t('copyCode')}
               </button>
@@ -269,11 +312,12 @@ export default function CreateRoomPage() {
 
           <dl className="preview-list">
             <div><dt>{t('roomName')}</dt><dd>{roomName || tx('My Sakura Room')}</dd></div>
-            <div><dt>{t('roomCode')}</dt><dd>{roomCode || '—'}</dd></div>
+            <div><dt>{t('roomCode')}</dt><dd>{isSoloMode ? '—' : roomCode || '—'}</dd></div>
             <div><dt>{t('mode')}</dt><dd>{tx(selectedTier?.name || selectedTierId)}</dd></div>
             <div><dt>{t('players')}</dt><dd>{maxPlayers} {t('players')}</dd></div>
             <div><dt>{t('bet')}</dt><dd className="preview-bet"><span>●</span>{formattedBet}</dd></div>
-            <div><dt>{t('type')}</dt><dd>{tx(roomType)}</dd></div>
+            <div><dt>{t('type')}</dt><dd>{previewRoomType}</dd></div>
+            <div><dt>{t('botMode')}</dt><dd>{isSoloMode ? t('botOn') : t('botOff')}</dd></div>
           </dl>
         </aside>
       </main>
