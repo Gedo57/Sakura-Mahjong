@@ -333,6 +333,7 @@ left: 17%; color: #d0b445;
 
 .app-shell[data-device='desktop'] .gameplay-center-compass .south {
 right: 17%; color: #d0b445;
+top:12%;
 }
 
 .app-shell[data-device='desktop'] .gameplay-center-compass .west {
@@ -2111,7 +2112,7 @@ animation: none;
 }
 
 .app-shell[data-device='desktop'] .gameplay-center-discard {
-  top: 49.2%;
+  top: 74.2%;
   left: 50%;
   transform: translate(-50%, -50%) scale(.74);
 }
