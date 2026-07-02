@@ -1372,3 +1372,98 @@ html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='
 
 html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-tile-focus--bottom { top: 55% !important; }
 html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-tile-focus--left { left: 42% !important; top: 49% !important; }
+
+/* Patch — Fixed 3P meld areas for portrait. */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack {
+  min-width: 60px;
+  min-height: 46px;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack.is-empty {
+  opacity: .86;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-placeholder {
+  display: grid;
+  gap: 3px;
+  padding: 4px 5px 5px;
+  border-radius: 8px;
+  background: rgba(5, 11, 18, .52);
+  border: 1px dashed rgba(255, 214, 92, .38);
+  box-shadow: 0 5px 11px rgba(0, 0, 0, .25), inset 0 0 8px rgba(255, 211, 92, .06);
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-label--placeholder {
+  color: rgba(255, 214, 92, .84);
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-empty-slots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-empty-slot {
+  width: 15px;
+  height: 24px;
+  border-radius: 4px;
+  background: rgba(255, 246, 215, .08);
+  border: 1px solid rgba(255, 246, 215, .18);
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack--top {
+  top: 37.8% !important;
+  left: 54% !important;
+  right: auto !important;
+  bottom: auto !important;
+  max-width: 210px !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transform: translateX(-50%) scale(.54) !important;
+  transform-origin: top center !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack--left {
+  top: 50.5% !important;
+  left: 35.7% !important;
+  right: auto !important;
+  bottom: auto !important;
+  max-width: none !important;
+  max-height: 190px !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transform: translate(-50%, -50%) scale(.52) !important;
+  transform-origin: center center !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack--bottom {
+  left: 69% !important;
+  bottom: 27.2% !important;
+  top: auto !important;
+  right: auto !important;
+  max-width: 210px !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transform: translateX(-50%) scale(.54) !important;
+  transform-origin: bottom center !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack--left .gameplay-meld-tiles,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack--left .gameplay-meld-empty-slots {
+  flex-direction: column !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack--left .gameplay-meld-tiles .gameplay-tile,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack--left .gameplay-meld-empty-slot {
+  margin-left: 0 !important;
+  margin-top: -5px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack--left .gameplay-meld-tiles .gameplay-tile:first-child,
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack--left .gameplay-meld-empty-slot:first-child {
+  margin-top: 0 !important;
+}
