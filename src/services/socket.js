@@ -576,6 +576,10 @@ export function discardTile(tileId) {
   return emitOnActiveSocket('player:discard', { tileId });
 }
 
+export function declareKong(payload = {}) {
+  return emitOnActiveSocket('player:declare_kong', payload || {});
+}
+
 export function claimDiscard(action) {
   if (!action) {
     console.warn('[game-socket] claimDiscard called without action.');

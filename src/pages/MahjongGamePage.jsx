@@ -7,6 +7,7 @@ import { normalizeGameState } from '../services/gameNormalizers.js';
 import {
   claimDiscard,
   connectGameSocket,
+  declareKong,
   declareWin,
   discardTile,
   disconnectGameSocket,
@@ -646,6 +647,54 @@ const isFeiOrJokerTileName = (tile) => {
     || assetName.includes('joker')
     || assetName.includes('clown');
 };
+
+
+const getKongBaseFromTile = (tile) => {
+  if (!tile || isFeiOrJokerTileName(tile)) return '';
+
+  const raw = String(getTileId(tile) || '').trim().toLowerCase().replace(/\.(png|jpe?g|webp|gif|svg)$/i, '');
+  const rendered = String(normalizeTileName(tile) || '').trim().toLowerCase().replace(/\.(png|jpe?g|webp|gif|svg)$/i, '');
+  const value = raw || rendered;
+  const parts = value.split('_');
+
+  if (parts[0] === 'p' && /^\d+$/.test(parts[1] || '')) return `p_${parts[1]}`;
+  if (parts[0] === 'w' && ['e', 's', 'w', 'n'].includes(parts[1])) return `w_${parts[1]}`;
+  if (parts[0] === 'd' && ['r', 'w', 'g'].includes(parts[1])) return `d_${parts[1]}`;
+  return '';
+};
+
+const hasLocalHiddenKong = (handTiles = []) => {
+  const counts = new Map();
+  toArray(handTiles).forEach((tile) => {
+    const base = getKongBaseFromTile(tile);
+    if (!base) return;
+    counts.set(base, (counts.get(base) || 0) + 1);
+  });
+  return [...counts.values()].some((count) => count >= 4);
+};
+
+const hasLocalPromotedKong = (openMelds = [], handTiles = []) => {
+  const handBases = new Set(toArray(handTiles).map(getKongBaseFromTile).filter(Boolean));
+
+  return normalizeMeldList(openMelds).some((meld) => {
+    const type = String(meld.type || '').toLowerCase();
+    if (!['pung', 'pong', 'pon'].includes(type)) return false;
+    if (meld.hasFei || meld.tiles?.some((tile) => isFeiOrJokerTileName(tile)) || meld.rawTiles?.some((tile) => isFeiOrJokerTileName(tile))) {
+      return false;
+    }
+
+    const meldBases = (meld.rawTiles?.length ? meld.rawTiles : meld.tiles)
+      .map(getKongBaseFromTile)
+      .filter(Boolean);
+    const uniqueBases = [...new Set(meldBases)];
+
+    return uniqueBases.length === 1 && meldBases.length >= 3 && handBases.has(uniqueBases[0]);
+  });
+};
+
+const hasLocalKongAction = (handTiles = [], openMelds = []) => (
+  hasLocalHiddenKong(handTiles) || hasLocalPromotedKong(openMelds, handTiles)
+);
 
 const normalizeTileList = (value) => toArray(value).map(normalizeTileName).filter(Boolean);
 const getRawTileList = (value) => toArray(value).map(getTileId).filter(Boolean);
@@ -2485,7 +2534,10 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     gameState.discardTiles?.center
   ));
   const isClaimWindowOpen = Boolean(gameState.claimWindow);
-  const availableActions = getAvailableActions(gameState, false);
+  const baseAvailableActions = getAvailableActions(gameState, false);
+  const availableActions = (!isClaimWindowOpen && isUserTurn && hasLocalKongAction(playerHandTiles, leftOpenMelds) && !baseAvailableActions.includes('kong'))
+    ? [...baseAvailableActions, 'kong']
+    : baseAvailableActions;
   const reclaimFeiWindow = normalizeReclaimFeiWindow(gameState.reclaimFei);
   const isReclaimFeiPending = Boolean(gameState.pendingReclaimFei);
 
@@ -2671,6 +2723,11 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
       return;
     }
 
+    if (actionKey === 'kong' && !isClaimWindowOpen) {
+      const sent = declareKong();
+      if (!sent) setGameError('Unable to declare Kong. Waiting for gameplay socket connection.');
+      return;
+    }
 
     const claimAction = CLAIM_ACTION_ALIASES[actionKey] || actionKey;
     const sent = claimDiscard(claimAction);
