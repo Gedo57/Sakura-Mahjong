@@ -388,6 +388,8 @@ const FEI_RECLAIM_COMPLETE_ACTIONS = new Set([
   'fei_reclaim_skipped',
   'skip_fei_reclaim',
 ]);
+const CLAIM_WINDOW_ONLY_ACTIONS = new Set(['chow', 'pong', 'kong', 'pass']);
+const TURN_ONLY_ACTIONS = new Set(['kong', 'hu']);
 
 
 const getCircularTableTiles = (tiles = [], maxTiles = MAX_TABLE_DISCARD_TILES) => {
@@ -694,6 +696,80 @@ const hasLocalPromotedKong = (openMelds = [], handTiles = []) => {
 
 const hasLocalKongAction = (handTiles = [], openMelds = []) => (
   hasLocalHiddenKong(handTiles) || hasLocalPromotedKong(openMelds, handTiles)
+);
+
+const getLocalHiddenKongCandidatePayload = (handTiles = []) => {
+  const byBase = new Map();
+
+  toArray(handTiles).forEach((tile) => {
+    const base = getKongBaseFromTile(tile);
+    const tileId = getTileId(tile);
+    if (!base || !tileId) return;
+    if (!byBase.has(base)) byBase.set(base, []);
+    byBase.get(base).push(tileId);
+  });
+
+  for (const [baseTile, tiles] of byBase.entries()) {
+    if (tiles.length >= 4) {
+      return {
+        type: 'hidden',
+        mode: 'hidden',
+        baseTile,
+        tileId: tiles[0],
+        tiles: tiles.slice(0, 4),
+      };
+    }
+  }
+
+  return null;
+};
+
+const getMeldBaseTile = (meld = {}) => {
+  const normalized = normalizeMeldEntry(meld);
+  if (!normalized) return '';
+  const tiles = normalized.rawTiles?.length ? normalized.rawTiles : normalized.tiles;
+  const bases = toArray(tiles).map(getKongBaseFromTile).filter(Boolean);
+  const uniqueBases = [...new Set(bases)];
+  return uniqueBases.length === 1 ? uniqueBases[0] : '';
+};
+
+const getLocalPromotedKongCandidatePayload = (openMelds = [], handTiles = []) => {
+  const handByBase = new Map();
+
+  toArray(handTiles).forEach((tile) => {
+    const base = getKongBaseFromTile(tile);
+    const tileId = getTileId(tile);
+    if (base && tileId && !handByBase.has(base)) handByBase.set(base, tileId);
+  });
+
+  return normalizeMeldList(openMelds).reduce((candidate, meld, index) => {
+    if (candidate) return candidate;
+
+    const type = String(meld.type || '').toLowerCase();
+    if (!['pung', 'pong', 'pon'].includes(type)) return null;
+    if (meld.hasFei || meld.tiles?.some((tile) => isFeiOrJokerTileName(tile)) || meld.rawTiles?.some((tile) => isFeiOrJokerTileName(tile))) {
+      return null;
+    }
+
+    const baseTile = getMeldBaseTile(meld);
+    const fourthTileId = handByBase.get(baseTile);
+    if (!baseTile || !fourthTileId) return null;
+
+    return {
+      type: 'promoted',
+      mode: 'promoted',
+      kongType: 'promoted',
+      baseTile,
+      tileId: fourthTileId,
+      targetTile: fourthTileId,
+      meldId: meld.meldId || meld.id || `meld_${index}`,
+      openMeldId: meld.meldId || meld.id || `meld_${index}`,
+    };
+  }, null);
+};
+
+const getLocalKongCandidatePayload = (handTiles = [], openMelds = []) => (
+  getLocalHiddenKongCandidatePayload(handTiles) || getLocalPromotedKongCandidatePayload(openMelds, handTiles)
 );
 
 const normalizeTileList = (value) => toArray(value).map(normalizeTileName).filter(Boolean);
@@ -1085,7 +1161,30 @@ const isMinimumFanErrorPayload = (payload = {}) => {
 
 const getGameplayErrorMessage = (payload = {}, t = (key) => key) => {
   if (isMinimumFanErrorPayload(payload)) return t('minimumFanRequired');
-  return payload.message || payload.error || 'Gameplay socket error.';
+
+  const rawMessage = String(payload.message || payload.error || payload.reason || '').trim();
+  const searchable = [payload.code, payload.errorCode, payload.reason, payload.type, rawMessage]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  if (searchable.includes('not your turn') || searchable.includes('turn_player') || searchable.includes('turnplayer')) {
+    return t('notYourTurn');
+  }
+
+  if (searchable.includes('claim window') || searchable.includes('pending claim') || searchable.includes('no claim')) {
+    return t('claimWindowClosed');
+  }
+
+  if (searchable.includes('no legal kong') || (searchable.includes('kong') && searchable.includes('available'))) {
+    return t('kongUnavailable');
+  }
+
+  if (searchable.includes('fei') && searchable.includes('discard')) {
+    return t('feiLocked');
+  }
+
+  return rawMessage || 'Gameplay socket error.';
 };
 
 const RECLAIM_FEI_WINDOW_KEYS = [
@@ -1227,6 +1326,9 @@ const buildFeiReclaimPayload = (windowState = {}, option = {}) => ({
   optionId: option.optionId || option.id || windowState.optionId || windowState.id,
   reclaimId: option.reclaimId || windowState.reclaimId || windowState.id,
   meldId: option.meldId || windowState.meldId,
+  meldIndex: option.meldIndex ?? windowState.meldIndex,
+  type: option.type || windowState.type,
+  baseTile: option.feiSubstitutes || option.baseTile || windowState.feiSubstitutes || windowState.baseTile,
   tileId: option.replacementTileId || windowState.replacementTileId,
   replacementTileId: option.replacementTileId || windowState.replacementTileId,
   actualTileId: option.replacementTileId || windowState.actualTileId,
@@ -1358,6 +1460,47 @@ const getOpenMeldsByPosition = (state, player, position) => {
     ...playerSpecificMelds,
     ...globallyOwnedMelds,
   ]);
+};
+
+const upsertMeldEntry = (melds = [], nextMeld = {}, payload = {}) => {
+  const normalizedMelds = normalizeMeldList(melds);
+  const normalizedNext = normalizeMeldEntry(nextMeld);
+  if (!normalizedNext) return normalizedMelds;
+
+  const isPromotedKong = normalizeActionForUi(normalizedNext.type) === 'kong'
+    && (payload.promotedFromPung || String(payload.kongType || '').toLowerCase() === 'promoted');
+
+  if (!isPromotedKong) {
+    const nextSignature = getMeldSignature(normalizedNext);
+    return normalizedMelds.some((meld) => getMeldSignature(meld) === nextSignature)
+      ? normalizedMelds
+      : [...normalizedMelds, normalizedNext];
+  }
+
+  const targetMeldId = String(payload.meldId || normalizedNext.meldId || normalizedNext.id || '').trim();
+  const targetBase = getMeldBaseTile(normalizedNext) || getKongBaseFromTile(payload.baseTile || payload.tileId || payload.targetTile);
+  let replaced = false;
+
+  const merged = normalizedMelds.map((meld) => {
+    const meldId = String(meld.meldId || meld.id || '').trim();
+    const meldType = String(meld.type || '').toLowerCase();
+    const sameId = targetMeldId && meldId && targetMeldId === meldId;
+    const sameBasePong = targetBase && ['pung', 'pong', 'pon'].includes(meldType) && getMeldBaseTile(meld) === targetBase;
+
+    if (!sameId && !sameBasePong) return meld;
+
+    replaced = true;
+    return {
+      ...meld,
+      ...normalizedNext,
+      type: 'kong',
+      tiles: normalizedNext.tiles?.length ? normalizedNext.tiles : meld.tiles,
+      rawTiles: normalizedNext.rawTiles?.length ? normalizedNext.rawTiles : meld.rawTiles,
+      promotedFromPung: true,
+    };
+  });
+
+  return replaced ? merged : [...merged, normalizedNext];
 };
 
 const removeLastMatchingTile = (tiles = [], rawTileId = '', renderedTileName = '') => {
@@ -1778,6 +1921,9 @@ function mergeTurnStart(current, payload = {}) {
     claimWindow: null,
     reclaimFei: null,
     pendingDiscardTileId: null,
+    pendingKong: null,
+    pendingClaimAction: null,
+    pendingReclaimFei: null,
   };
 }
 
@@ -1863,7 +2009,10 @@ function mergeActionBroadcast(current, payload = {}) {
     status: action === 'disconnected' || action === 'reconnected' ? current.status : 'playing',
     claimWindow: null,
     availableActions: [],
+    validActions: [],
     pendingDiscardTileId: null,
+    pendingKong: null,
+    pendingClaimAction: null,
   };
 
   if (FEI_RECLAIM_AVAILABLE_ACTIONS.has(action)) {
@@ -1874,10 +2023,48 @@ function mergeActionBroadcast(current, payload = {}) {
     next.reclaimFei = null;
     next.pendingReclaimFei = null;
     const payloadHandTiles = getFirstRawTileList(payload.handTiles, payload.myHand, payload.playerHand, payload.remainingHand, payload.currentPlayerHand, payload.hand);
+    const isReclaimConfirm = ['fei_reclaimed', 'reclaim_fei', 'reclaim_fei_confirmed', 'replace_fei'].includes(action);
+    const currentIds = getCurrentPlayerIdCandidates(current);
+    const isLocalReclaimPlayer = seatPosition === 'left' || (actionIds.length && actionIds.some((id) => currentIds.includes(id)));
+    const replacementTileId = payload.replacementTileId || payload.actualTileId || payload.tileId;
+    const feiTileId = payload.feiTileId || payload.feiTile || 'fei';
+    const nextMeldTiles = getFirstTileList(payload.meldTiles, payload.tiles, payload.openMeld?.tiles, payload.meld?.tiles);
+    const rawNextMeldTiles = getFirstRawTileList(payload.meldTiles, payload.tiles, payload.openMeld?.tiles, payload.meld?.tiles);
+
     if (payloadHandTiles.length) {
       next.handTiles = payloadHandTiles;
       next.myHand = payloadHandTiles;
       next.playerHand = payloadHandTiles;
+    } else if (isReclaimConfirm && isLocalReclaimPlayer && replacementTileId) {
+      const currentHandTiles = getFirstRawTileList(current.handTiles, current.myHand, current.playerHand);
+      const handWithoutReplacement = removeOneTileFromHand(currentHandTiles, replacementTileId, tileIdToAssetName(replacementTileId));
+      next.handTiles = feiTileId ? [...handWithoutReplacement, feiTileId] : handWithoutReplacement;
+      next.myHand = next.handTiles;
+      next.playerHand = next.handTiles;
+    }
+
+    if (isReclaimConfirm && nextMeldTiles.length && Array.isArray(current.players)) {
+      next.players = current.players.map((player) => {
+        const isTarget = (actionIds.length && playerMatchesAnyId(player, actionIds))
+          || (seatPosition && normalizePosition(player.position) === seatPosition);
+        if (!isTarget) return player;
+
+        const currentOpenMelds = normalizeMeldList(player.openMelds || player.melds || player.exposedMelds || player.declaredMelds || []);
+        const targetMeldId = String(payload.meldId || '').trim();
+        const targetIndex = Number.isInteger(payload.meldIndex) ? payload.meldIndex : Number.parseInt(payload.meldIndex, 10);
+
+        const openMelds = currentOpenMelds.map((meld, index) => {
+          const meldId = String(meld.meldId || meld.id || '').trim();
+          const isTargetMeld = (targetMeldId && meldId && targetMeldId === meldId) || (Number.isInteger(targetIndex) && targetIndex === index);
+          return isTargetMeld ? { ...meld, tiles: nextMeldTiles, rawTiles: rawNextMeldTiles, hasFei: false } : meld;
+        });
+
+        return {
+          ...player,
+          openMelds,
+          ...(isLocalReclaimPlayer && next.handTiles ? { handTiles: next.handTiles, hand: next.handTiles, tiles: next.handTiles } : {}),
+        };
+      });
     }
   }
 
@@ -1980,6 +2167,13 @@ function mergeActionBroadcast(current, payload = {}) {
       payload.exposedTiles
     );
     const renderedClaimedTile = tileIdToAssetName(tileId);
+    const isSelfDeclaredKong = uiAction === 'kong'
+      && Boolean(payload.kongType || payload.concealed || payload.promotedFromPung)
+      && !(payload.claimedTile || payload.discardedTile || payload.claimedTileId || payload.discardedTileId);
+    const isPromotedKong = uiAction === 'kong'
+      && (payload.promotedFromPung || String(payload.kongType || '').toLowerCase() === 'promoted');
+    const handRemovalClaimedTileId = isSelfDeclaredKong ? '' : tileId;
+    const handRemovalClaimedTile = isSelfDeclaredKong ? '' : renderedClaimedTile;
     const meldEntry = normalizeMeldEntry({
       type: uiAction,
       tiles: meldTiles,
@@ -1998,6 +2192,7 @@ function mergeActionBroadcast(current, payload = {}) {
       const ownerSeat = payload.seat || payload.claimedBySeat || payload.claimerSeat || payload.actorSeat || '';
       const ownedMeldEntry = {
         ...meldEntry,
+        ...(payload.meldId || payload.openMeld?.id || payload.meld?.id ? { id: payload.meldId || payload.openMeld?.id || payload.meld?.id } : {}),
         ...(actionUserId ? { ownerId: actionUserId } : {}),
         ...(ownerSeat ? { ownerSeat } : {}),
         ...(positionToUpdate ? { ownerPosition: positionToUpdate } : {}),
@@ -2021,7 +2216,9 @@ function mergeActionBroadcast(current, payload = {}) {
         const currentHandTiles = getFirstRawTileList(current.handTiles, current.myHand, current.playerHand);
         const nextHandTiles = payloadHandTiles.length
           ? payloadHandTiles
-          : removeMeldTilesFromHand(currentHandTiles, rawMeldTiles, meldTiles, tileId, renderedClaimedTile);
+          : isPromotedKong
+            ? removeOneTileFromHand(currentHandTiles, tileId, renderedClaimedTile)
+            : removeMeldTilesFromHand(currentHandTiles, rawMeldTiles, meldTiles, handRemovalClaimedTileId, handRemovalClaimedTile);
 
         next.handTiles = nextHandTiles;
         next.myHand = nextHandTiles;
@@ -2048,14 +2245,21 @@ function mergeActionBroadcast(current, payload = {}) {
             const shouldUpdatePlayerHand = isLocalActionPlayer && playerPrivateHand.length;
             const nextPlayerHand = payloadHandTiles.length
               ? payloadHandTiles
-              : removeMeldTilesFromHand(playerPrivateHand, rawMeldTiles, meldTiles, tileId, renderedClaimedTile);
+              : isPromotedKong
+                ? removeOneTileFromHand(playerPrivateHand, tileId, renderedClaimedTile)
+                : removeMeldTilesFromHand(playerPrivateHand, rawMeldTiles, meldTiles, handRemovalClaimedTileId, handRemovalClaimedTile);
+            const removedFromHandCount = isPromotedKong
+              ? 1
+              : isSelfDeclaredKong
+                ? rawMeldTiles.length
+                : Math.max(0, rawMeldTiles.length - (tileId ? 1 : 0));
             const nextHandSize = shouldUpdatePlayerHand
               ? nextPlayerHand.length
-              : Math.max(0, Number(player.handSize ?? player.handCount ?? 0) - Math.max(0, rawMeldTiles.length - (tileId ? 1 : 0)));
+              : Math.max(0, Number(player.handSize ?? player.handCount ?? 0) - removedFromHandCount);
 
             return {
               ...player,
-              openMelds: [...currentOpenMelds, ownedMeldEntry],
+              openMelds: upsertMeldEntry(currentOpenMelds, ownedMeldEntry, payload),
               ...(shouldUpdatePlayerHand ? { handTiles: nextPlayerHand, hand: nextPlayerHand, tiles: nextPlayerHand } : {}),
               ...(Number.isFinite(nextHandSize) && nextHandSize > 0 ? { handSize: nextHandSize, handCount: nextHandSize } : {}),
             };
@@ -2079,13 +2283,13 @@ function mergeActionBroadcast(current, payload = {}) {
       if (hasActionIdentity) {
         const openMeldsByPosition = { ...(current.openMelds || {}) };
         const currentPositionMelds = getFirstMeldList(openMeldsByPosition[positionToUpdate]);
-        if (positionToUpdate && !currentPositionMelds.some((meld) => JSON.stringify(meld.tiles) === JSON.stringify(ownedMeldEntry.tiles))) {
-          openMeldsByPosition[positionToUpdate] = [...currentPositionMelds, ownedMeldEntry];
+        if (positionToUpdate) {
+          openMeldsByPosition[positionToUpdate] = upsertMeldEntry(currentPositionMelds, ownedMeldEntry, payload);
           next.openMelds = openMeldsByPosition;
         }
       }
 
-      if (tileId || renderedClaimedTile) {
+      if ((tileId || renderedClaimedTile) && !isSelfDeclaredKong) {
         const discards = { ...(current.discards || {}) };
         const priorityPositions = [sourcePosition, 'center', 'left', 'top', 'right'].filter(Boolean);
         const uniquePositions = priorityPositions.filter((position, index, list) => list.indexOf(position) === index);
@@ -2368,7 +2572,13 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           });
           break;
         case 'error':
-          setGameState((current) => ({ ...(current || {}), pendingDiscardTileId: null }));
+          setGameState((current) => ({
+            ...(current || {}),
+            pendingDiscardTileId: null,
+            pendingKong: null,
+            pendingClaimAction: null,
+            pendingReclaimFei: null,
+          }));
           setGameError(getGameplayErrorMessage(payload, t));
           break;
         default:
@@ -2534,12 +2744,21 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     gameState.discardTiles?.center
   ));
   const isClaimWindowOpen = Boolean(gameState.claimWindow);
-  const baseAvailableActions = getAvailableActions(gameState, false);
-  const availableActions = (!isClaimWindowOpen && isUserTurn && hasLocalKongAction(playerHandTiles, leftOpenMelds) && !baseAvailableActions.includes('kong'))
-    ? [...baseAvailableActions, 'kong']
-    : baseAvailableActions;
   const reclaimFeiWindow = normalizeReclaimFeiWindow(gameState.reclaimFei);
   const isReclaimFeiPending = Boolean(gameState.pendingReclaimFei);
+  const isFeiReclaimBlocking = Boolean(reclaimFeiWindow?.active || isReclaimFeiPending);
+  const baseAvailableActions = getAvailableActions(gameState, false);
+  const turnAvailableActions = isUserTurn && !isClaimWindowOpen && !isFeiReclaimBlocking
+    ? baseAvailableActions.filter((action) => TURN_ONLY_ACTIONS.has(action))
+    : [];
+  const claimAvailableActions = isClaimWindowOpen && !isFeiReclaimBlocking
+    ? baseAvailableActions.filter((action) => CLAIM_WINDOW_ONLY_ACTIONS.has(action) || action === 'hu')
+    : [];
+  const localKongPayload = getLocalKongCandidatePayload(playerHandTiles, leftOpenMelds);
+  const localKongAvailable = Boolean(isUserTurn && !isClaimWindowOpen && !isFeiReclaimBlocking && localKongPayload);
+  const availableActions = localKongAvailable && !turnAvailableActions.includes('kong')
+    ? [...turnAvailableActions, 'kong']
+    : (isClaimWindowOpen ? claimAvailableActions : turnAvailableActions);
 
 
   useEffect(() => {
@@ -2625,6 +2844,16 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   const handleTileDiscard = (tileEntry) => {
     if (!isUserTurn || gameState.pendingDiscardTileId) return;
 
+    if (isClaimWindowOpen) {
+      setGameError(t('claimWindowOpen'));
+      return;
+    }
+
+    if (isFeiReclaimBlocking) {
+      setGameError(t('resolveFeiReclaimFirst'));
+      return;
+    }
+
     const entry = normalizeHandTileEntry(tileEntry, tileEntry?.index ?? 0);
     if (!entry) return;
 
@@ -2671,10 +2900,37 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   };
 
   const handleMahjongAction = (actionKey) => {
-    setSelectedAction(actionKey);
+    const normalizedAction = normalizeActionForUi(actionKey);
+    const effectiveActionKey = normalizedAction || actionKey;
+    setSelectedAction(effectiveActionKey);
+
+    if (isFeiReclaimBlocking) {
+      setGameError(t('resolveFeiReclaimFirst'));
+      return;
+    }
+
+    if (!availableActions.includes(normalizedAction)) {
+      setGameError(t('actionUnavailable'));
+      return;
+    }
+
+    if (!isClaimWindowOpen && CLAIM_WINDOW_ONLY_ACTIONS.has(normalizedAction) && normalizedAction !== 'kong') {
+      setGameError(t('claimWindowClosed'));
+      return;
+    }
+
+    if (normalizedAction === 'pass' && !isClaimWindowOpen) {
+      setGameError(t('claimWindowClosed'));
+      return;
+    }
+
+    if (!isClaimWindowOpen && !isUserTurn) {
+      setGameError(t('notYourTurn'));
+      return;
+    }
 
     if (isMockGameplay) {
-      if (['chow', 'pong', 'kong'].includes(actionKey)) {
+      if (['chow', 'pong', 'kong'].includes(effectiveActionKey)) {
         const mockMeldTilesByAction = {
           chow: ['p_2.png', 'p_3.png', 'p_4.png'],
           pong: ['p_5.png', 'p_5.png', 'p_5.png'],
@@ -2690,7 +2946,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
               ...player,
               openMelds: [
                 ...currentOpenMelds,
-                { type: actionKey, tiles: mockMeldTilesByAction[actionKey] || [] },
+                { type: effectiveActionKey, tiles: mockMeldTilesByAction[effectiveActionKey] || [] },
               ],
             };
           }),
@@ -2700,38 +2956,60 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
       return;
     }
 
-    if (actionKey === 'pass') {
+    if (effectiveActionKey === 'pass') {
       const sent = passClaimWindow();
-      if (!sent) setGameError('Unable to pass. Waiting for gameplay socket connection.');
+      if (sent) {
+        setGameState((current) => ({ ...(current || {}), pendingClaimAction: 'skip' }));
+        setGameError('');
+      } else {
+        setGameError('Unable to pass. Waiting for gameplay socket connection.');
+      }
       return;
     }
 
-    if (actionKey === 'hu') {
+    if (effectiveActionKey === 'hu') {
       if (fanInfo.hasCurrentFan && fanInfo.currentFan < fanInfo.minimumFan) {
         setGameError(t('minimumFanRequired'));
         return;
       }
 
       const sent = isClaimWindowOpen ? claimDiscard('ron') : declareWin('tsumo');
-      if (!sent) setGameError('Unable to declare Hu. Waiting for gameplay socket connection.');
+      if (sent) {
+        setGameState((current) => ({ ...(current || {}), pendingClaimAction: isClaimWindowOpen ? 'ron' : 'tsumo' }));
+        setGameError('');
+      } else {
+        setGameError('Unable to declare Hu. Waiting for gameplay socket connection.');
+      }
       return;
     }
 
-    if (actionKey === 'tsumo') {
+    if (effectiveActionKey === 'tsumo') {
       const sent = declareWin('tsumo');
       if (!sent) setGameError('Unable to declare win. Waiting for gameplay socket connection.');
       return;
     }
 
-    if (actionKey === 'kong' && !isClaimWindowOpen) {
-      const sent = declareKong();
-      if (!sent) setGameError('Unable to declare Kong. Waiting for gameplay socket connection.');
+    if (effectiveActionKey === 'kong' && !isClaimWindowOpen) {
+      if (!localKongPayload) {
+        setGameError(t('kongUnavailable'));
+        return;
+      }
+      const sent = declareKong(localKongPayload);
+      if (sent) {
+        setGameState((current) => ({ ...(current || {}), pendingKong: localKongPayload }));
+        setGameError('');
+      } else {
+        setGameError('Unable to declare Kong. Waiting for gameplay socket connection.');
+      }
       return;
     }
 
-    const claimAction = CLAIM_ACTION_ALIASES[actionKey] || actionKey;
+    const claimAction = CLAIM_ACTION_ALIASES[effectiveActionKey] || effectiveActionKey;
     const sent = claimDiscard(claimAction);
-    if (!sent) {
+    if (sent) {
+      setGameState((current) => ({ ...(current || {}), pendingClaimAction: claimAction }));
+      setGameError('');
+    } else {
       setGameError('Unable to send claim action. Waiting for gameplay socket connection.');
     }
   };
@@ -2914,7 +3192,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
                 data-tile-id={tile.rawId}
                 aria-label={isLockedFei ? `${t('feiLocked')} ${index + 1}` : `Tile ${index + 1}`}
                 title={isLockedFei ? t('feiLocked') : undefined}
-                disabled={!isUserTurn || Boolean(gameState.pendingDiscardTileId) || isLockedFei}
+                disabled={!isUserTurn || isClaimWindowOpen || isFeiReclaimBlocking || Boolean(gameState.pendingDiscardTileId) || isLockedFei}
                 onClick={() => handleTileDiscard(tile)}
               >
                 <GameplayTile name={assetName} className={isLockedFei ? 'gameplay-tile--fei' : ''} />
@@ -2942,7 +3220,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
               key={actionKey}
               onClick={() => handleMahjongAction(actionKey)}
               aria-pressed={isActive}
-              disabled={!isClaimWindowOpen && !isUserTurn}
+              disabled={isFeiReclaimBlocking || !availableActions.includes(actionKey) || (!isClaimWindowOpen && !isUserTurn)}
             >
               {t(action.labelKey)}
             </button>

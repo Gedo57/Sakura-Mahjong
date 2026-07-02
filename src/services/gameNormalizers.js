@@ -83,16 +83,28 @@ export function normalizeGameState(response = {}) {
   const privateHandPlayer = getPrivateHandPlayer(players);
   const privateHand = getPrivateHandTilesFromPlayers(players);
   const claimWindow = state.claimWindow || state.claim || safeResponse.claimWindow || null;
+  const actionSources = [
+    claimWindow?.yourValidActions,
+    claimWindow?.validActions,
+    claimWindow?.actions,
+    state.yourValidActions,
+    state.validActions,
+    state.availableActions,
+    state.actions,
+    state.allowedActions,
+    state.turnActions,
+    state.allowedTurnActions,
+  ];
   const availableActions = normalizeActionList(
-    claimWindow?.yourValidActions
-    || claimWindow?.validActions
-    || claimWindow?.actions
-    || state.yourValidActions
-    || state.validActions
-    || state.availableActions
-    || state.actions
-    || state.allowedActions
+    actionSources.find((actions) => Array.isArray(actions) && actions.length) || []
   );
+  const feiReclaim = state.reclaimFei
+    || state.feiReclaim
+    || state.feiReclaimWindow
+    || state.reclaimFeiWindow
+    || safeResponse.reclaimFei
+    || safeResponse.feiReclaimWindow
+    || null;
 
   return {
     ...state,
@@ -132,6 +144,7 @@ export function normalizeGameState(response = {}) {
     discards: state.discards || state.discardTiles || state.discardPiles || {},
     centerTiles: state.centerTiles || state.centerDiscardTiles || state.centerMeldTiles || state.meldTiles || state.melds?.center || [],
     claimWindow,
+    reclaimFei: feiReclaim,
     availableActions,
     validActions: availableActions,
     maxPlayers: state.maxPlayers || state.room?.maxPlayers || safeResponse.maxPlayers,
