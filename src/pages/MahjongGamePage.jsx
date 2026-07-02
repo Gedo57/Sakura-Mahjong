@@ -575,10 +575,41 @@ const tileIdToAssetName = (tileId) => {
 const getTileId = (tile) => {
   if (!tile) return '';
   if (typeof tile === 'string') return tile;
-  return tile.id || tile.tileId || tile.value || tile.name || tile.tileName || tile.image || tile.asset || '';
+  return tile.rawId
+    || tile.backendId
+    || tile.instanceId
+    || tile.id
+    || tile.tileId
+    || tile.value
+    || tile.name
+    || tile.tileName
+    || tile.image
+    || tile.asset
+    || tile.assetName
+    || '';
 };
 
-const normalizeTileName = (tile) => tileIdToAssetName(getTileId(tile));
+const normalizeTileName = (tile) => {
+  if (tile && typeof tile === 'object' && tile.assetName) {
+    return getSupportedTileAsset(tile.assetName) || tileIdToAssetName(tile.assetName);
+  }
+
+  return tileIdToAssetName(getTileId(tile));
+};
+
+const normalizeHandTileEntry = (tile, index = 0) => {
+  const rawId = getTileId(tile);
+  const assetName = normalizeTileName(tile);
+
+  if (!assetName) return null;
+
+  return {
+    rawId: rawId || assetName,
+    assetName,
+    index,
+    source: tile,
+  };
+};
 
 const isFeiOrJokerTileName = (tile) => {
   const assetName = normalizeTileName(tile) || String(tile || '').trim().toLowerCase();
@@ -689,6 +720,54 @@ const removeOneTileFromHand = (tiles = [], rawTileId = '', renderedTileName = ''
 
   if (removeIndex < 0) return list;
   return [...list.slice(0, removeIndex), ...list.slice(removeIndex + 1)];
+};
+
+const removeMeldTilesFromHand = (tiles = [], rawMeldTiles = [], renderedMeldTiles = [], claimedTileId = '', renderedClaimedTile = '') => {
+  let nextTiles = toArray(tiles);
+  if (!nextTiles.length) return nextTiles;
+
+  const rawEntries = toArray(rawMeldTiles)
+    .map((tile, index) => {
+      const rawId = getTileId(tile);
+      const rendered = normalizeTileName(tile) || renderedMeldTiles[index] || tileIdToAssetName(rawId);
+      return rawId || rendered ? { rawId, rendered } : null;
+    })
+    .filter(Boolean);
+
+  const renderedOnlyEntries = !rawEntries.length
+    ? toArray(renderedMeldTiles).map((tile) => ({ rawId: '', rendered: normalizeTileName(tile) || String(tile || '') })).filter((entry) => entry.rendered)
+    : [];
+
+  const entries = rawEntries.length ? rawEntries : renderedOnlyEntries;
+  if (!entries.length) return nextTiles;
+
+  const claimedRaw = String(claimedTileId || '').trim();
+  const claimedRendered = renderedClaimedTile || tileIdToAssetName(claimedRaw);
+  const hasExactClaimEntry = claimedRaw && entries.some((entry) => String(entry.rawId || '').trim() === claimedRaw);
+  let skippedClaimByFace = false;
+
+  entries.forEach((entry) => {
+    const entryRaw = String(entry.rawId || '').trim();
+    const entryRendered = entry.rendered || tileIdToAssetName(entryRaw);
+
+    // The claimed discard is part of the exposed meld, but it was not in the
+    // claimant's hand.  Do not remove that exact instance from the local hand.
+    if (claimedRaw && entryRaw && entryRaw === claimedRaw) {
+      return;
+    }
+
+    // Some backend builds send meld faces without unique copy ids. In that case
+    // skip one tile matching the claimed face so we remove only the tiles that
+    // actually came from this player's hand.
+    if (!hasExactClaimEntry && claimedRendered && entryRendered === claimedRendered && !skippedClaimByFace) {
+      skippedClaimByFace = true;
+      return;
+    }
+
+    nextTiles = removeOneTileFromHand(nextTiles, entryRaw, entryRendered);
+  });
+
+  return nextTiles;
 };
 
 const getPlayerTileList = (player, ...keys) => {
@@ -1255,6 +1334,30 @@ function mergeActionBroadcast(current, payload = {}) {
       const sourcePosition = getSeatPosition(payload.discardedBySeat || payload.shooterSeat || payload.fromSeat, current);
       const positionToUpdate = normalizePosition(seatPosition);
       const hasActionIdentity = Boolean(actionIds.length || positionToUpdate);
+      const currentIds = getCurrentPlayerIdCandidates(current);
+      const isLocalActionPlayer = positionToUpdate === 'left'
+        || (actionIds.length && actionIds.some((id) => currentIds.includes(id)));
+      const payloadHandTiles = getFirstRawTileList(
+        payload.handTiles,
+        payload.myHand,
+        payload.playerHand,
+        payload.remainingHand,
+        payload.currentPlayerHand,
+        payload.hand,
+        payload.player?.handTiles,
+        payload.player?.hand
+      );
+
+      if (isLocalActionPlayer) {
+        const currentHandTiles = getFirstRawTileList(current.handTiles, current.myHand, current.playerHand);
+        const nextHandTiles = payloadHandTiles.length
+          ? payloadHandTiles
+          : removeMeldTilesFromHand(currentHandTiles, rawMeldTiles, meldTiles, tileId, renderedClaimedTile);
+
+        next.handTiles = nextHandTiles;
+        next.myHand = nextHandTiles;
+        next.playerHand = nextHandTiles;
+      }
 
       if (Array.isArray(current.players)) {
         let removedFromPlayerDiscard = false;
@@ -1272,9 +1375,20 @@ function mergeActionBroadcast(current, payload = {}) {
 
           if (isActionPlayer) {
             const currentOpenMelds = normalizeMeldList(player.openMelds || player.melds || player.exposedMelds || player.declaredMelds || []);
+            const playerPrivateHand = getFirstRawTileList(player.handTiles, player.hand, player.tiles);
+            const shouldUpdatePlayerHand = isLocalActionPlayer && playerPrivateHand.length;
+            const nextPlayerHand = payloadHandTiles.length
+              ? payloadHandTiles
+              : removeMeldTilesFromHand(playerPrivateHand, rawMeldTiles, meldTiles, tileId, renderedClaimedTile);
+            const nextHandSize = shouldUpdatePlayerHand
+              ? nextPlayerHand.length
+              : Math.max(0, Number(player.handSize ?? player.handCount ?? 0) - Math.max(0, rawMeldTiles.length - (tileId ? 1 : 0)));
+
             return {
               ...player,
               openMelds: [...currentOpenMelds, meldEntry],
+              ...(shouldUpdatePlayerHand ? { handTiles: nextPlayerHand, hand: nextPlayerHand, tiles: nextPlayerHand } : {}),
+              ...(Number.isFinite(nextHandSize) && nextHandSize > 0 ? { handSize: nextHandSize, handCount: nextHandSize } : {}),
             };
           }
 
@@ -1569,6 +1683,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           });
           break;
         case 'error':
+          setGameState((current) => ({ ...(current || {}), pendingDiscardTileId: null }));
           setGameError(payload.message || payload.error || 'Gameplay socket error.');
           break;
         default:
@@ -1696,7 +1811,9 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     gameState.currentPlayerHand,
     ...(gameApiAvailable ? [getPlayerTileList(leftPlayer, 'handTiles', 'hand', 'tiles')] : [])
   );
-  const playerHandTiles = rawPlayerHandTiles.map((tile) => normalizeTileName(tile));
+  const playerHandTiles = rawPlayerHandTiles
+    .map((tile, index) => normalizeHandTileEntry(tile, index))
+    .filter(Boolean);
   const leftDiscardTiles = getVisibleDiscardTilesByPosition(gameState, leftPlayer, 'left');
   const topDiscardTiles = getVisibleDiscardTilesByPosition(gameState, topPlayer, 'top');
   const rightDiscardTiles = hasRightPlayer ? getVisibleDiscardTilesByPosition(gameState, rightPlayer, 'right') : [];
@@ -1801,22 +1918,22 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     }
   };
 
-  const handleTileDiscard = (visualTile) => {
+  const handleTileDiscard = (tileEntry) => {
     if (!isUserTurn || gameState.pendingDiscardTileId) return;
 
-    if (isFeiOrJokerTileName(visualTile)) {
+    const entry = normalizeHandTileEntry(tileEntry, tileEntry?.index ?? 0);
+    if (!entry) return;
+
+    if (isFeiOrJokerTileName(entry)) {
       setGameError(t('feiLocked'));
       return;
     }
 
-    const rawList = getFirstRawTileList(gameState.handTiles, gameState.myHand, gameState.playerHand);
-    const rawTileId = rawList.find(t => tileIdToAssetName(t) === visualTile) || visualTile;
-
-    const tileId = getTileId(rawTileId);
+    const tileId = getTileId(entry);
+    const renderedTile = entry.assetName;
     if (!tileId) return;
 
     if (isMockGameplay) {
-      const renderedTile = tileIdToAssetName(tileId);
       setGameState((current) => {
         const handTiles = removeOneTileFromHand(
           getFirstRawTileList(current.handTiles, current.myHand, current.playerHand),
@@ -1830,6 +1947,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           ...(current || {}),
           handTiles,
           myHand: handTiles,
+          playerHand: handTiles,
           discards,
           currentDiscard: renderedTile,
           pendingDiscardTileId: null,
@@ -2017,18 +2135,20 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         <div className="gameplay-hand" aria-label="Player hand tiles">
           {playerHandTiles.map((tile, index) => {
             const isLockedFei = isFeiOrJokerTileName(tile);
+            const assetName = tile.assetName;
 
             return (
               <button
                 className={`gameplay-hand-tile ${isLockedFei ? 'gameplay-hand-tile--fei' : ''}`}
                 type="button"
-                key={`${tile}-${index}`}
+                key={`${tile.rawId || assetName}-${index}`}
+                data-tile-id={tile.rawId}
                 aria-label={isLockedFei ? `${t('feiLocked')} ${index + 1}` : `Tile ${index + 1}`}
                 title={isLockedFei ? t('feiLocked') : undefined}
                 disabled={!isUserTurn || Boolean(gameState.pendingDiscardTileId) || isLockedFei}
                 onClick={() => handleTileDiscard(tile)}
               >
-                <GameplayTile name={tile} className={isLockedFei ? 'gameplay-tile--fei' : ''} />
+                <GameplayTile name={assetName} className={isLockedFei ? 'gameplay-tile--fei' : ''} />
                 {isLockedFei ? <span className="gameplay-fei-lock" aria-hidden="true">FEI</span> : null}
               </button>
             );
