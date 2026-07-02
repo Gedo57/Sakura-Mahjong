@@ -1656,3 +1656,54 @@ animation: none;
   60% { transform: translateY(-2px) scale(1.04); }
   100% { transform: translateY(0) scale(1); }
 }
+
+/* Patch 6 — Safety cleanup for any mobile landscape canvas that still uses data-device='mobile'.
+   Portrait has a later dedicated file and will override these values. */
+html[data-device='mobile'][data-orientation='landscape'] .app-shell[data-device='mobile'] .gameplay-screen {
+  --gp-table-p4-x: 50%;
+  --gp-table-p4-y: 53.2%;
+  --gp-table-p4-width: 820px;
+  --gp-middle-tray-x: 50%;
+  --gp-middle-tray-y: 47.8%;
+  --gp-middle-tray-w: 360px;
+  --gp-middle-tray-h: 242px;
+  --gp-bonus-mine-x: 294px;
+  --gp-bonus-mine-y: 82px;
+  --gp-timer-size: 54px;
+}
+
+html[data-device='mobile'][data-orientation='landscape'] .app-shell[data-device='mobile'] .gameplay-table-zone {
+  left: var(--gp-table-p4-x);
+  top: var(--gp-table-p4-y);
+  width: var(--gp-table-p4-width);
+  transform: translate(-50%, -50%);
+}
+
+html[data-device='mobile'][data-orientation='landscape'] .app-shell[data-device='mobile'] .gameplay-player-badge.right {
+  right: 54px;
+  top: 292px;
+  width: 132px;
+  min-height: 184px;
+}
+
+html[data-device='mobile'][data-orientation='landscape'] .app-shell[data-device='mobile'] .gameplay-player-badge.left {
+  left: 34px;
+  bottom: 76px;
+}
+
+html[data-device='mobile'][data-orientation='landscape'] .app-shell[data-device='mobile'] .gameplay-hand {
+  bottom: 70px;
+  width: 720px;
+}
+
+html[data-device='mobile'][data-orientation='landscape'] .app-shell[data-device='mobile'] .gameplay-hand-tile {
+  width: 52px;
+  height: 84px;
+  margin-left: -3px;
+}
+
+html[data-device='mobile'][data-orientation='landscape'] .app-shell[data-device='mobile'] .gameplay-actions {
+  bottom: 14px;
+  width: 760px;
+  gap: 12px;
+}
