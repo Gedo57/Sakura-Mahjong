@@ -118,7 +118,8 @@ export async function login(credentials) {
 }
 
 export async function refreshToken() {
-  const response = await postToApi('/auth/refresh', undefined, (mockApi) => mockApi.refreshToken(), {
+  const storedRefreshToken = getRefreshToken();
+  const response = await postToApi('/auth/refresh', { refreshToken: storedRefreshToken }, (mockApi) => mockApi.refreshToken(), {
     retryOnUnauthorized: false,
   });
 

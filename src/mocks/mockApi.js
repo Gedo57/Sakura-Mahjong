@@ -119,13 +119,14 @@ export const mockApi = {
         diamonds: 0,
         chest: null,
       },
+      claimableDay: 3,
       rewardSchedule: [
         { day: 1, coins: 300, diamonds: 0, chest: null },
-        { day: 2, coins: 0, diamonds: 10, chest: null },
+        { day: 2, coins: 0, diamonds: 5, chest: null },
         { day: 3, coins: 500, diamonds: 0, chest: null },
-        { day: 4, coins: 700, diamonds: 0, chest: null },
-        { day: 5, coins: 0, diamonds: 20, chest: null },
-        { day: 6, coins: 0, diamonds: 0, chest: 'basic_chest' },
+        { day: 4, coins: 500, diamonds: 0, chest: null },
+        { day: 5, coins: 0, diamonds: 10, chest: null },
+        { day: 6, coins: 0, diamonds: 0, chest: 'chest_bronze' },
         { day: 7, coins: 1000, diamonds: 0, chest: null },
       ],
     };
@@ -138,7 +139,9 @@ export const mockApi = {
       streak: {
         current: 4,
       },
+      claimableDay: 4,
       rewards: {
+        day: 4,
         coinsAdded: 500,
         diamondsAdded: 0,
         chestGiven: null,

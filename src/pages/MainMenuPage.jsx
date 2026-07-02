@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../router/routes.js';
-import { claimDailyReward, getBalances, getDailyRewardStatus } from '../services/economyService.js';
+import { DEFAULT_DAILY_REWARD_SCHEDULE, claimDailyReward, getBalances, getDailyRewardStatus } from '../services/economyService.js';
 import { saveMatchmakingContext } from '../store/gameStore.js';
 import { getStoredAuthUser } from '../services/authService.js';
 import { getRoomTiers } from '../services/roomService.js';
@@ -395,21 +395,34 @@ function RoomCard({ room, onPlay, t, tx }) {
 
 
 
-const dailyRewards = [
-  { day: 1, image: 'day-1.png' },
-  { day: 2, image: 'day-2.png' },
-  { day: 3, image: 'day-3.png' },
-  { day: 4, image: 'day-4.png' },
-  { day: 5, image: 'day-5.png' },
-  { day: 6, image: 'day-6.png' },
-  { day: 7, image: 'day-7.png' },
-];
+function getDailyRewardImage(day) {
+  return `day-${day}.png`;
+}
+
+function getDailyRewardLabel(reward = {}) {
+  if (reward.coins) {
+    return `${reward.coins} Coins`;
+  }
+
+  if (reward.diamonds) {
+    return `${reward.diamonds} Gems`;
+  }
+
+  if (reward.chest) {
+    return 'Chest';
+  }
+
+  return 'Reward';
+}
 
 function DailyLoginPopup({ status, onClose, onClaim }) {
-  const rawStreak = Number(status?.currentStreak ?? status?.streak ?? status?.newStreak ?? 1);
+  const rewardSchedule = Array.isArray(status?.rewardSchedule) && status.rewardSchedule.length > 0
+    ? status.rewardSchedule
+    : DEFAULT_DAILY_REWARD_SCHEDULE;
+  const rawStreak = Number(status?.claimableDay ?? status?.currentStreak ?? status?.streak ?? status?.newStreak ?? 1);
   const streak = Number.isFinite(rawStreak) && rawStreak > 0 ? rawStreak : 1;
   const canClaimToday = Boolean(status?.canClaimToday);
-  const activeDay = Math.min(Math.max(streak, 1), dailyRewards.length);
+  const activeDay = Math.min(Math.max(streak, 1), rewardSchedule.length);
   const streakUnit = activeDay === 1 ? 'Day' : 'Days';
 
   return (
@@ -424,14 +437,15 @@ function DailyLoginPopup({ status, onClose, onClaim }) {
         </div>
 
         <div className="daily-login-cards">
-          {dailyRewards.map((reward) => {
-            const isClaimable = reward.day === activeDay && canClaimToday;
-            const isClaimed = reward.day < activeDay || (reward.day === activeDay && !canClaimToday);
-            const isLocked = reward.day > activeDay;
+          {rewardSchedule.map((reward) => {
+            const rewardDay = Number(reward.day) || 1;
+            const isClaimable = rewardDay === activeDay && canClaimToday;
+            const isClaimed = rewardDay < activeDay || (rewardDay === activeDay && !canClaimToday);
+            const isLocked = rewardDay > activeDay;
 
             return (
-              <article className={`daily-login-card${isClaimable ? ' is-active' : ''}`} key={reward.day}>
-                <img className="daily-login-card-art" src={dailyAsset(reward.image)} alt={`Day ${reward.day}`} />
+              <article className={`daily-login-card${isClaimable ? ' is-active' : ''}`} key={rewardDay} title={getDailyRewardLabel(reward)}>
+                <img className="daily-login-card-art" src={dailyAsset(getDailyRewardImage(rewardDay))} alt={`Day ${rewardDay} - ${getDailyRewardLabel(reward)}`} />
 
                 {isClaimed && (
                   <div className="daily-login-claimed">

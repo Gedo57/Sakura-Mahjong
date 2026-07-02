@@ -4,13 +4,13 @@ import { isMockApiEnabled } from './api.js';
 
 const ECONOMY_BASE = '/economy';
 
-const DEFAULT_DAILY_REWARD_SCHEDULE = [
+export const DEFAULT_DAILY_REWARD_SCHEDULE = [
   { day: 1, coins: 300, diamonds: 0, chest: null },
-  { day: 2, coins: 0, diamonds: 10, chest: null },
+  { day: 2, coins: 0, diamonds: 5, chest: null },
   { day: 3, coins: 500, diamonds: 0, chest: null },
-  { day: 4, coins: 700, diamonds: 0, chest: null },
-  { day: 5, coins: 0, diamonds: 20, chest: null },
-  { day: 6, coins: 0, diamonds: 0, chest: 'basic_chest' },
+  { day: 4, coins: 500, diamonds: 0, chest: null },
+  { day: 5, coins: 0, diamonds: 10, chest: null },
+  { day: 6, coins: 0, diamonds: 0, chest: 'chest_bronze' },
   { day: 7, coins: 1000, diamonds: 0, chest: null },
 ];
 
@@ -57,11 +57,18 @@ function unwrapTransactions(response) {
 
 function unwrapValidateTransaction(response) {
   const payload = unwrapPayload(response);
+  const validation = asObject(payload.validation || payload.result || payload);
+  const isValid = validation.valid ?? validation.canAfford ?? validation.allowed ?? validation.isValid;
 
   return {
     ...payload,
+    validation,
     success: Boolean(payload.success ?? true),
-    canAfford: Boolean(payload.canAfford ?? payload.allowed ?? payload.isValid),
+    canAfford: Boolean(isValid),
+    valid: Boolean(isValid),
+    current: normalizeNumber(validation.current ?? validation.balance ?? payload.current, 0),
+    required: normalizeNumber(validation.required ?? validation.requiredAmount ?? payload.required, 0),
+    message: validation.message || payload.message || null,
     balances: payload.balances ? unwrapBalances(payload) : null,
   };
 }
@@ -100,7 +107,6 @@ function unwrapDailyRewardStatus(response) {
   const payload = unwrapPayload(response);
   const eligibility = asObject(payload.eligibility || payload.dailyRewardEligibility);
   const streakInfo = asObject(payload.streakInfo || payload.streak);
-  const nextReward = normalizeReward(payload.nextReward || payload.todayReward || {});
   const currentStreak = normalizeNumber(
     streakInfo.current
       ?? streakInfo.currentStreak
@@ -109,16 +115,31 @@ function unwrapDailyRewardStatus(response) {
       ?? eligibility.currentStreak,
     1,
   );
+  const claimableDay = normalizeNumber(
+    eligibility.claimableDay
+      ?? streakInfo.claimableDay
+      ?? payload.claimableDay
+      ?? currentStreak,
+    currentStreak,
+  );
+  const nextReward = normalizeReward(
+    eligibility.todayReward
+      || streakInfo.todayReward
+      || payload.todayReward
+      || payload.nextReward
+      || {},
+  );
 
   return {
     ...payload,
     currentStreak,
+    claimableDay,
     longestStreak: normalizeNumber(streakInfo.longest ?? streakInfo.longestStreak ?? payload.longestStreak, 0),
     totalLoginDays: normalizeNumber(streakInfo.totalLoginDays ?? payload.totalLoginDays, 0),
     canClaimToday: Boolean(eligibility.canClaim ?? payload.canClaimToday ?? payload.canClaim),
-    todayReward: normalizeReward(payload.todayReward || payload.nextReward || {}),
+    todayReward: nextReward,
     nextReward,
-    rewardSchedule: normalizeDailyRewardSchedule(payload),
+    rewardSchedule: normalizeDailyRewardSchedule({ ...payload, ...streakInfo, ...eligibility }),
     lastClaimedDate: eligibility.lastClaimedDate || streakInfo.lastClaimedDate || payload.lastClaimedDate || null,
     nextClaimTime: eligibility.nextClaimTime || payload.nextClaimTime || null,
     recentClaims: payload.recentClaims || streakInfo.recentClaims || [],
@@ -133,17 +154,20 @@ function unwrapClaimDailyReward(response) {
   return {
     ...payload,
     success: Boolean(payload.success ?? true),
+    claimableDay: normalizeNumber(payload.claimableDay ?? rewards.day ?? streak.current, 1),
     streak: {
       ...streak,
       current: normalizeNumber(streak.current ?? payload.currentStreak ?? payload.newStreak, 1),
     },
     rewards: {
       ...rewards,
+      day: normalizeNumber(rewards.day ?? payload.claimableDay, 1),
       coinsAdded: normalizeNumber(rewards.coinsAdded ?? rewards.coins, 0),
       diamondsAdded: normalizeNumber(rewards.diamondsAdded ?? rewards.diamonds ?? rewards.gems, 0),
       chestGiven: rewards.chestGiven ?? rewards.chest ?? rewards.chestId ?? null,
       chestResult: rewards.chestResult ?? null,
     },
+    rewardSchedule: normalizeDailyRewardSchedule(payload),
     balances: payload.balances || null,
   };
 }
@@ -195,9 +219,11 @@ export async function getTransactionHistory() {
   return unwrapTransactions(response);
 }
 
-export async function validateTransaction({ amount, currencyType } = {}) {
+export async function validateTransaction({ amount, requiredAmount, currencyType } = {}) {
+  const normalizedAmount = normalizeNumber(requiredAmount ?? amount, 0);
   const payload = {
-    amount: normalizeNumber(amount, 0),
+    requiredAmount: normalizedAmount,
+    amount: normalizedAmount,
     currencyType: currencyType || 'coins',
   };
 
