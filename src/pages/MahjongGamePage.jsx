@@ -123,7 +123,7 @@ const normalizeGameplayPlayer = (player = {}, index = 0) => {
     handSize: player.handSize ?? player.handCount ?? player.tileCount ?? player.tilesCount ?? handTiles.length ?? 0,
     discardTiles: player.discardTiles || player.discards || player.discardPile || player.discardedTiles || [],
     discards: player.discards || player.discardTiles || player.discardPile || player.discardedTiles || [],
-    openMelds: player.openMelds || player.melds || [],
+    openMelds: player.openMelds || player.melds || player.exposedMelds || player.declaredMelds || player.openSets || player.sets || [],
     bonusTiles: player.bonusTiles || player.revealedBonusTiles || player.revealedBonus || player.bonus || player.flowers || player.seasons || player.animals || [],
   };
 };
@@ -160,6 +160,8 @@ const getPlayerProfileRichnessScore = (player = {}) => [
   Array.isArray(player.handTiles) && player.handTiles.length ? 'handTiles' : '',
   Array.isArray(player.discards) && player.discards.length ? 'discards' : '',
   Array.isArray(player.openMelds) && player.openMelds.length ? 'openMelds' : '',
+  Array.isArray(player.exposedMelds) && player.exposedMelds.length ? 'exposedMelds' : '',
+  Array.isArray(player.declaredMelds) && player.declaredMelds.length ? 'declaredMelds' : '',
 ].filter(Boolean).length;
 
 const getPlayerMergeKey = (player = {}, fallbackIndex = 0) => String(
@@ -590,6 +592,72 @@ const isFeiOrJokerTileName = (tile) => {
 const normalizeTileList = (value) => toArray(value).map(normalizeTileName).filter(Boolean);
 const getRawTileList = (value) => toArray(value).map(getTileId).filter(Boolean);
 
+const MELD_TILE_KEYS = ['tiles', 'meldTiles', 'claimedTiles', 'exposedTiles', 'setTiles', 'groupTiles', 'cards'];
+
+const normalizeMeldEntry = (meld, fallbackType = '') => {
+  if (!meld) return null;
+
+  const rawType = typeof meld === 'object' && !Array.isArray(meld)
+    ? (meld.type || meld.action || meld.name || meld.kind || meld.meldType || fallbackType)
+    : fallbackType;
+  const type = normalizeActionForUi(rawType) || String(rawType || '').toLowerCase() || 'meld';
+
+  let tiles = [];
+  let rawTiles = [];
+
+  if (Array.isArray(meld) || typeof meld === 'string') {
+    tiles = normalizeTileList(Array.isArray(meld) ? meld : [meld]);
+    rawTiles = getRawTileList(Array.isArray(meld) ? meld : [meld]);
+  } else if (typeof meld === 'object') {
+    const tileSource = MELD_TILE_KEYS.map((key) => meld[key]).find((value) => Array.isArray(value) && value.length)
+      || (Array.isArray(meld.set) ? meld.set : null)
+      || (Array.isArray(meld.group) ? meld.group : null);
+
+    tiles = normalizeTileList(tileSource || []);
+    rawTiles = getRawTileList(tileSource || []);
+  }
+
+  if (!tiles.length) return null;
+
+  return {
+    ...(typeof meld === 'object' && !Array.isArray(meld) ? meld : {}),
+    type,
+    tiles,
+    rawTiles,
+  };
+};
+
+const normalizeMeldList = (value) => {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizeMeldEntry(entry)).filter(Boolean);
+  }
+
+  if (typeof value === 'object') {
+    const looksLikeSingleMeld = MELD_TILE_KEYS.some((key) => Array.isArray(value[key]) && value[key].length)
+      || Array.isArray(value.set)
+      || Array.isArray(value.group);
+
+    const source = looksLikeSingleMeld
+      ? [value]
+      : Object.values(value).flatMap((entry) => (Array.isArray(entry) ? entry : [entry]));
+
+    return source.map((entry) => normalizeMeldEntry(entry)).filter(Boolean);
+  }
+
+  return [];
+};
+
+const getFirstMeldList = (...values) => {
+  for (const value of values) {
+    const melds = normalizeMeldList(value);
+    if (melds.length) return melds;
+  }
+
+  return [];
+};
+
 const getFirstRawTileList = (...values) => {
   for (const value of values) {
     const tiles = getRawTileList(value);
@@ -648,6 +716,52 @@ const getDiscardTilesByPosition = (state, player, position) => getFirstTileList(
 
 const getVisibleDiscardTilesByPosition = (state, player, position) => (
   getCircularTableTiles(getDiscardTilesByPosition(state, player, position))
+);
+
+const getOpenMeldsByPosition = (state, player, position) => getFirstMeldList(
+  player?.openMelds,
+  player?.melds,
+  player?.exposedMelds,
+  player?.declaredMelds,
+  player?.openSets,
+  player?.sets,
+  state.openMelds?.[position],
+  state.exposedMelds?.[position],
+  state.declaredMelds?.[position],
+  state.melds?.[position],
+  state[`${position}OpenMelds`],
+  state[`${position}Melds`]
+);
+
+const removeLastMatchingTile = (tiles = [], rawTileId = '', renderedTileName = '') => {
+  const list = toArray(tiles);
+  if (!list.length) return { tiles: [], removed: false };
+
+  const raw = String(rawTileId || '').trim();
+  const rendered = String(renderedTileName || '').trim();
+  let removeIndex = -1;
+
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const tile = list[index];
+    const tileRaw = String(getTileId(tile) || '').trim();
+    const tileRendered = normalizeTileName(tile);
+
+    if ((raw && tileRaw === raw) || (rendered && tileRendered === rendered)) {
+      removeIndex = index;
+      break;
+    }
+  }
+
+  if (removeIndex < 0) return { tiles: list, removed: false };
+  return { tiles: [...list.slice(0, removeIndex), ...list.slice(removeIndex + 1)], removed: true };
+};
+
+const hasMatchingTile = (tiles = [], rawTileId = '', renderedTileName = '') => (
+  toArray(tiles).some((tile) => {
+    const tileRaw = String(getTileId(tile) || '').trim();
+    const tileRendered = normalizeTileName(tile);
+    return (rawTileId && tileRaw === String(rawTileId)) || (renderedTileName && tileRendered === renderedTileName);
+  })
 );
 
 const getAvailableActions = (state, useMockDefaults = false) => {
@@ -800,6 +914,40 @@ function BonusTileRack({ position = 'left', tiles = [], label = 'BONUS', visible
           <span className="gameplay-bonus-empty-slot" key={`bonus-empty-${position}-${index}`} aria-hidden="true" />
         ))}
       </div>
+    </div>
+  );
+}
+
+function getMeldDisplayLabel(type = '') {
+  const normalized = normalizeActionForUi(type);
+  if (normalized === 'chow') return 'CHOW';
+  if (normalized === 'pong') return 'PONG';
+  if (normalized === 'kong') return 'KONG';
+  if (normalized === 'hu') return 'HU';
+  return 'MELD';
+}
+
+function PlayerMeldRack({ position = 'left', melds = [] }) {
+  const meldList = normalizeMeldList(melds);
+
+  if (!meldList.length) return null;
+
+  return (
+    <div className={`gameplay-meld-rack gameplay-meld-rack--${position}`} aria-label={`${position} open melds`}>
+      {meldList.map((meld, meldIndex) => {
+        const meldType = normalizeActionForUi(meld.type) || 'meld';
+
+        return (
+          <div className={`gameplay-meld-group gameplay-meld-group--${meldType}`} key={`meld-${position}-${meldIndex}`}>
+            <span className="gameplay-meld-label">{getMeldDisplayLabel(meldType)}</span>
+            <div className="gameplay-meld-tiles">
+              {meld.tiles.map((tile, tileIndex) => (
+                <GameplayTile name={tile} key={`meld-${position}-${meldIndex}-${tile}-${tileIndex}`} />
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -997,15 +1145,19 @@ function mergeClaimWindow(current, payload = {}) {
 
 function mergeActionBroadcast(current, payload = {}) {
   const action = String(payload.action || '').toLowerCase();
-  const tileId = payload.tileId || payload.tile || payload.discardedTile;
-  const actionUserId = payload.userId || payload.playerId || payload.activeUserId || payload.discardedBy || payload.discardedByUserId || payload.discardedByPlayerId;
+  const tileId = payload.tileId || payload.tile || payload.discardedTile || payload.claimedTile;
+  const isMeldAction = ['pung', 'pong', 'pon', 'kong', 'kan', 'chow', 'chi'].includes(action);
+  const actionUserId = isMeldAction
+    ? (payload.userId || payload.playerId || payload.activeUserId || payload.claimedBy || payload.claimedByUserId || payload.claimedByPlayerId || payload.claimerId || payload.actorId || payload.actorUserId)
+    : (payload.userId || payload.playerId || payload.activeUserId || payload.discardedBy || payload.discardedByUserId || payload.discardedByPlayerId || payload.actorId || payload.actorUserId);
   const actionIds = getEntityIds({ id: actionUserId });
   const playerWithActionId = actionIds.length
     ? toArray(current.players).find((player) => playerMatchesAnyId(player, actionIds))
     : null;
-  const seatPosition = getSeatPosition(payload.seat || payload.discardedBySeat, current)
-    || playerWithActionId?.position
-    || payload.position;
+  const seatPosition = getSeatPosition(
+    payload.seat || payload.claimedBySeat || payload.claimerSeat || payload.actorSeat || (!isMeldAction ? payload.discardedBySeat : ''),
+    current
+  ) || playerWithActionId?.position || payload.position;
 
   if (!action) return current;
 
@@ -1068,9 +1220,110 @@ function mergeActionBroadcast(current, payload = {}) {
     }
   }
 
-  if ((action === 'pung' || action === 'pong' || action === 'kong' || action === 'chow') && payload.meldTiles) {
-    const currentMelds = Array.isArray(current.centerTiles) ? current.centerTiles : [];
-    next.centerTiles = [...currentMelds, ...normalizeTileList(payload.meldTiles)];
+  if (isMeldAction) {
+    const uiAction = normalizeActionForUi(action);
+    const meldTiles = getFirstTileList(
+      payload.meldTiles,
+      payload.tiles,
+      payload.openMeld?.tiles,
+      payload.meld?.tiles,
+      payload.claimedTiles,
+      payload.exposedTiles
+    );
+    const rawMeldTiles = getFirstRawTileList(
+      payload.meldTiles,
+      payload.tiles,
+      payload.openMeld?.tiles,
+      payload.meld?.tiles,
+      payload.claimedTiles,
+      payload.exposedTiles
+    );
+    const renderedClaimedTile = tileIdToAssetName(tileId);
+    const meldEntry = normalizeMeldEntry({
+      type: uiAction,
+      tiles: meldTiles,
+      rawTiles: rawMeldTiles,
+      claimedTile: tileId || payload.claimedTile || payload.discardedTile,
+      fromPlayerId: payload.discardedBy || payload.discardedByUserId || payload.discardedByPlayerId || payload.shooterId || payload.fromPlayerId,
+      fromSeat: payload.discardedBySeat || payload.shooterSeat || payload.fromSeat,
+    });
+
+    if (meldEntry) {
+      const sourceIds = getEntityIds({
+        id: payload.discardedBy || payload.discardedByUserId || payload.discardedByPlayerId || payload.shooterId || payload.fromPlayerId,
+      });
+      const sourcePosition = getSeatPosition(payload.discardedBySeat || payload.shooterSeat || payload.fromSeat, current);
+      const positionToUpdate = normalizePosition(seatPosition);
+      const hasActionIdentity = Boolean(actionIds.length || positionToUpdate);
+
+      if (Array.isArray(current.players)) {
+        let removedFromPlayerDiscard = false;
+
+        next.players = current.players.map((player) => {
+          const isActionPlayer = (actionIds.length && playerMatchesAnyId(player, actionIds))
+            || (positionToUpdate && normalizePosition(player.position) === positionToUpdate);
+          const isSourcePlayer = (sourceIds.length && playerMatchesAnyId(player, sourceIds))
+            || (sourcePosition && normalizePosition(player.position) === sourcePosition);
+          const shouldFallbackRemove = !sourceIds.length
+            && !sourcePosition
+            && !isActionPlayer
+            && !removedFromPlayerDiscard
+            && hasMatchingTile(player.discards || player.discardTiles || [], tileId, renderedClaimedTile);
+
+          if (isActionPlayer) {
+            const currentOpenMelds = normalizeMeldList(player.openMelds || player.melds || player.exposedMelds || player.declaredMelds || []);
+            return {
+              ...player,
+              openMelds: [...currentOpenMelds, meldEntry],
+            };
+          }
+
+          if ((isSourcePlayer || shouldFallbackRemove) && (tileId || renderedClaimedTile)) {
+            const rawDiscards = player.discards || player.discardTiles || [];
+            const { tiles: nextPlayerDiscards, removed } = removeLastMatchingTile(rawDiscards, tileId, renderedClaimedTile);
+            removedFromPlayerDiscard = removedFromPlayerDiscard || removed;
+            return {
+              ...player,
+              discards: nextPlayerDiscards,
+              discardTiles: nextPlayerDiscards,
+            };
+          }
+
+          return player;
+        });
+      }
+
+      if (hasActionIdentity) {
+        const openMeldsByPosition = { ...(current.openMelds || {}) };
+        const currentPositionMelds = getFirstMeldList(openMeldsByPosition[positionToUpdate]);
+        if (positionToUpdate && !currentPositionMelds.some((meld) => JSON.stringify(meld.tiles) === JSON.stringify(meldEntry.tiles))) {
+          openMeldsByPosition[positionToUpdate] = [...currentPositionMelds, meldEntry];
+          next.openMelds = openMeldsByPosition;
+        }
+      }
+
+      if (tileId || renderedClaimedTile) {
+        const discards = { ...(current.discards || {}) };
+        const priorityPositions = [sourcePosition, 'center', 'left', 'top', 'right'].filter(Boolean);
+        const uniquePositions = priorityPositions.filter((position, index, list) => list.indexOf(position) === index);
+        let removedFromStateDiscard = false;
+
+        uniquePositions.forEach((position) => {
+          if (removedFromStateDiscard && !sourcePosition) return;
+          const { tiles: nextPositionDiscards, removed } = removeLastMatchingTile(discards[position] || [], tileId, renderedClaimedTile);
+          if (removed) {
+            discards[position] = nextPositionDiscards;
+            removedFromStateDiscard = true;
+          }
+        });
+
+        next.discards = discards;
+
+        if (Array.isArray(current.centerTiles)) {
+          next.centerTiles = removeLastMatchingTile(current.centerTiles, tileId, renderedClaimedTile).tiles;
+        }
+      }
+    }
   }
 
   return next;
@@ -1452,6 +1705,9 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   const topBonusTiles = getFirstTileList(topPlayer?.bonusTiles);
   const rightBonusTiles = hasRightPlayer ? getFirstTileList(rightPlayer?.bonusTiles) : [];
   const shouldShowBonusRacks = isMockGameplay || leftBonusTiles.length || topBonusTiles.length || rightBonusTiles.length;
+  const leftOpenMelds = getOpenMeldsByPosition(gameState, leftPlayer, 'left');
+  const topOpenMelds = getOpenMeldsByPosition(gameState, topPlayer, 'top');
+  const rightOpenMelds = hasRightPlayer ? getOpenMeldsByPosition(gameState, rightPlayer, 'right') : [];
   const centerDiscardTiles = getCircularTableTiles(getFirstTileList(
     gameState.centerTiles,
     gameState.centerDiscardTiles,
@@ -1596,6 +1852,28 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     setSelectedAction(actionKey);
 
     if (isMockGameplay) {
+      if (['chow', 'pong', 'kong'].includes(actionKey)) {
+        const mockMeldTilesByAction = {
+          chow: ['p_2.png', 'p_3.png', 'p_4.png'],
+          pong: ['p_5.png', 'p_5.png', 'p_5.png'],
+          kong: ['w_e.png', 'w_e.png', 'w_e.png', 'w_e.png'],
+        };
+
+        setGameState((current) => ({
+          ...(current || {}),
+          players: toArray(current?.players).map((player) => {
+            if (normalizePosition(player.position) !== 'left') return player;
+            const currentOpenMelds = normalizeMeldList(player.openMelds || player.melds || []);
+            return {
+              ...player,
+              openMelds: [
+                ...currentOpenMelds,
+                { type: actionKey, tiles: mockMeldTilesByAction[actionKey] || [] },
+              ],
+            };
+          }),
+        }));
+      }
       setGameError('');
       return;
     }
@@ -1708,6 +1986,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           ))}
         </div>
         <BonusTileRack position="top" tiles={topBonusTiles} label={t('bonusTiles')} visible={shouldShowBonusRacks} />
+        <PlayerMeldRack position="top" melds={topOpenMelds} />
 
         {hasRightPlayer ? (
           <>
@@ -1717,6 +1996,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
               ))}
             </div>
             <BonusTileRack position="right" tiles={rightBonusTiles} label={t('bonusTiles')} visible={shouldShowBonusRacks} />
+            <PlayerMeldRack position="right" melds={rightOpenMelds} />
           </>
         ) : null}
 
@@ -1732,6 +2012,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           ))}
         </div>
         <BonusTileRack position="left" tiles={leftBonusTiles} label={t('bonusTiles')} visible={shouldShowBonusRacks} />
+        <PlayerMeldRack position="left" melds={leftOpenMelds} />
 
         <div className="gameplay-hand" aria-label="Player hand tiles">
           {playerHandTiles.map((tile, index) => {

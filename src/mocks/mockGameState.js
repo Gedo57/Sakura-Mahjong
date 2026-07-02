@@ -24,6 +24,9 @@ export const mockGameState = {
       position: 'top',
       handCount: 13,
       discardTiles: ['p_3.png', 'p_5.png', 'd_g.png'],
+      openMelds: [
+        { type: 'pong', tiles: ['p_8.png', 'p_8.png', 'p_8.png'] },
+      ],
       bonusTiles: ['fl_spring.png', 'sn_plum.png'],
     },
     {
@@ -47,6 +50,9 @@ export const mockGameState = {
         'd_r.png',
         'fei.png',
       ],
+      openMelds: [
+        { type: 'chow', tiles: ['p_1.png', 'p_2.png', 'p_3.png'] },
+      ],
       bonusTiles: ['an_cat.png', 'fl_winter.png'],
     },
     {
@@ -57,6 +63,9 @@ export const mockGameState = {
       position: 'right',
       handCount: 13,
       discardTiles: ['p_2.png', 'p_4.png', 'p_6.png', 'p_8.png'],
+      openMelds: [
+        { type: 'kong', tiles: ['w_n.png', 'w_n.png', 'w_n.png', 'w_n.png'] },
+      ],
       bonusTiles: ['an_mouse.png'],
     },
   ],

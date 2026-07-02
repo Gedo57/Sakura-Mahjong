@@ -297,7 +297,7 @@ html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='
 
 html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-right-discard {
   top: 24% !important;
-  left: 72% !important;
+  left: 62% !important;
   transform: scale(0.8) !important;
 }
 
@@ -409,9 +409,9 @@ html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='
 
 /* Patch — Portrait support for Malaysian 3P rule UI additions */
 html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-screen {
-  --gp-bonus-top-x: 506px;
+  --gp-bonus-top-x: 490px;
   --gp-bonus-top-y: 118px;
-  --gp-bonus-right-x: 508px;
+  --gp-bonus-right-x: 540px;
   --gp-bonus-right-y: 270px;
   --gp-bonus-left-x: 458px;
   --gp-bonus-left-y: 342px;
@@ -481,4 +481,84 @@ html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='
   bottom: -12px !important;
   min-width: 30px !important;
   font-size: 7px !important;
+}
+
+/* Patch — Portrait per player open meld racks
+   Coordinates are relative to .gameplay-table-zone, not to the full screen. */
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-screen {
+  --gp-meld-top-x: 238px;
+  --gp-meld-top-y: 122px;
+  --gp-meld-right-x: 456px;
+  --gp-meld-right-y: 164px;
+  --gp-meld-left-x: 218px;
+  --gp-meld-left-y: 244px;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack {
+  z-index: 34 !important;
+  gap: 5px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-group {
+  padding: 4px 5px 5px !important;
+  border-radius: 10px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-label {
+  font-size: 7px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-tiles .gameplay-tile {
+  width: 25px !important;
+  height: 40px !important;
+  margin-left: -4px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-tiles .gameplay-tile:first-child {
+  margin-left: 0 !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack--top {
+  left: var(--gp-meld-top-x) !important;
+  top: var(--gp-meld-top-y) !important;
+  right: auto !important;
+  bottom: auto !important;
+  max-width: 330px !important;
+  flex-wrap: wrap !important;
+  transform: translateX(-50%) scale(.82) !important;
+  transform-origin: top center !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack--left {
+  left: var(--gp-meld-left-x) !important;
+  top: var(--gp-meld-left-y) !important;
+  right: auto !important;
+  bottom: auto !important;
+  max-width: 390px !important;
+  flex-wrap: wrap !important;
+  transform: translateX(-50%) scale(.82) !important;
+  transform-origin: top center !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack--right {
+  left: var(--gp-meld-right-x) !important;
+  top: var(--gp-meld-right-y) !important;
+  right: auto !important;
+  bottom: auto !important;
+  max-height: 230px !important;
+  transform: scale(.76) !important;
+  transform-origin: top left !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack--right .gameplay-meld-tiles {
+  flex-direction: column !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack--right .gameplay-meld-tiles .gameplay-tile {
+  margin-left: 0 !important;
+  margin-top: -7px !important;
+}
+
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .gameplay-meld-rack--right .gameplay-meld-tiles .gameplay-tile:first-child {
+  margin-top: 0 !important;
 }

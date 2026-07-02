@@ -64,7 +64,7 @@ export function normalizePlayer(player = {}, index = 0) {
     handCount: player.handCount ?? player.handSize ?? player.tileCount ?? player.tilesCount ?? handTiles.length ?? 0,
     discardTiles: player.discardTiles || player.discards || player.discardPile || player.discardedTiles || [],
     discards: player.discards || player.discardTiles || player.discardPile || player.discardedTiles || [],
-    openMelds: player.openMelds || player.melds || [],
+    openMelds: player.openMelds || player.melds || player.exposedMelds || player.declaredMelds || player.openSets || player.sets || [],
     bonusTiles: player.bonusTiles || player.revealedBonusTiles || player.revealedBonus || player.bonus || player.flowers || player.seasons || player.animals || [],
   };
 }
