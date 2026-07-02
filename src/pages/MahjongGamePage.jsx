@@ -123,7 +123,7 @@ const normalizeGameplayPlayer = (player = {}, index = 0) => {
     handSize: player.handSize ?? player.handCount ?? player.tileCount ?? player.tilesCount ?? handTiles.length ?? 0,
     discardTiles: player.discardTiles || player.discards || player.discardPile || player.discardedTiles || [],
     discards: player.discards || player.discardTiles || player.discardPile || player.discardedTiles || [],
-    openMelds: player.openMelds || player.melds || player.exposedMelds || player.declaredMelds || player.openSets || player.sets || [],
+    openMelds: player.openMelds || player.exposedMelds || player.declaredMelds || player.openSets || player.sets || [],
     bonusTiles: player.bonusTiles || player.revealedBonusTiles || player.revealedBonus || player.bonus || player.flowers || player.seasons || player.animals || [],
   };
 };
@@ -716,6 +716,192 @@ const getFirstMeldList = (...values) => {
   return [];
 };
 
+const MELD_OWNER_ID_KEYS = [
+  'ownerId',
+  'ownerUserId',
+  'ownerPlayerId',
+  'playerId',
+  'userId',
+  'claimedBy',
+  'claimedByUserId',
+  'claimedByPlayerId',
+  'claimerId',
+  'claimingPlayerId',
+  'actorId',
+  'actorUserId',
+  'actorPlayerId',
+  'byPlayerId',
+];
+
+const MELD_OWNER_POSITION_KEYS = [
+  'position',
+  'ownerPosition',
+  'playerPosition',
+  'seatPosition',
+  'claimedByPosition',
+  'claimerPosition',
+  'actorPosition',
+  'actionPosition',
+];
+
+const MELD_OWNER_SEAT_KEYS = [
+  'seat',
+  'ownerSeat',
+  'playerSeat',
+  'claimedBySeat',
+  'claimerSeat',
+  'claimingSeat',
+  'actorSeat',
+  'actionSeat',
+];
+
+const getObjectKeyValue = (object, keys = []) => {
+  if (!object || typeof object !== 'object') return '';
+  for (const key of keys) {
+    const value = object[key];
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return '';
+};
+
+const getMeldOwnerIds = (meld = {}) => {
+  if (!meld || typeof meld !== 'object') return [];
+
+  const ids = MELD_OWNER_ID_KEYS.flatMap((key) => {
+    const value = meld[key];
+    return Array.isArray(value) ? value : [value];
+  });
+
+  ids.push(
+    meld.player?.id,
+    meld.player?.userId,
+    meld.player?.playerId,
+    meld.owner?.id,
+    meld.owner?.userId,
+    meld.owner?.playerId,
+  );
+
+  return ids.map(normalizeId).filter(Boolean).filter((id, index, list) => list.indexOf(id) === index);
+};
+
+const getPlayerOwnerIds = (player = {}) => getEntityIds(player)
+  .filter(Boolean)
+  .filter((id, index, list) => list.indexOf(id) === index);
+
+const getMeldOwnerPosition = (meld = {}, state = {}) => {
+  const explicitPosition = normalizePosition(getObjectKeyValue(meld, MELD_OWNER_POSITION_KEYS));
+  if (explicitPosition) return explicitPosition;
+
+  const ownerSeat = getObjectKeyValue(meld, MELD_OWNER_SEAT_KEYS);
+  return ownerSeat ? getSeatPosition(ownerSeat, state) : '';
+};
+
+const meldHasExplicitOwner = (meld = {}, state = {}) => Boolean(
+  getMeldOwnerIds(meld).length
+  || getMeldOwnerPosition(meld, state)
+  || getObjectKeyValue(meld, MELD_OWNER_SEAT_KEYS)
+);
+
+const isMeldOwnedByPlayer = (meld = {}, player = {}, position = '', state = {}) => {
+  const ownerIds = getMeldOwnerIds(meld);
+  const playerIds = getPlayerOwnerIds(player);
+
+  if (ownerIds.length) return ownerIds.some((id) => playerIds.includes(id));
+
+  const ownerPosition = getMeldOwnerPosition(meld, state);
+  if (ownerPosition) return ownerPosition === normalizePosition(position || player?.position);
+
+  const ownerSeat = normalizeSeat(getObjectKeyValue(meld, MELD_OWNER_SEAT_KEYS));
+  const playerSeat = normalizeSeat(player?.seat);
+  if (ownerSeat && playerSeat) return ownerSeat === playerSeat;
+
+  return true;
+};
+
+const looksLikeSingleMeldObject = (value = {}) => value && typeof value === 'object' && !Array.isArray(value) && (
+  MELD_TILE_KEYS.some((key) => Array.isArray(value[key]) && value[key].length)
+  || Array.isArray(value.set)
+  || Array.isArray(value.group)
+);
+
+const getMappedMeldSourceCandidates = (value, player = {}, position = '') => {
+  if (!value || Array.isArray(value) || typeof value !== 'object' || looksLikeSingleMeldObject(value)) {
+    return value ? [value] : [];
+  }
+
+  const keys = [
+    position,
+    normalizePosition(player?.position),
+    player?.seat,
+    normalizeSeat(player?.seat),
+    player?.id,
+    player?.userId,
+    player?.playerId,
+    player?._id,
+    player?.uid,
+    player?.socketId,
+  ].map((key) => String(key || '').trim()).filter(Boolean);
+
+  const candidates = [];
+  const seenKeys = new Set();
+  keys.forEach((key) => {
+    [key, key.toLowerCase(), key.toUpperCase()].forEach((candidateKey) => {
+      if (!candidateKey || seenKeys.has(candidateKey)) return;
+      seenKeys.add(candidateKey);
+      if (value[candidateKey] !== undefined && value[candidateKey] !== null) candidates.push(value[candidateKey]);
+    });
+  });
+
+  return candidates;
+};
+
+const normalizeOwnedMeldList = (value, player = {}, position = '', state = {}, { allowUnowned = false, positionMappedOnly = false } = {}) => {
+  const mappedCandidates = getMappedMeldSourceCandidates(value, player, position);
+  const candidates = mappedCandidates.length ? mappedCandidates : (positionMappedOnly ? [] : [value]);
+
+  return candidates
+    .flatMap((candidate) => normalizeMeldList(candidate))
+    .filter((meld) => (meldHasExplicitOwner(meld, state) ? isMeldOwnedByPlayer(meld, player, position, state) : allowUnowned));
+};
+
+const getMeldSignature = (meld = {}) => {
+  const normalized = normalizeMeldEntry(meld);
+  if (!normalized) return '';
+  const type = normalizeActionForUi(normalized.type) || String(normalized.type || '').toLowerCase() || 'meld';
+  const tiles = (Array.isArray(normalized.rawTiles) && normalized.rawTiles.length ? normalized.rawTiles : normalized.tiles) || [];
+  const normalizedTiles = tiles.map((tile) => normalizeTileName(tile) || getTileId(tile)).filter(Boolean);
+  return `${type}|${normalizedTiles.join(',')}`;
+};
+
+const dedupeMeldListBySignature = (melds = []) => {
+  const seen = new Set();
+  return normalizeMeldList(melds).filter((meld) => {
+    const signature = getMeldSignature(meld);
+    if (!signature || seen.has(signature)) return false;
+    seen.add(signature);
+    return true;
+  });
+};
+
+const dedupeMeldRacksByOwnership = (meldsByPosition = {}, state = {}) => {
+  const next = {};
+  const seenOwnerless = new Set();
+
+  ['left', 'top', 'right'].forEach((position) => {
+    next[position] = dedupeMeldListBySignature(meldsByPosition[position] || []).filter((meld) => {
+      const signature = getMeldSignature(meld);
+      if (!signature) return false;
+
+      if (meldHasExplicitOwner(meld, state)) return true;
+      if (seenOwnerless.has(signature)) return false;
+      seenOwnerless.add(signature);
+      return true;
+    });
+  });
+
+  return next;
+};
+
 const getFirstRawTileList = (...values) => {
   for (const value of values) {
     const tiles = getRawTileList(value);
@@ -1088,20 +1274,42 @@ const getVisibleDiscardTilesByPosition = (state, player, position) => (
   getCircularTableTiles(getDiscardTilesByPosition(state, player, position))
 );
 
-const getOpenMeldsByPosition = (state, player, position) => getFirstMeldList(
-  player?.openMelds,
-  player?.melds,
-  player?.exposedMelds,
-  player?.declaredMelds,
-  player?.openSets,
-  player?.sets,
-  state.openMelds?.[position],
-  state.exposedMelds?.[position],
-  state.declaredMelds?.[position],
-  state.melds?.[position],
-  state[`${position}OpenMelds`],
-  state[`${position}Melds`]
-);
+const getOpenMeldsByPosition = (state, player, position) => {
+  const normalizedPosition = normalizePosition(position);
+
+  const positionMappedMelds = [
+    ...normalizeOwnedMeldList(state.openMelds, player, normalizedPosition, state, { allowUnowned: true, positionMappedOnly: true }),
+    ...normalizeOwnedMeldList(state.exposedMelds, player, normalizedPosition, state, { allowUnowned: true, positionMappedOnly: true }),
+    ...normalizeOwnedMeldList(state.declaredMelds, player, normalizedPosition, state, { allowUnowned: true, positionMappedOnly: true }),
+    ...normalizeOwnedMeldList(state.melds, player, normalizedPosition, state, { allowUnowned: true, positionMappedOnly: true }),
+    ...normalizeOwnedMeldList(state[`${normalizedPosition}OpenMelds`], player, normalizedPosition, state, { allowUnowned: true }),
+    ...normalizeOwnedMeldList(state[`${normalizedPosition}Melds`], player, normalizedPosition, state, { allowUnowned: true }),
+  ];
+
+  const playerSpecificMelds = [
+    ...normalizeOwnedMeldList(player?.openMelds, player, normalizedPosition, state, { allowUnowned: true }),
+    ...normalizeOwnedMeldList(player?.exposedMelds, player, normalizedPosition, state, { allowUnowned: true }),
+    ...normalizeOwnedMeldList(player?.declaredMelds, player, normalizedPosition, state, { allowUnowned: true }),
+    ...normalizeOwnedMeldList(player?.openSets, player, normalizedPosition, state, { allowUnowned: true }),
+    ...normalizeOwnedMeldList(player?.sets, player, normalizedPosition, state, { allowUnowned: true }),
+    // Generic `melds` is risky because some backends put all players' melds there.
+    // Only accept it when the meld itself has owner metadata.
+    ...normalizeOwnedMeldList(player?.melds, player, normalizedPosition, state, { allowUnowned: false }),
+  ];
+
+  const globallyOwnedMelds = [
+    ...normalizeOwnedMeldList(state.openMelds, player, normalizedPosition, state, { allowUnowned: false }),
+    ...normalizeOwnedMeldList(state.exposedMelds, player, normalizedPosition, state, { allowUnowned: false }),
+    ...normalizeOwnedMeldList(state.declaredMelds, player, normalizedPosition, state, { allowUnowned: false }),
+    ...normalizeOwnedMeldList(state.melds, player, normalizedPosition, state, { allowUnowned: false }),
+  ];
+
+  return dedupeMeldListBySignature([
+    ...positionMappedMelds.map((meld) => ({ ...meld, ownerPosition: getMeldOwnerPosition(meld, state) || normalizedPosition })),
+    ...playerSpecificMelds,
+    ...globallyOwnedMelds,
+  ]);
+};
 
 const removeLastMatchingTile = (tiles = [], rawTileId = '', renderedTileName = '') => {
   const list = toArray(tiles);
@@ -1738,6 +1946,13 @@ function mergeActionBroadcast(current, payload = {}) {
       });
       const sourcePosition = getSeatPosition(payload.discardedBySeat || payload.shooterSeat || payload.fromSeat, current);
       const positionToUpdate = normalizePosition(seatPosition);
+      const ownerSeat = payload.seat || payload.claimedBySeat || payload.claimerSeat || payload.actorSeat || '';
+      const ownedMeldEntry = {
+        ...meldEntry,
+        ...(actionUserId ? { ownerId: actionUserId } : {}),
+        ...(ownerSeat ? { ownerSeat } : {}),
+        ...(positionToUpdate ? { ownerPosition: positionToUpdate } : {}),
+      };
       const hasActionIdentity = Boolean(actionIds.length || positionToUpdate);
       const currentIds = getCurrentPlayerIdCandidates(current);
       const isLocalActionPlayer = positionToUpdate === 'left'
@@ -1791,7 +2006,7 @@ function mergeActionBroadcast(current, payload = {}) {
 
             return {
               ...player,
-              openMelds: [...currentOpenMelds, meldEntry],
+              openMelds: [...currentOpenMelds, ownedMeldEntry],
               ...(shouldUpdatePlayerHand ? { handTiles: nextPlayerHand, hand: nextPlayerHand, tiles: nextPlayerHand } : {}),
               ...(Number.isFinite(nextHandSize) && nextHandSize > 0 ? { handSize: nextHandSize, handCount: nextHandSize } : {}),
             };
@@ -1815,8 +2030,8 @@ function mergeActionBroadcast(current, payload = {}) {
       if (hasActionIdentity) {
         const openMeldsByPosition = { ...(current.openMelds || {}) };
         const currentPositionMelds = getFirstMeldList(openMeldsByPosition[positionToUpdate]);
-        if (positionToUpdate && !currentPositionMelds.some((meld) => JSON.stringify(meld.tiles) === JSON.stringify(meldEntry.tiles))) {
-          openMeldsByPosition[positionToUpdate] = [...currentPositionMelds, meldEntry];
+        if (positionToUpdate && !currentPositionMelds.some((meld) => JSON.stringify(meld.tiles) === JSON.stringify(ownedMeldEntry.tiles))) {
+          openMeldsByPosition[positionToUpdate] = [...currentPositionMelds, ownedMeldEntry];
           next.openMelds = openMeldsByPosition;
         }
       }
@@ -2252,9 +2467,14 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   const wallRemaining = getWallRemainingValue(gameState);
   const fanInfo = getFanDisplayInfo(gameState, leftPlayer);
   const shouldShowGameplayInfo = wallRemaining !== null || fanInfo.hasCurrentFan;
-  const leftOpenMelds = getOpenMeldsByPosition(gameState, leftPlayer, 'left');
-  const topOpenMelds = getOpenMeldsByPosition(gameState, topPlayer, 'top');
-  const rightOpenMelds = hasRightPlayer ? getOpenMeldsByPosition(gameState, rightPlayer, 'right') : [];
+  const openMeldsByPosition = dedupeMeldRacksByOwnership({
+    left: getOpenMeldsByPosition(gameState, leftPlayer, 'left'),
+    top: getOpenMeldsByPosition(gameState, topPlayer, 'top'),
+    right: hasRightPlayer ? getOpenMeldsByPosition(gameState, rightPlayer, 'right') : [],
+  }, gameState);
+  const leftOpenMelds = openMeldsByPosition.left;
+  const topOpenMelds = openMeldsByPosition.top;
+  const rightOpenMelds = openMeldsByPosition.right;
   const centerDiscardTiles = getCircularTableTiles(getFirstTileList(
     gameState.centerTiles,
     gameState.centerDiscardTiles,
