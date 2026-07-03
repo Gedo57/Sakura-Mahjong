@@ -2386,3 +2386,792 @@ animation: none;
 
 .app-shell[data-device='desktop'] .gameplay-tile-focus--bottom { top: 57% !important; }
 .app-shell[data-device='desktop'] .gameplay-tile-focus--left { left: 40% !important; top: 50% !important; }
+
+/* Patch 12 — Landscape Timer Only Center
+   Scope: desktop/landscape gameplay only. Removes the middle tray/compass panel and keeps the timer alone. */
+.app-shell[data-device='desktop'] .gameplay-middle-tray {
+  display: none !important;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-center-compass {
+  z-index: 20 !important;
+  left: 50% !important;
+  top: 48% !important;
+  width: 56px !important;
+  height: 56px !important;
+  aspect-ratio: auto !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  clip-path: none !important;
+  box-shadow: none !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-center-compass::before {
+  content: none !important;
+  display: none !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-center-compass strong,
+.app-shell[data-device='desktop'] .gameplay-center-compass em,
+.app-shell[data-device='desktop'] .gameplay-center-compass .east,
+.app-shell[data-device='desktop'] .gameplay-center-compass .south,
+.app-shell[data-device='desktop'] .gameplay-center-compass .west,
+.app-shell[data-device='desktop'] .gameplay-center-compass .north {
+  display: none !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-center-compass .timer {
+  position: static !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  width: 46px !important;
+  height: 46px !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 50% !important;
+  color: #10220c !important;
+  background: linear-gradient(180deg, #dcff8c, #43dd62 58%, #15913d) !important;
+  border: 2px solid rgba(241, 255, 185, .9) !important;
+  box-shadow: 0 7px 16px rgba(0, 0, 0, .42), 0 0 18px rgba(78, 235, 105, .56), inset 0 2px 0 rgba(255, 255, 255, .46) !important;
+  font-size: 30px !important;
+  font-weight: 1000 !important;
+  line-height: 1 !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .36) !important;
+  transform: none !important;
+}
+
+/* Patch 13 — Bounded Bonus & Meld Racks
+   Keeps BONUS / CHOW / PONG / KONG inside fixed rack zones so long games cannot stack out of the table or screen. */
+.app-shell[data-device='desktop'] .gameplay-bonus-rack {
+  max-width: 154px !important;
+  max-height: 102px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bonus-rack-body {
+  display: grid !important;
+  grid-template-columns: repeat(2, 30px) !important;
+  grid-auto-rows: 47px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 3px !important;
+  max-width: 132px !important;
+  max-height: 97px !important;
+  overflow: hidden !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bonus-rack--top .gameplay-bonus-rack-body,
+.app-shell[data-device='desktop'] .gameplay-bonus-rack--bottom .gameplay-bonus-rack-body {
+  grid-template-columns: repeat(4, 30px) !important;
+  grid-auto-rows: 47px !important;
+  max-width: 132px !important;
+  max-height: 47px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bonus-rack--left .gameplay-bonus-rack-body {
+  grid-template-columns: repeat(2, 30px) !important;
+  grid-auto-rows: 47px !important;
+  max-width: 64px !important;
+  max-height: 97px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bonus-rack .gameplay-tile,
+.app-shell[data-device='desktop'] .gameplay-bonus-empty-slot {
+  width: 30px !important;
+  height: 47px !important;
+  margin: 0 !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bonus-overflow-badge,
+.app-shell[data-device='desktop'] .gameplay-meld-overflow-badge,
+.app-shell[data-device='desktop'] .gameplay-meld-tile-overflow-badge {
+  display: inline-grid !important;
+  place-items: center !important;
+  width: 30px !important;
+  min-width: 30px !important;
+  height: 30px !important;
+  border-radius: 999px !important;
+  color: #180d00 !important;
+  background: linear-gradient(180deg, #fff2a8, #ffc738 58%, #bd7600) !important;
+  border: 1px solid rgba(255, 244, 177, .92) !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .38), 0 0 10px rgba(255, 209, 70, .32) !important;
+  font-size: 12px !important;
+  font-weight: 1000 !important;
+  line-height: 1 !important;
+  letter-spacing: -.02em !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack {
+  max-width: 300px !important;
+  max-height: 142px !important;
+  overflow: hidden !important;
+  align-content: flex-start !important;
+  gap: 6px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--top,
+.app-shell[data-device='desktop'] .gameplay-meld-rack--bottom {
+  max-width: 340px !important;
+  max-height: 128px !important;
+  flex-wrap: wrap !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--left {
+  max-width: 132px !important;
+  max-height: 252px !important;
+  overflow: hidden !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-group {
+  flex: 0 0 auto !important;
+  max-width: 130px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-tiles {
+  max-width: 118px !important;
+  max-height: 54px !important;
+  overflow: hidden !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--left .gameplay-meld-tiles {
+  max-width: 48px !important;
+  max-height: 154px !important;
+  overflow: hidden !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-tile-overflow-badge {
+  width: 24px !important;
+  min-width: 24px !important;
+  height: 24px !important;
+  margin-left: 2px !important;
+  font-size: 10px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--left .gameplay-meld-tile-overflow-badge {
+  margin-left: 0 !important;
+  margin-top: 3px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-overflow-badge {
+  align-self: center !important;
+}
+
+/* Patch 14 — Desktop/Landscape gameplay final layout consolidation
+   Fixed 1280x720 stage tuning. Mobile landscape is routed to desktop styles. */
+.app-shell[data-device='desktop'] .gameplay-screen {
+  --gp-table-x: 50%;
+  --gp-table-y: 53.2%;
+  --gp-table-w: 820px;
+  --gp-hand-w: 720px;
+  --gp-hand-bottom: 64px;
+  --gp-actions-bottom: 14px;
+  --gp-tile-w: 34px;
+  --gp-tile-h: 55px;
+  --gp-hand-tile-w: 36.4px;
+  --gp-hand-tile-h: 58.8px;
+  --gp-rack-tile-w: 30px;
+  --gp-rack-tile-h: 47px;
+}
+
+.app-shell[data-device='desktop'] .gameplay-room-title {
+  top: 24px !important;
+  left: 34px !important;
+  max-width: 410px !important;
+  height: 48px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  padding: 0 14px !important;
+  border-radius: 15px !important;
+  background: rgba(7, 10, 24, .42) !important;
+  border: 1px solid rgba(255, 255, 255, .08) !important;
+  font-size: 18px !important;
+  overflow: hidden !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-room-title strong {
+  min-width: 0 !important;
+  max-width: 292px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: 27px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-info-panel {
+  top: 84px !important;
+  left: 38px !important;
+  gap: 8px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-info-item {
+  min-width: 76px !important;
+  padding: 6px 10px 7px !important;
+  border-radius: 13px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-info-item strong {
+  font-size: 18px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-side-menu {
+  right: 28px !important;
+  top: 36px !important;
+  bottom: auto !important;
+  width: 74px !important;
+  display: block !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-side-tool.leave {
+  width: 74px !important;
+  display: grid !important;
+  justify-items: center !important;
+  gap: 6px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-side-icon-shell {
+  width: 62px !important;
+  height: 62px !important;
+  border-radius: 17px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-side-label {
+  font-size: 12px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-table-zone {
+  left: var(--gp-table-x) !important;
+  top: var(--gp-table-y) !important;
+  width: var(--gp-table-w) !important;
+  aspect-ratio: 1448 / 1086 !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-table {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-middle-tray {
+  display: none !important;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-center-compass {
+  z-index: 20 !important;
+  left: 50% !important;
+  top: 48% !important;
+  width: 56px !important;
+  height: 56px !important;
+  aspect-ratio: auto !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  clip-path: none !important;
+  box-shadow: none !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-center-compass::before,
+.app-shell[data-device='desktop'] .gameplay-center-compass strong,
+.app-shell[data-device='desktop'] .gameplay-center-compass em,
+.app-shell[data-device='desktop'] .gameplay-center-compass .east,
+.app-shell[data-device='desktop'] .gameplay-center-compass .south,
+.app-shell[data-device='desktop'] .gameplay-center-compass .west,
+.app-shell[data-device='desktop'] .gameplay-center-compass .north {
+  content: none !important;
+  display: none !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-center-compass .timer {
+  position: static !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  width: 46px !important;
+  height: 46px !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 50% !important;
+  color: #10220c !important;
+  background: linear-gradient(180deg, #dcff8c, #43dd62 58%, #15913d) !important;
+  border: 2px solid rgba(241, 255, 185, .9) !important;
+  box-shadow: 0 7px 16px rgba(0, 0, 0, .42), 0 0 18px rgba(78, 235, 105, .56), inset 0 2px 0 rgba(255, 255, 255, .46) !important;
+  font-size: 30px !important;
+  font-weight: 1000 !important;
+  line-height: 1 !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .36) !important;
+  transform: none !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-tile-wall img {
+  width: 20.5px !important;
+  height: 28.2px !important;
+  margin-left: -2px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-tile-wall.wall-top {
+  top: 21% !important;
+  left: 53% !important;
+  transform: translateX(-50%) scaleY(.78) !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-tile-wall.wall-left {
+  top: 45% !important;
+  left: 32.9% !important;
+  transform: translate(-50%, -50%) scaleX(.9) scaleY(.78) !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-tile-wall.wall-bottom {
+  top: 64% !important;
+  left: 53% !important;
+  transform: translateX(-50%) scaleY(.78) !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-upper-discard,
+.app-shell[data-device='desktop'] .gameplay-center-discard,
+.app-shell[data-device='desktop'] .gameplay-bottom-discard,
+.app-shell[data-device='desktop'] .gameplay-side-discard {
+  position: absolute !important;
+  z-index: 14 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-upper-discard {
+  top: 13.2% !important;
+  left: 50% !important;
+  transform: translateX(-50%) scale(.68) !important;
+  transform-origin: top center !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-center-discard {
+  top: 74.2% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) scale(.74) !important;
+  transform-origin: center !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bottom-discard {
+  left: 50% !important;
+  bottom: 130px !important;
+  transform: translateX(-50%) scale(.62) !important;
+  transform-origin: bottom center !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-side-discard {
+  left: 27.5% !important;
+  top: 36% !important;
+  flex-direction: column !important;
+  transform: scale(.62) !important;
+  transform-origin: top left !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-side-discard .gameplay-tile {
+  margin-top: 3px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-upper-discard .gameplay-tile,
+.app-shell[data-device='desktop'] .gameplay-center-discard .gameplay-tile,
+.app-shell[data-device='desktop'] .gameplay-bottom-discard .gameplay-tile,
+.app-shell[data-device='desktop'] .gameplay-side-discard .gameplay-tile {
+  width: var(--gp-tile-w) !important;
+  height: var(--gp-tile-h) !important;
+  margin-left: -3px !important;
+  object-fit: fill !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-side-discard .gameplay-tile {
+  margin-left: 0 !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-hand {
+  left: 50% !important;
+  bottom: var(--gp-hand-bottom) !important;
+  width: var(--gp-hand-w) !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+  transform: translateX(-50%) !important;
+  z-index: 22 !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-hand-tile {
+  width: var(--gp-hand-tile-w) !important;
+  height: var(--gp-hand-tile-h) !important;
+  margin-left: -1px !important;
+  padding: 0 !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-hand-tile .gameplay-tile {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: fill !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-actions {
+  left: 50% !important;
+  bottom: var(--gp-actions-bottom) !important;
+  width: 760px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 12px !important;
+  transform: translateX(-50%) !important;
+  z-index: 26 !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-action {
+  min-width: 112px !important;
+  height: 48px !important;
+  padding: 0 14px !important;
+  border-radius: 12px !important;
+  font-size: 22px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-player-badge {
+  z-index: 24 !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-player-badge.top {
+  top: 14px !important;
+  left: 50% !important;
+  width: 236px !important;
+  height: 76px !important;
+  min-height: 76px !important;
+  padding: 6px 12px 6px 8px !important;
+  border-radius: 16px !important;
+  transform: translateX(-50%) !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-player-badge.top .gameplay-player-avatar {
+  width: 62px !important;
+  height: 62px !important;
+  margin-right: 11px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-player-badge.top .gameplay-player-info strong {
+  font-size: 24px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-player-badge.top .gameplay-player-info small {
+  font-size: 12px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-player-badge.top .gameplay-player-info span {
+  font-size: 23px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-player-badge.bottom {
+  left: 34px !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: 76px !important;
+  width: 228px !important;
+  min-height: 84px !important;
+  padding: 10px 12px 10px 94px !important;
+  border-radius: 15px !important;
+  flex-direction: row !important;
+  text-align: left !important;
+  transform: none !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-player-badge.bottom .gameplay-player-avatar {
+  position: absolute !important;
+  left: -13px !important;
+  top: 50% !important;
+  width: 102px !important;
+  height: 102px !important;
+  margin: 0 !important;
+  transform: translateY(-56%) !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-player-badge.bottom .gameplay-player-info strong {
+  font-size: 24px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-player-badge.bottom .gameplay-player-info small {
+  font-size: 12px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-player-badge.bottom .gameplay-player-info span {
+  font-size: 23px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-player-badge.bottom .gameplay-turn-badge {
+  top: -24px !important;
+  left: 92px !important;
+  right: auto !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-player-badge.bottom .gameplay-turn-arrow {
+  right: -34px !important;
+  left: auto !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+}
+
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left {
+  left: 62px !important;
+  right: auto !important;
+  top: 318px !important;
+  bottom: auto !important;
+  width: 132px !important;
+  min-height: 184px !important;
+  padding: 10px 8px 12px !important;
+  border-radius: 16px !important;
+  flex-direction: column !important;
+  text-align: center !important;
+  transform: translateY(-50%) !important;
+}
+
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left::before {
+  content: none !important;
+}
+
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left .gameplay-player-avatar {
+  position: static !important;
+  width: 96px !important;
+  height: 96px !important;
+  margin: 0 auto 8px !important;
+  transform: none !important;
+}
+
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left .gameplay-player-info {
+  width: 100% !important;
+  text-align: center !important;
+}
+
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left .gameplay-player-info strong {
+  font-size: 21px !important;
+}
+
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left .gameplay-player-info small {
+  font-size: 11px !important;
+}
+
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left .gameplay-player-info span {
+  justify-content: center !important;
+  font-size: 20px !important;
+}
+
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left .gameplay-turn-badge {
+  left: -8px !important;
+  right: auto !important;
+  top: -28px !important;
+}
+
+.app-shell[data-device='desktop'] .left-opponent-player.gameplay-player-badge.left .gameplay-turn-arrow {
+  left: -30px !important;
+  right: auto !important;
+  top: 50% !important;
+  transform: translateY(-50%) rotate(180deg) !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bonus-rack {
+  max-width: 154px !important;
+  max-height: 102px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bonus-rack-body {
+  display: grid !important;
+  grid-template-columns: repeat(2, var(--gp-rack-tile-w)) !important;
+  grid-auto-rows: var(--gp-rack-tile-h) !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 3px !important;
+  max-width: 132px !important;
+  max-height: 97px !important;
+  overflow: hidden !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bonus-rack--top .gameplay-bonus-rack-body,
+.app-shell[data-device='desktop'] .gameplay-bonus-rack--bottom .gameplay-bonus-rack-body {
+  grid-template-columns: repeat(4, var(--gp-rack-tile-w)) !important;
+  max-width: 132px !important;
+  max-height: var(--gp-rack-tile-h) !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bonus-rack .gameplay-tile,
+.app-shell[data-device='desktop'] .gameplay-bonus-empty-slot {
+  width: var(--gp-rack-tile-w) !important;
+  height: var(--gp-rack-tile-h) !important;
+  margin: 0 !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bonus-rack--top {
+  top: 10.8% !important;
+  left: 21% !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translateX(-50%) scale(.9) !important;
+  transform-origin: top center !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bonus-rack--left {
+  left: 11.5% !important;
+  right: auto !important;
+  top: 40% !important;
+  bottom: auto !important;
+  transform: scale(.85) !important;
+  transform-origin: top left !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bonus-rack--left .gameplay-bonus-rack-body {
+  grid-template-columns: repeat(2, var(--gp-rack-tile-w)) !important;
+  max-width: 64px !important;
+  max-height: 97px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bonus-rack--bottom {
+  right: 84.5% !important;
+  left: auto !important;
+  bottom: 20% !important;
+  top: auto !important;
+  transform: scale(1) !important;
+  transform-origin: bottom right !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack {
+  max-width: 300px !important;
+  max-height: 142px !important;
+  overflow: hidden !important;
+  align-content: flex-start !important;
+  gap: 6px !important;
+  z-index: 15 !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-group {
+  flex: 0 0 auto !important;
+  max-width: 130px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-tiles {
+  max-width: 118px !important;
+  max-height: 54px !important;
+  overflow: hidden !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-tiles .gameplay-tile {
+  width: 29px !important;
+  height: 47px !important;
+  margin-left: -3px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-tiles .gameplay-tile:first-child {
+  margin-left: 0 !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--top {
+  top: 29.8% !important;
+  left: 78% !important;
+  max-width: 340px !important;
+  max-height: 128px !important;
+  flex-wrap: wrap !important;
+  transform: translateX(-50%) scale(.58) !important;
+  transform-origin: top center !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--left {
+  top: 35% !important;
+  left: 20% !important;
+  right: auto !important;
+  bottom: auto !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  max-width: 132px !important;
+  max-height: 252px !important;
+  transform: scale(.8) !important;
+  transform-origin: top left !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--left .gameplay-meld-tiles {
+  flex-direction: column !important;
+  max-width: 48px !important;
+  max-height: 154px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--left .gameplay-meld-tiles .gameplay-tile {
+  margin-left: 0 !important;
+  margin-top: 2px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--bottom {
+  left: 80.2% !important;
+  bottom: 23.6% !important;
+  max-width: 340px !important;
+  max-height: 128px !important;
+  flex-wrap: wrap !important;
+  transform: translateX(-50%) scale(.68) !important;
+  transform-origin: bottom center !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-bonus-overflow-badge,
+.app-shell[data-device='desktop'] .gameplay-meld-overflow-badge,
+.app-shell[data-device='desktop'] .gameplay-meld-tile-overflow-badge {
+  display: inline-grid !important;
+  place-items: center !important;
+  width: 30px !important;
+  min-width: 30px !important;
+  height: 30px !important;
+  border-radius: 999px !important;
+  color: #180d00 !important;
+  background: linear-gradient(180deg, #fff2a8, #ffc738 58%, #bd7600) !important;
+  border: 1px solid rgba(255, 244, 177, .92) !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .38), 0 0 10px rgba(255, 209, 70, .32) !important;
+  font-size: 12px !important;
+  font-weight: 1000 !important;
+  line-height: 1 !important;
+  letter-spacing: -.02em !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-tile-overflow-badge {
+  width: 24px !important;
+  min-width: 24px !important;
+  height: 24px !important;
+  margin-left: 2px !important;
+  font-size: 10px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-meld-rack--left .gameplay-meld-tile-overflow-badge {
+  margin-left: 0 !important;
+  margin-top: 3px !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-tile-focus--top {
+  top: 37% !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-tile-focus--bottom {
+  top: 57% !important;
+}
+
+.app-shell[data-device='desktop'] .gameplay-tile-focus--left {
+  left: 40% !important;
+  top: 50% !important;
+}

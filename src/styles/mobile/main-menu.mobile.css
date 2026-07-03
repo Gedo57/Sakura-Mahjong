@@ -470,16 +470,7 @@ margin: 5px 0 0;
   font-size: 12px;
 }
 
-.app-shell[data-device='mobile'] .room-character {
-position: absolute;
-  top: 60px;
-  left: 50%;
-  width: 148px;
-  height: 148px;
-  object-fit: contain;
-  transform: translateX(-50%);
-  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.36));
-}
+
 
 .app-shell[data-device='mobile'] .room-stat-list {
 position: relative;
@@ -1916,7 +1907,7 @@ align-items: start !important;
 .app-shell[data-device='mobile'] .main-menu-reference .sakura-room-card {
 box-sizing: border-box !important;
   width: 100% !important;
-  aspect-ratio: 207 / 264 !important;
+  aspect-ratio: 107 / 224 !important;
   height: auto !important;
   min-height: 0 !important;
   max-height: none !important;
@@ -2650,10 +2641,10 @@ content: none !important;
 .app-shell[data-device='mobile'] .main-menu-reference .sakura-room-card {
   position: relative !important;
   width: 100% !important;
-  aspect-ratio: 207 / 264 !important;
+  aspect-ratio: 150 / 224 !important;
   height: auto !important;
   min-height: 0 !important;
-  max-height: 292px !important;
+  max-height: 350px !important;
   padding: 0 !important;
   display: block !important;
   overflow: hidden !important;
@@ -2704,52 +2695,6 @@ content: none !important;
   --animal-max-height: 42.5%;
 }
 
-.app-shell[data-device='mobile'] .main-menu-reference .sakura-room-card .room-character-wrap {
-  position: absolute !important;
-  top: var(--animal-top) !important;
-  left: var(--animal-left) !important;
-  width: var(--animal-width) !important;
-  height: var(--animal-max-height) !important;
-  transform: translate(-50%, -50%) scale(var(--animal-scale)) !important;
-  transform-origin: center center !important;
-  z-index: 2 !important;
-  pointer-events: none !important;
-  will-change: transform;
-}
-
-.app-shell[data-device='mobile'] .main-menu-reference .sakura-room-card .room-character-wrap .room-character {
-  position: relative !important;
-  inset: auto !important;
-  top: auto !important;
-  left: auto !important;
-  width: 100% !important;
-  height: 100% !important;
-  max-width: 100% !important;
-  max-height: 100% !important;
-  display: block !important;
-  object-fit: contain !important;
-  translate: none !important;
-  transform: translateY(0) scale(1);
-  transform-origin: center center !important;
-  z-index: 2 !important;
-  animation: roomAnimalFloatInner 3.8s ease-in-out infinite !important;
-  filter:
-    drop-shadow(0 11px 16px rgba(0, 0, 0, .42))
-    drop-shadow(0 0 8px rgba(255, 255, 255, .12));
-  will-change: transform, filter;
-}
-
-.app-shell[data-device='mobile'] .main-menu-reference .sakura-room-card:nth-child(2) .room-character-wrap .room-character {
-  animation-delay: .45s !important;
-}
-
-.app-shell[data-device='mobile'] .main-menu-reference .sakura-room-card:nth-child(3) .room-character-wrap .room-character {
-  animation-delay: .9s !important;
-}
-
-.app-shell[data-device='mobile'] .main-menu-reference .sakura-room-card:nth-child(4) .room-character-wrap .room-character {
-  animation-delay: 1.25s !important;
-}
 
 @keyframes roomAnimalFloatInner {
   0%, 100% {

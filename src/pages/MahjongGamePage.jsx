@@ -1820,18 +1820,32 @@ function ReclaimFeiPrompt({ windowState, t, onConfirm, onSkip, isPending = false
   );
 }
 
+const MAX_VISIBLE_BONUS_TILES = 4;
+const MAX_VISIBLE_MELD_GROUPS = 3;
+const MAX_VISIBLE_SIDE_MELD_GROUPS = 2;
+const MAX_VISIBLE_MELD_TILES = 4;
+
 function BonusTileRack({ position = 'left', tiles = [], label = 'BONUS', visible = false }) {
   const tileList = toArray(tiles).filter(Boolean);
+  const visibleTiles = tileList.slice(0, MAX_VISIBLE_BONUS_TILES);
+  const hiddenTileCount = Math.max(tileList.length - visibleTiles.length, 0);
 
   if (!visible && !tileList.length) return null;
 
   return (
-    <div className={`gameplay-bonus-rack gameplay-bonus-rack--${position} ${tileList.length ? 'has-tiles' : 'empty'}`} aria-label={`${label} ${position}`}>
-      <span className="gameplay-bonus-rack-label">{label}</span>
+    <div className={`gameplay-bonus-rack gameplay-bonus-rack--${position} ${tileList.length ? 'has-tiles' : 'empty'} ${hiddenTileCount ? 'has-overflow' : ''}`} aria-label={`${label} ${position}`}>
+      <span className="gameplay-bonus-rack-label">{hiddenTileCount ? `${label} +${hiddenTileCount}` : label}</span>
       <div className="gameplay-bonus-rack-body">
-        {tileList.length ? tileList.map((tile, index) => (
-          <GameplayTile name={tile} key={`bonus-${position}-${tile}-${index}`} />
-        )) : Array.from({ length: 4 }).map((_, index) => (
+        {tileList.length ? (
+          <>
+            {visibleTiles.map((tile, index) => (
+              <GameplayTile name={tile} key={`bonus-${position}-${tile}-${index}`} />
+            ))}
+            {hiddenTileCount ? (
+              <span className="gameplay-bonus-overflow-badge" aria-label={`${hiddenTileCount} more bonus tiles`}>+{hiddenTileCount}</span>
+            ) : null}
+          </>
+        ) : Array.from({ length: 4 }).map((_, index) => (
           <span className="gameplay-bonus-empty-slot" key={`bonus-empty-${position}-${index}`} aria-hidden="true" />
         ))}
       </div>
@@ -1850,25 +1864,37 @@ function getMeldDisplayLabel(type = '') {
 
 function PlayerMeldRack({ position = 'left', melds = [] }) {
   const meldList = normalizeMeldList(melds);
+  const maxVisibleMeldGroups = position === 'left' ? MAX_VISIBLE_SIDE_MELD_GROUPS : MAX_VISIBLE_MELD_GROUPS;
+  const visibleMeldList = meldList.slice(0, maxVisibleMeldGroups);
+  const hiddenMeldCount = Math.max(meldList.length - visibleMeldList.length, 0);
 
   if (!meldList.length) return null;
 
   return (
-    <div className={`gameplay-meld-rack gameplay-meld-rack--${position}`} aria-label={`${position} open melds`}>
-      {meldList.map((meld, meldIndex) => {
+    <div className={`gameplay-meld-rack gameplay-meld-rack--${position} ${hiddenMeldCount ? 'has-overflow' : ''}`} aria-label={`${position} open melds`}>
+      {visibleMeldList.map((meld, meldIndex) => {
         const meldType = normalizeActionForUi(meld.type) || 'meld';
+        const meldTiles = toArray(meld.tiles).filter(Boolean);
+        const visibleMeldTiles = meldTiles.slice(0, MAX_VISIBLE_MELD_TILES);
+        const hiddenTileCount = Math.max(meldTiles.length - visibleMeldTiles.length, 0);
 
         return (
           <div className={`gameplay-meld-group gameplay-meld-group--${meldType}`} key={`meld-${position}-${meldIndex}`}>
             <span className="gameplay-meld-label">{getMeldDisplayLabel(meldType)}</span>
             <div className="gameplay-meld-tiles">
-              {meld.tiles.map((tile, tileIndex) => (
+              {visibleMeldTiles.map((tile, tileIndex) => (
                 <GameplayTile name={tile} key={`meld-${position}-${meldIndex}-${tile}-${tileIndex}`} />
               ))}
+              {hiddenTileCount ? (
+                <span className="gameplay-meld-tile-overflow-badge" aria-label={`${hiddenTileCount} more meld tiles`}>+{hiddenTileCount}</span>
+              ) : null}
             </div>
           </div>
         );
       })}
+      {hiddenMeldCount ? (
+        <div className="gameplay-meld-overflow-badge" aria-label={`${hiddenMeldCount} more melds`}>+{hiddenMeldCount}</div>
+      ) : null}
     </div>
   );
 }
