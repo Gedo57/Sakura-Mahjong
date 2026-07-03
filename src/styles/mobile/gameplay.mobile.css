@@ -253,7 +253,7 @@ display: block;
   width: clamp(19px, 2.05vw, 32px);
   height: clamp(80px, 3.2vw, 40px);
   object-fit: fill;
-  margin-left: clamp(2x, -.22vw, -2px);
+  margin-left: clamp(-2px, -.22vw, -1px);
   filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .3));
 }
 
