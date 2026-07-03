@@ -5,6 +5,7 @@ import { getStoredAuthUser } from '../services/authService.js';
 import { getGameState, isGameApiAvailable, leaveGame } from '../services/gameService.js';
 import { normalizeGameState } from '../services/gameNormalizers.js';
 import {
+  acknowledgeDiceRoll,
   claimDiscard,
   connectGameSocket,
   declareKong,
@@ -1762,23 +1763,32 @@ const getDiceRollAvatar = (roll = {}, players = []) => {
 };
 
 const normalizeDiceRollPhase = (payload = {}, players = [], options = {}) => {
-  const source = payload.diceRollPhase || payload.startPhase || payload;
+  payload = payload || {};
+  const hasWrappedPhase = Boolean(payload?.diceRollPhase);
+  const source = hasWrappedPhase ? payload.diceRollPhase : (payload.startPhase || payload);
+  const phaseName = String(source?.phase || payload?.phase || '').toLowerCase();
+  const hasExplicitDicePayload = hasWrappedPhase || phaseName === 'dice_roll' || options.allowImplicitPayload === true;
+  if (!hasExplicitDicePayload) return null;
+
   const rawRankedRolls = source.rankedRolls || source.rolls || source.diceRolls || payload.diceRolls || payload.dealerRolls || [];
   const rawSequence = source.sequence || source.diceRollSequence || payload.diceRollSequence || rawRankedRolls;
   if (!Array.isArray(rawRankedRolls) || !rawRankedRolls.length) return null;
 
-  const stepMs = Number(source.stepMs || payload.stepMs || 1050) || 1050;
-  const resultMs = Number(source.resultMs || payload.resultMs || 1500) || 1500;
-  const presentationMs = Number(source.presentationMs || payload.presentationMs || ((rawSequence.length * stepMs) + resultMs)) || ((rawSequence.length * stepMs) + resultMs);
+  const stepMs = Number(source.stepMs || source.rollDurationMs || payload.stepMs || 2000) || 2000;
+  const resultMs = Number(source.resultMs || payload.resultMs || 0) || 0;
+  const presentationMs = Number(source.presentationMs || source.rollDurationMs || payload.presentationMs || stepMs || 2000) || 2000;
   const now = Date.now();
   const explicitEndsAt = parseTimerTimestampMs(source.endsAt || source.visibleUntil || payload.endsAt || payload.visibleUntil);
   const statusForVisibility = String(source.status || payload.status || '').toLowerCase();
-  const forceVisibleMs = statusForVisibility === 'result' || statusForVisibility === 'complete'
+  const requiresAck = Boolean(source.requiresAck || payload.requiresAck || ['awaiting_ack', 'result_waiting_ok'].includes(statusForVisibility));
+  const forceVisibleMs = (statusForVisibility === 'result' || statusForVisibility === 'complete' || statusForVisibility === 'awaiting_ack')
     ? resultMs
     : presentationMs;
-  const visibleUntil = options.forceVisible
-    ? Math.max(explicitEndsAt || 0, now + forceVisibleMs)
-    : (explicitEndsAt && explicitEndsAt > now ? explicitEndsAt : now + Math.min(forceVisibleMs, 5200));
+  const visibleUntil = requiresAck
+    ? 0
+    : options.forceVisible
+      ? Math.max(explicitEndsAt || 0, now + forceVisibleMs)
+      : (explicitEndsAt && explicitEndsAt > now ? explicitEndsAt : now + Math.min(forceVisibleMs, 5200));
 
   const normalizeRoll = (roll = {}, index, { sequence = false } = {}) => {
     const dice = Array.isArray(roll.dice)
@@ -1828,6 +1838,11 @@ const normalizeDiceRollPhase = (payload = {}, players = [], options = {}) => {
     method: source.method || payload.dealerSelectionMethod || 'dice_roll_highest_total',
     stepMs,
     resultMs,
+    rollDurationMs: presentationMs,
+    requiresAck,
+    acknowledgedBy: toArray(source.acknowledgedBy || payload.acknowledgedBy).map(normalizeId).filter(Boolean),
+    pendingUserIds: toArray(source.pendingUserIds || payload.pendingUserIds).map(normalizeId).filter(Boolean),
+    acknowledgedByMe: Boolean(source.acknowledgedByMe || payload.acknowledgedByMe),
     activeRollIndex: Number(source.activeRollIndex ?? payload.activeRollIndex ?? source.activeStepIndex ?? payload.activeStepIndex ?? -1),
     activeRoll: source.activeRoll || payload.activeRoll || null,
     visibleRolls: source.visibleRolls || payload.visibleRolls || [],
@@ -1849,7 +1864,7 @@ const normalizeDiceRollPhase = (payload = {}, players = [], options = {}) => {
 };
 
 const mergeDiceRollPhase = (current = {}, payload = {}) => {
-  const phase = normalizeDiceRollPhase(payload, current.players || [], { forceVisible: true });
+  const phase = normalizeDiceRollPhase(payload, current.players || [], { forceVisible: true, allowImplicitPayload: true });
   if (!phase) return current;
 
   return {
@@ -1865,9 +1880,12 @@ const mergeDiceRollPhase = (current = {}, payload = {}) => {
   };
 };
 
-const isDiceRollOverlayVisible = (phase = null) => (
-  Boolean(phase?.rolls?.length) && Number(phase.visibleUntil || 0) > Date.now()
-);
+const isDiceRollOverlayVisible = (phase = null) => {
+  if (!phase?.rolls?.length) return false;
+  const status = String(phase.status || '').toLowerCase();
+  if (phase.requiresAck || ['awaiting_ack', 'result_waiting_ok'].includes(status)) return true;
+  return Number(phase.visibleUntil || 0) > Date.now();
+};
 
 const isDiceRollLockActive = (state = {}) => (
   String(state.status || '').toUpperCase() === 'DICE_ROLL'
@@ -1984,7 +2002,7 @@ function TileFocusOverlay({ focus }) {
 }
 
 
-function DiceRollOverlay({ phase = null, t }) {
+function DiceRollOverlay({ phase = null, t, currentPlayerIds = [], onConfirm, isAckPending = false }) {
   const [, setAnimationTick] = useState(0);
 
   useEffect(() => {
@@ -1997,36 +2015,41 @@ function DiceRollOverlay({ phase = null, t }) {
   if (!phase?.rolls?.length) return null;
 
   const rankedRolls = toArray(phase.rolls).filter(Boolean);
+  const currentIdSet = new Set(toArray(currentPlayerIds).map(normalizeId).filter(Boolean));
   const sequence = toArray(phase.sequence || phase.diceRollSequence).length
     ? toArray(phase.sequence || phase.diceRollSequence).filter(Boolean)
     : rankedRolls;
   const winnerId = String(phase.startingPlayerId || phase.dealerUserId || phase.winnerUserId || rankedRolls[0]?.userId || '');
   const winner = rankedRolls.find((roll) => String(roll.userId || roll.playerId || '') === winnerId) || rankedRolls[0];
-  const stepMs = Number(phase.stepMs || 1050) || 1050;
-  const resultMs = Number(phase.resultMs || 1500) || 1500;
+  const ownRoll = rankedRolls.find((roll) => currentIdSet.has(normalizeId(roll.userId || roll.playerId || roll.id || roll._id)))
+    || sequence.find((roll) => currentIdSet.has(normalizeId(roll.userId || roll.playerId || roll.id || roll._id)))
+    || rankedRolls[0];
+  const rollDurationMs = Number(phase.rollDurationMs || phase.stepMs || 2000) || 2000;
   const elapsed = Math.max(0, Date.now() - Number(phase.receivedAt || Date.now()));
-  const computedStepIndex = Math.min(sequence.length, Math.floor(elapsed / stepMs));
-  const activeIndex = Number(phase.activeRollIndex) >= 0 ? Number(phase.activeRollIndex) : computedStepIndex;
-  const stepElapsed = Number(phase.activeRollIndex) >= 0 ? Math.min(stepMs, elapsed) : (elapsed % stepMs);
-  const isResultStage = String(phase.status || '').toLowerCase() === 'result' || activeIndex >= sequence.length || elapsed >= sequence.length * stepMs;
-  const activeRoll = isResultStage ? winner : (sequence[Math.min(activeIndex, sequence.length - 1)] || sequence[0]);
-  const isActiveRollSettled = isResultStage || stepElapsed >= Math.floor(stepMs * 0.72);
-  const visibleDuringRoll = sequence.slice(0, Math.max(0, Math.min(activeIndex, sequence.length)));
-  if (!isResultStage && isActiveRollSettled && activeRoll) visibleDuringRoll.push(activeRoll);
+  const status = String(phase.status || '').toLowerCase();
+  const isResultStage = ['result', 'awaiting_ack', 'complete', 'result_waiting_ok'].includes(status) || elapsed >= rollDurationMs;
+  const activeRoll = isResultStage ? winner : ownRoll;
+  const isActiveRollSettled = isResultStage;
   const visibleIds = new Set(
-    (isResultStage ? rankedRolls : visibleDuringRoll)
+    (isResultStage ? rankedRolls : [ownRoll])
+      .filter(Boolean)
       .map((roll) => String(roll.userId || roll.playerId || ''))
   );
-  const displayRolls = isResultStage ? rankedRolls : sequence;
+  const displayRolls = rankedRolls;
   const activeDice = toArray(activeRoll?.dice).length ? toArray(activeRoll?.dice) : [activeRoll?.total || activeRoll?.diceTotal || 0];
   const pendingDice = activeDice.length > 1 ? activeDice : [0, 0];
+  const acknowledgedIds = new Set(toArray(phase.acknowledgedBy).map(normalizeId).filter(Boolean));
+  const hasAcknowledged = Boolean(phase.acknowledgedByMe)
+    || toArray(currentPlayerIds).map(normalizeId).filter(Boolean).some((id) => acknowledgedIds.has(id));
+  const pendingCount = toArray(phase.pendingUserIds).length;
+  const confirmDisabled = Boolean(hasAcknowledged || isAckPending);
 
   return (
     <div className={`gameplay-dice-roll-overlay ${isResultStage ? 'is-result' : 'is-rolling'}`} role="status" aria-live="polite">
       <div className="gameplay-dice-roll-card">
         <span className="gameplay-dice-roll-kicker">{t('diceRollPhase')}</span>
         <h2>{isResultStage ? t('highestDiceStarts') : t('rollingDice')}</h2>
-        <p>{isResultStage ? `${winner?.name || 'Player'} ${t('startsFirst')}` : `${activeRoll?.name || 'Player'} ${t('isRolling')}`}</p>
+        <p>{isResultStage ? `${winner?.name || 'Player'} ${t('startsFirst')}` : `${ownRoll?.name || 'Player'} ${t('isRolling')}`}</p>
 
         <div className="gameplay-dice-roll-active">
           <img
@@ -2037,7 +2060,7 @@ function DiceRollOverlay({ phase = null, t }) {
           />
           <div className="gameplay-dice-roll-active-info">
             <strong>{activeRoll?.name || activeRoll?.username || 'Player'}</strong>
-            <span>{isResultStage ? `${activeRoll?.rankLabel || '1st'} · ${activeRoll?.seatLabel || 'East'} · ${activeRoll?.visualPosition || 'bottom'}` : (isActiveRollSettled ? t('rollRevealed') : t('rollingDice'))}</span>
+            <span>{isResultStage ? `${activeRoll?.rankLabel || '1st'} · ${activeRoll?.seatLabel || 'East'} · ${activeRoll?.visualPosition || 'bottom'}` : t('rollingDice')}</span>
           </div>
           <div className={`gameplay-dice-values gameplay-dice-values--active ${isActiveRollSettled ? 'is-settled' : 'is-shaking'}`} aria-label={`Dice total ${isActiveRollSettled ? (activeRoll?.total || activeRoll?.diceTotal || 0) : 0}`}>
             {isActiveRollSettled ? activeDice.map((die, dieIndex) => (
@@ -2085,6 +2108,15 @@ function DiceRollOverlay({ phase = null, t }) {
             <strong>{t('turnOrder')}</strong>
             <span>{rankedRolls.map((roll) => `${roll.name || roll.username || 'Player'} ${roll.visualPosition ? `(${roll.visualPosition})` : ''}`).join(' → ')}</span>
             <small>{t('counterclockwiseOrder')}</small>
+          </div>
+        ) : null}
+
+        {isResultStage && phase.requiresAck ? (
+          <div className="gameplay-dice-roll-confirm">
+            <button type="button" onClick={onConfirm} disabled={confirmDisabled}>
+              {confirmDisabled ? t('diceRollWaitingForPlayers') : t('diceRollOk')}
+            </button>
+            <small>{pendingCount > 0 ? `${pendingCount} ${t('playersPendingOk')}` : t('startingGame')}</small>
           </div>
         ) : null}
       </div>
@@ -2911,7 +2943,7 @@ function normalizeInitialSocketState(payload = {}, fallbackMatchId = '') {
     canDiscard: payload.canDiscard ?? normalized.canDiscard,
     canPlayBonus: payload.canPlayBonus ?? normalized.canPlayBonus,
     playableBonusTiles: payload.playableBonusTiles || normalized.playableBonusTiles || [],
-    diceRollPhase: normalizeDiceRollPhase(payload.diceRollPhase || payload, players),
+    diceRollPhase: normalizeDiceRollPhase(payload.diceRollPhase ? { diceRollPhase: payload.diceRollPhase } : null, players),
     diceRolls: payload.diceRolls || payload.dealerRolls || normalized.diceRolls || normalized.dealerRolls || [],
     diceRollSequence: payload.diceRollSequence || normalized.diceRollSequence || [],
     dealerRolls: payload.dealerRolls || payload.diceRolls || normalized.dealerRolls || [],
@@ -2985,6 +3017,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   }));
   const [gameError, setGameError] = useState('');
   const [isLeavingGame, setIsLeavingGame] = useState(false);
+  const [isDiceAckPending, setIsDiceAckPending] = useState(false);
   const [displayTimer, setDisplayTimer] = useState(() => Number(gameState.timer ?? gameState.timeLimit ?? 0) || 0);
   const [areGameplayAssetsReady, setAreGameplayAssetsReady] = useState(() => typeof window === 'undefined');
 
@@ -3093,10 +3126,13 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         case 'game_start':
           setGameState((current) => {
             const normalizedStart = normalizeInitialSocketState(payload, resolvedMatchId);
+            const isPlayingStart = String(normalizedStart.status || payload.status || '').toUpperCase() === 'PLAYING';
             const currentDiceRollPhase = current?.diceRollPhase;
-            const nextDiceRollPhase = isDiceRollOverlayVisible(currentDiceRollPhase)
-              ? currentDiceRollPhase
-              : (normalizedStart.diceRollPhase || currentDiceRollPhase || null);
+            const nextDiceRollPhase = isPlayingStart
+              ? null
+              : isDiceRollOverlayVisible(currentDiceRollPhase)
+                ? currentDiceRollPhase
+                : (normalizedStart.diceRollPhase || currentDiceRollPhase || null);
             return {
               ...(current || EMPTY_SOCKET_GAME_STATE),
               ...normalizedStart,
@@ -3105,11 +3141,17 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
               matchId: payload.matchId || payload.gameId || payload.roomId || current?.matchId || resolvedMatchId,
             };
           });
+          setIsDiceAckPending(false);
           setGameError('');
           break;
         case 'dice_roll':
+          setIsDiceAckPending(false);
+          setGameState((current) => mergeDiceRollPhase(current || {}, payload));
+          setGameError('');
+          break;
         case 'dice_roll_step':
         case 'dice_roll_result':
+          setIsDiceAckPending(false);
           setGameState((current) => mergeDiceRollPhase(current || {}, payload));
           setGameError('');
           break;
@@ -3460,6 +3502,39 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     }
   }, [gameState.matchId, gameState.result, gameState.status, gameState.winner, gameState.winnerId, isMockGameplay, navigate, resolvedMatchId]);
 
+  const handleDiceRollConfirm = () => {
+    const phase = gameState.diceRollPhase;
+    if (!phase?.requiresAck || isDiceAckPending) return;
+
+    if (isMockGameplay) {
+      setGameState((current) => current?.diceRollPhase
+        ? ({ ...current, diceRollPhase: { ...current.diceRollPhase, acknowledgedByMe: true, visibleUntil: 0 } })
+        : current);
+      return;
+    }
+
+    const sent = acknowledgeDiceRoll();
+    if (sent) {
+      setIsDiceAckPending(true);
+      setGameState((current) => current?.diceRollPhase
+        ? ({
+          ...current,
+          diceRollPhase: {
+            ...current.diceRollPhase,
+            acknowledgedByMe: true,
+            acknowledgedBy: Array.from(new Set([
+              ...toArray(current.diceRollPhase.acknowledgedBy).map(normalizeId).filter(Boolean),
+              ...toArray(currentPlayerIds).map(normalizeId).filter(Boolean),
+            ])),
+          },
+        })
+        : current);
+      setGameError('');
+    } else {
+      setGameError(t('unableConfirmDiceRoll'));
+    }
+  };
+
   const handleExitGameplaySession = async () => {
     if (isLeavingGame) return;
 
@@ -3774,7 +3849,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         ))}
       </div>
 
-      <DiceRollOverlay phase={visibleDiceRollPhase} t={t} />
+      <DiceRollOverlay phase={visibleDiceRollPhase} t={t} currentPlayerIds={currentPlayerIds} onConfirm={handleDiceRollConfirm} isAckPending={isDiceAckPending} />
 
       {!areGameplayAssetsReady ? (
         <div className="gameplay-asset-preload" role="status" aria-live="polite">

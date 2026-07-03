@@ -28,6 +28,7 @@ export const GAME_SOCKET_EVENTS = {
   diceRoll: 'game:dice_roll',
   diceRollStep: 'game:dice_roll_step',
   diceRollResult: 'game:dice_roll_result',
+  diceRollAck: 'game:dice_roll_ack',
   turnStart: 'game:turn_start',
   drawnTile: 'player:drawn_tile',
   claimWindow: 'game:claim_window',
@@ -633,6 +634,10 @@ export function skipFeiReclaim(payload = {}) {
 
 export function declareWin(type = 'tsumo') {
   return emitOnActiveSocket('player:declare_win', { type });
+}
+
+export function acknowledgeDiceRoll() {
+  return emitOnActiveSocket('game:dice_roll_ack', {});
 }
 
 
