@@ -107,6 +107,11 @@ const normalizeGameplayPlayer = (player = {}, index = 0) => {
     seat: player.seat,
     seatLabel: player.seatLabel || player.seatName || '',
     seatIndex: player.seatIndex,
+    rollRank: player.rollRank ?? player.rank,
+    rank: player.rank ?? player.rollRank,
+    visualPosition: normalizePosition(player.visualPosition || player.layoutPosition || player.tablePosition || player.seatPosition),
+    layoutPosition: normalizePosition(player.layoutPosition || player.visualPosition || player.tablePosition || player.seatPosition),
+    position: normalizePosition(player.visualPosition || player.layoutPosition || player.tablePosition || player.seatPosition || player.position),
     isDealer: Boolean(player.isDealer ?? player.dealer),
     isDisconnected: Boolean(player.isDisconnected ?? player.disconnected),
     handTiles,
@@ -237,8 +242,14 @@ const seatPlayersForGameplay = (sourcePlayers, expectedPlayerCount = 3, currentI
 
   if (!normalizedPlayers.length) return [];
 
+  const hasServerVisualSeats = normalizedPlayers.some((player) => normalizePosition(player.visualPosition || player.layoutPosition));
+
   const playersWithPosition = normalizedPlayers.map((player) => {
-    const seatPosition = player.seat && currentSeat
+    const fixedPosition = normalizePosition(player.visualPosition || player.layoutPosition || player.tablePosition || player.seatPosition);
+    const seatPosition = player.seat
+      ? getSeatPosition(player.seat, { hasNorthPlayer: false, rotation: 'counterclockwise' })
+      : '';
+    const relativeSeatPosition = player.seat && currentSeat && !hasServerVisualSeats
       ? getRelativeSeatPosition(player.seat, currentSeat, expectedPlayerCount)
       : '';
     const requestedPosition = normalizePosition(player.position);
@@ -246,25 +257,35 @@ const seatPlayersForGameplay = (sourcePlayers, expectedPlayerCount = 3, currentI
 
     return {
       ...player,
-      position: isCurrent ? 'bottom' : (seatPosition || requestedPosition || ''),
+      position: fixedPosition || seatPosition || (isCurrent && !hasServerVisualSeats ? 'bottom' : (relativeSeatPosition || requestedPosition || '')),
     };
   });
 
-  let currentIndex = playersWithPosition.findIndex((player) => player.isCurrentPlayer || player.isMe || player.isSelf || playerMatchesAnyId(player, currentIds));
+  if (!hasServerVisualSeats) {
+    let currentIndex = playersWithPosition.findIndex((player) => player.isCurrentPlayer || player.isMe || player.isSelf || playerMatchesAnyId(player, currentIds));
 
-  if (currentIndex === -1) {
-    currentIndex = playersWithPosition.findIndex((player) => player.position === 'bottom');
-  }
+    if (currentIndex === -1) {
+      currentIndex = playersWithPosition.findIndex((player) => player.position === 'bottom');
+    }
 
-  if (currentIndex > 0) {
-    const [currentPlayer] = playersWithPosition.splice(currentIndex, 1);
-    playersWithPosition.unshift({ ...currentPlayer, position: 'bottom' });
-  } else if (currentIndex === 0) {
-    playersWithPosition[0] = { ...playersWithPosition[0], position: 'bottom' };
+    if (currentIndex > 0) {
+      const [currentPlayer] = playersWithPosition.splice(currentIndex, 1);
+      playersWithPosition.unshift({ ...currentPlayer, position: 'bottom' });
+    } else if (currentIndex === 0) {
+      playersWithPosition[0] = { ...playersWithPosition[0], position: 'bottom' };
+    }
   }
 
   const usedPositions = new Set();
-  return playersWithPosition.map((player, index) => {
+  const sortedPlayers = hasServerVisualSeats
+    ? [...playersWithPosition].sort((a, b) => {
+        const aIndex = allowedPositions.indexOf(normalizePosition(a.position));
+        const bIndex = allowedPositions.indexOf(normalizePosition(b.position));
+        return (aIndex < 0 ? 99 : aIndex) - (bIndex < 0 ? 99 : bIndex);
+      })
+    : playersWithPosition;
+
+  return sortedPlayers.map((player, index) => {
     let position = normalizePosition(player.position);
 
     if (!position || usedPositions.has(position) || !allowedPositions.includes(position)) {
@@ -1742,22 +1763,32 @@ const getDiceRollAvatar = (roll = {}, players = []) => {
 
 const normalizeDiceRollPhase = (payload = {}, players = [], options = {}) => {
   const source = payload.diceRollPhase || payload.startPhase || payload;
-  const rawRolls = source.rolls || source.diceRolls || payload.diceRolls || payload.dealerRolls || [];
-  if (!Array.isArray(rawRolls) || !rawRolls.length) return null;
+  const rawRankedRolls = source.rankedRolls || source.rolls || source.diceRolls || payload.diceRolls || payload.dealerRolls || [];
+  const rawSequence = source.sequence || source.diceRollSequence || payload.diceRollSequence || rawRankedRolls;
+  if (!Array.isArray(rawRankedRolls) || !rawRankedRolls.length) return null;
 
-  const presentationMs = Number(source.presentationMs || payload.presentationMs || 2400) || 2400;
+  const stepMs = Number(source.stepMs || payload.stepMs || 1050) || 1050;
+  const resultMs = Number(source.resultMs || payload.resultMs || 1500) || 1500;
+  const presentationMs = Number(source.presentationMs || payload.presentationMs || ((rawSequence.length * stepMs) + resultMs)) || ((rawSequence.length * stepMs) + resultMs);
   const now = Date.now();
   const explicitEndsAt = parseTimerTimestampMs(source.endsAt || source.visibleUntil || payload.endsAt || payload.visibleUntil);
+  const statusForVisibility = String(source.status || payload.status || '').toLowerCase();
+  const forceVisibleMs = statusForVisibility === 'result' || statusForVisibility === 'complete'
+    ? resultMs
+    : presentationMs;
   const visibleUntil = options.forceVisible
-    ? Math.max(explicitEndsAt || 0, now + presentationMs)
-    : (explicitEndsAt && explicitEndsAt > now ? explicitEndsAt : now + Math.min(presentationMs, 1800));
+    ? Math.max(explicitEndsAt || 0, now + forceVisibleMs)
+    : (explicitEndsAt && explicitEndsAt > now ? explicitEndsAt : now + Math.min(forceVisibleMs, 5200));
 
-  const rolls = rawRolls.map((roll = {}, index) => {
+  const normalizeRoll = (roll = {}, index, { sequence = false } = {}) => {
     const dice = Array.isArray(roll.dice)
       ? roll.dice.map(normalizeDiceRollNumber).filter(Boolean)
       : [roll.die1, roll.die2].map(normalizeDiceRollNumber).filter(Boolean);
     const total = normalizeDiceRollNumber(roll.total ?? roll.diceTotal ?? dice.reduce((sum, value) => sum + value, 0));
     const userId = normalizeId(roll.userId || roll.playerId || roll.id || roll._id);
+    const seat = roll.seat || roll.seatWind || '';
+    const visualPosition = normalizePosition(roll.visualPosition || roll.layoutPosition || getFixedSeatPosition(seat));
+    const rollRank = Number(roll.rollRank ?? roll.rank ?? (sequence ? 0 : index + 1)) || 0;
 
     return {
       ...roll,
@@ -1768,29 +1799,49 @@ const normalizeDiceRollPhase = (payload = {}, players = [], options = {}) => {
       dice,
       total,
       diceTotal: total,
-      seat: roll.seat || roll.seatWind || '',
+      rollRank,
+      rank: rollRank,
+      rankLabel: roll.rankLabel || (rollRank === 1 ? '1st' : rollRank === 2 ? '2nd' : rollRank === 3 ? '3rd' : ''),
+      stepIndex: Number(roll.stepIndex ?? (sequence ? index : 0)) || 0,
+      seat,
+      seatWind: seat,
       seatLabel: roll.seatLabel || roll.seatName || '',
       seatIndex: roll.seatIndex ?? index,
+      visualPosition,
+      layoutPosition: visualPosition,
       isDealer: Boolean(roll.isDealer || roll.isStartingPlayer || String(source.dealerUserId || source.winnerUserId || payload.dealerUserId || '') === userId),
       isStartingPlayer: Boolean(roll.isStartingPlayer || roll.isDealer || String(source.startingPlayerId || source.dealerUserId || source.winnerUserId || payload.turnPlayerId || '') === userId),
     };
-  }).sort((a, b) => {
+  };
+
+  const rolls = rawRankedRolls.map((roll, index) => normalizeRoll(roll, index, { sequence: false })).sort((a, b) => {
+    if (Number(a.rollRank || 0) && Number(b.rollRank || 0) && Number(a.rollRank) !== Number(b.rollRank)) return Number(a.rollRank) - Number(b.rollRank);
     if (Number(b.total) !== Number(a.total)) return Number(b.total) - Number(a.total);
     return Number(a.seatIndex || 0) - Number(b.seatIndex || 0);
   });
-
+  const sequence = rawSequence.map((roll, index) => normalizeRoll(roll, index, { sequence: true })).sort((a, b) => Number(a.stepIndex || 0) - Number(b.stepIndex || 0));
   const winner = rolls.find((roll) => roll.isStartingPlayer || roll.isDealer) || rolls[0] || null;
 
   return {
     phase: 'dice_roll',
     status: source.status || payload.status || 'complete',
     method: source.method || payload.dealerSelectionMethod || 'dice_roll_highest_total',
+    stepMs,
+    resultMs,
+    activeRollIndex: Number(source.activeRollIndex ?? payload.activeRollIndex ?? source.activeStepIndex ?? payload.activeStepIndex ?? -1),
+    activeRoll: source.activeRoll || payload.activeRoll || null,
+    visibleRolls: source.visibleRolls || payload.visibleRolls || [],
+    sequence,
+    diceRollSequence: sequence,
     rolls,
+    rankedRolls: rolls,
     diceRolls: rolls,
     winnerUserId: source.winnerUserId || source.dealerUserId || winner?.userId || '',
     startingPlayerId: source.startingPlayerId || source.dealerUserId || winner?.userId || '',
     dealerUserId: source.dealerUserId || source.winnerUserId || winner?.userId || '',
     seatOrder: source.seatOrder || payload.seatOrder || [],
+    turnOrder: source.turnOrder || payload.turnOrder || rolls.map((roll) => roll.userId),
+    visualSeatMap: source.visualSeatMap || payload.visualSeatMap || {},
     rotation: source.rotation || payload.rotation || 'counterclockwise',
     visibleUntil,
     receivedAt: now,
@@ -1805,7 +1856,10 @@ const mergeDiceRollPhase = (current = {}, payload = {}) => {
     ...(current || EMPTY_SOCKET_GAME_STATE),
     diceRollPhase: phase,
     diceRolls: phase.rolls,
+    diceRollSequence: phase.sequence,
     dealerRolls: phase.rolls,
+    turnOrder: phase.turnOrder || current.turnOrder,
+    visualSeatMap: phase.visualSeatMap || current.visualSeatMap,
     dealerUserId: phase.dealerUserId || current.dealerUserId,
     startingPlayerId: phase.startingPlayerId || current.startingPlayerId,
   };
@@ -1913,25 +1967,61 @@ function TileFocusOverlay({ focus }) {
 function DiceRollOverlay({ phase = null, t }) {
   if (!phase?.rolls?.length) return null;
 
-  const rolls = toArray(phase.rolls).filter(Boolean);
-  const winnerId = String(phase.startingPlayerId || phase.dealerUserId || phase.winnerUserId || rolls[0]?.userId || '');
-  const winner = rolls.find((roll) => String(roll.userId || roll.playerId || '') === winnerId) || rolls[0];
+  const rankedRolls = toArray(phase.rolls).filter(Boolean);
+  const sequence = toArray(phase.sequence || phase.diceRollSequence).length
+    ? toArray(phase.sequence || phase.diceRollSequence).filter(Boolean)
+    : rankedRolls;
+  const winnerId = String(phase.startingPlayerId || phase.dealerUserId || phase.winnerUserId || rankedRolls[0]?.userId || '');
+  const winner = rankedRolls.find((roll) => String(roll.userId || roll.playerId || '') === winnerId) || rankedRolls[0];
+  const stepMs = Number(phase.stepMs || 1050) || 1050;
+  const resultMs = Number(phase.resultMs || 1500) || 1500;
+  const elapsed = Math.max(0, Date.now() - Number(phase.receivedAt || Date.now()));
+  const computedStepIndex = Math.min(sequence.length, Math.floor(elapsed / stepMs));
+  const activeIndex = Number(phase.activeRollIndex) >= 0 ? Number(phase.activeRollIndex) : computedStepIndex;
+  const isResultStage = String(phase.status || '').toLowerCase() === 'result' || activeIndex >= sequence.length || elapsed >= sequence.length * stepMs;
+  const activeRoll = isResultStage ? winner : (sequence[Math.min(activeIndex, sequence.length - 1)] || sequence[0]);
+  const visibleIds = new Set(
+    (isResultStage ? rankedRolls : sequence.slice(0, Math.min(activeIndex + 1, sequence.length)))
+      .map((roll) => String(roll.userId || roll.playerId || ''))
+  );
+  const displayRolls = isResultStage ? rankedRolls : sequence;
 
   return (
-    <div className="gameplay-dice-roll-overlay" role="status" aria-live="polite">
+    <div className={`gameplay-dice-roll-overlay ${isResultStage ? 'is-result' : 'is-rolling'}`} role="status" aria-live="polite">
       <div className="gameplay-dice-roll-card">
         <span className="gameplay-dice-roll-kicker">{t('diceRollPhase')}</span>
-        <h2>{t('highestDiceStarts')}</h2>
-        <p>{winner?.name || 'Player'} {t('startsFirst')}</p>
+        <h2>{isResultStage ? t('highestDiceStarts') : t('rollingDice')}</h2>
+        <p>{isResultStage ? `${winner?.name || 'Player'} ${t('startsFirst')}` : `${activeRoll?.name || 'Player'} ${t('isRolling')}`}</p>
 
-        <div className="gameplay-dice-roll-list">
-          {rolls.map((roll, index) => {
+        <div className="gameplay-dice-roll-active">
+          <img
+            src={resolveProfileAvatarSrc(activeRoll?.avatar || activeRoll?.avatarId)}
+            alt=""
+            draggable="false"
+            onError={(event) => handleProfileAvatarError(event)}
+          />
+          <div className="gameplay-dice-roll-active-info">
+            <strong>{activeRoll?.name || activeRoll?.username || 'Player'}</strong>
+            <span>{isResultStage ? `${activeRoll?.rankLabel || '1st'} · ${activeRoll?.seatLabel || 'East'} · ${activeRoll?.visualPosition || 'bottom'}` : t('rollingDice')}</span>
+          </div>
+          <div className={`gameplay-dice-values gameplay-dice-values--active ${isResultStage ? 'is-settled' : 'is-shaking'}`} aria-label={`Dice total ${activeRoll?.total || activeRoll?.diceTotal || 0}`}>
+            {(toArray(activeRoll?.dice).length ? toArray(activeRoll?.dice) : [activeRoll?.total || activeRoll?.diceTotal || 0]).map((die, dieIndex) => (
+              <b key={`active-die-${activeRoll?.userId || dieIndex}-${dieIndex}`}>{die}</b>
+            ))}
+          </div>
+          <em>{activeRoll?.total || activeRoll?.diceTotal || 0}</em>
+        </div>
+
+        <div className="gameplay-dice-roll-list gameplay-dice-roll-list--sequence">
+          {displayRolls.map((roll, index) => {
             const rollUserId = String(roll.userId || roll.playerId || index);
             const isWinner = winner && String(winner.userId || winner.playerId || '') === rollUserId;
+            const isActive = activeRoll && String(activeRoll.userId || activeRoll.playerId || '') === rollUserId;
+            const isVisible = visibleIds.has(rollUserId);
             const dice = toArray(roll.dice).length ? toArray(roll.dice) : [roll.total || roll.diceTotal || 0];
 
             return (
-              <article className={`gameplay-dice-roll-player ${isWinner ? 'winner' : ''}`} key={`dice-roll-${rollUserId}-${index}`}>
+              <article className={`gameplay-dice-roll-player ${isWinner ? 'winner' : ''} ${isActive ? 'active' : ''} ${isVisible ? 'revealed' : 'pending'}`} key={`dice-roll-${rollUserId}-${index}`}>
                 <img
                   src={resolveProfileAvatarSrc(roll.avatar || roll.avatarId)}
                   alt=""
@@ -1940,18 +2030,26 @@ function DiceRollOverlay({ phase = null, t }) {
                 />
                 <div className="gameplay-dice-roll-player-info">
                   <strong>{roll.name || roll.username || `Player ${index + 1}`}</strong>
-                  <span>{roll.seatLabel || roll.seat || (isWinner ? 'East' : '')}</span>
+                  <span>{isVisible ? `${roll.rankLabel || ''} ${roll.seatLabel || roll.seat || ''} ${roll.visualPosition ? `· ${roll.visualPosition}` : ''}` : t('waitingRoll')}</span>
                 </div>
                 <div className="gameplay-dice-values" aria-label={`Dice total ${roll.total || roll.diceTotal || 0}`}>
-                  {dice.map((die, dieIndex) => (
+                  {isVisible ? dice.map((die, dieIndex) => (
                     <b key={`die-${rollUserId}-${dieIndex}`}>{die}</b>
-                  ))}
+                  )) : <b>?</b>}
                 </div>
-                <em>{roll.total || roll.diceTotal || 0}</em>
+                <em>{isVisible ? (roll.total || roll.diceTotal || 0) : '-'}</em>
               </article>
             );
           })}
         </div>
+
+        {isResultStage ? (
+          <div className="gameplay-dice-roll-order">
+            <strong>{t('turnOrder')}</strong>
+            <span>{rankedRolls.map((roll) => `${roll.name || roll.username || 'Player'} ${roll.visualPosition ? `(${roll.visualPosition})` : ''}`).join(' → ')}</span>
+            <small>{t('counterclockwiseOrder')}</small>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -2167,6 +2265,15 @@ function normalizeSeat(value) {
   return aliases[seat] || seat;
 }
 
+
+function getFixedSeatPosition(seat) {
+  const normalizedSeat = normalizeSeat(seat);
+  if (normalizedSeat === 'e') return 'bottom';
+  if (normalizedSeat === 's') return 'top';
+  if (normalizedSeat === 'w') return 'left';
+  return '';
+}
+
 function getRelativeSeatPosition(activeSeat, ownSeat, playerCount = 3) {
   const active = normalizeSeat(activeSeat);
   const own = normalizeSeat(ownSeat);
@@ -2190,6 +2297,14 @@ function getRelativeSeatPosition(activeSeat, ownSeat, playerCount = 3) {
 
 function getSeatPosition(seat, state = {}) {
   if (!seat) return '';
+
+  const fixedSeatPosition = getFixedSeatPosition(seat);
+  if (fixedSeatPosition && (state.hasNorthPlayer === false || String(state.rotation || '').toLowerCase() === 'counterclockwise')) {
+    return fixedSeatPosition;
+  }
+
+  const playerWithVisualSeat = toArray(state.players).find((player) => normalizeSeat(player.seat) === normalizeSeat(seat) && normalizePosition(player.visualPosition || player.layoutPosition || player.position));
+  if (playerWithVisualSeat) return normalizePosition(playerWithVisualSeat.visualPosition || playerWithVisualSeat.layoutPosition || playerWithVisualSeat.position);
 
   // Always prefer the relative seat calculation based on mySeat.
   // This gives each client a DIFFERENT perspective (the whole point).
@@ -2761,7 +2876,10 @@ function normalizeInitialSocketState(payload = {}, fallbackMatchId = '') {
     playableBonusTiles: payload.playableBonusTiles || normalized.playableBonusTiles || [],
     diceRollPhase: normalizeDiceRollPhase(payload.diceRollPhase || payload, players),
     diceRolls: payload.diceRolls || payload.dealerRolls || normalized.diceRolls || normalized.dealerRolls || [],
+    diceRollSequence: payload.diceRollSequence || normalized.diceRollSequence || [],
     dealerRolls: payload.dealerRolls || payload.diceRolls || normalized.dealerRolls || [],
+    turnOrder: payload.turnOrder || normalized.turnOrder || [],
+    visualSeatMap: payload.visualSeatMap || normalized.visualSeatMap || {},
     dealerUserId: payload.dealerUserId || normalized.dealerUserId,
     startingPlayerId: payload.startingPlayerId || payload.dealerUserId || normalized.startingPlayerId,
     playerCount: payload.playerCount ?? normalized.playerCount ?? players.length,
@@ -2953,6 +3071,8 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           setGameError('');
           break;
         case 'dice_roll':
+        case 'dice_roll_step':
+        case 'dice_roll_result':
           setGameState((current) => mergeDiceRollPhase(current || {}, payload));
           setGameError('');
           break;

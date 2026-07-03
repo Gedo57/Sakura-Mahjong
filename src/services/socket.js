@@ -26,6 +26,8 @@ export const GAME_SOCKET_EVENTS = {
   roomStateUpdate: 'room:state_update',
   gameStart: 'game:start',
   diceRoll: 'game:dice_roll',
+  diceRollStep: 'game:dice_roll_step',
+  diceRollResult: 'game:dice_roll_result',
   turnStart: 'game:turn_start',
   drawnTile: 'player:drawn_tile',
   claimWindow: 'game:claim_window',
@@ -51,6 +53,8 @@ const SERVER_EVENTS_TO_LISTEN = [
   GAME_SOCKET_EVENTS.roomStateUpdate,
   GAME_SOCKET_EVENTS.gameStart,
   GAME_SOCKET_EVENTS.diceRoll,
+  GAME_SOCKET_EVENTS.diceRollStep,
+  GAME_SOCKET_EVENTS.diceRollResult,
   GAME_SOCKET_EVENTS.turnStart,
   GAME_SOCKET_EVENTS.drawnTile,
   GAME_SOCKET_EVENTS.claimWindow,
@@ -95,6 +99,8 @@ function rememberGameSocketMessage(message) {
   const gameplayTypes = new Set([
     'game_start',
     'dice_roll',
+    'dice_roll_step',
+    'dice_roll_result',
     'game_state',
     'turn_changed',
     'drawn_tile',
@@ -234,6 +240,14 @@ export function normalizeSocketMessage(message) {
 
   if (originalEvent === GAME_SOCKET_EVENTS.diceRoll || originalEvent === 'dice_roll' || originalEvent === 'diceRoll') {
     return { type: 'dice_roll', payload, originalEvent };
+  }
+
+  if (originalEvent === GAME_SOCKET_EVENTS.diceRollStep || originalEvent === 'game:dice_roll_step' || originalEvent === 'dice_roll_step') {
+    return { type: 'dice_roll_step', payload, originalEvent };
+  }
+
+  if (originalEvent === GAME_SOCKET_EVENTS.diceRollResult || originalEvent === 'game:dice_roll_result' || originalEvent === 'dice_roll_result') {
+    return { type: 'dice_roll_result', payload, originalEvent };
   }
 
   if (originalEvent === GAME_SOCKET_EVENTS.turnStart || originalEvent === 'turn_changed' || originalEvent === 'turnChanged') {
