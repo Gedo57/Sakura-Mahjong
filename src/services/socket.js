@@ -25,6 +25,7 @@ export const GAME_SOCKET_EVENTS = {
   privateJoined: 'private_joined',
   roomStateUpdate: 'room:state_update',
   gameStart: 'game:start',
+  diceRoll: 'game:dice_roll',
   turnStart: 'game:turn_start',
   drawnTile: 'player:drawn_tile',
   claimWindow: 'game:claim_window',
@@ -49,6 +50,7 @@ const SERVER_EVENTS_TO_LISTEN = [
   GAME_SOCKET_EVENTS.privateJoined,
   GAME_SOCKET_EVENTS.roomStateUpdate,
   GAME_SOCKET_EVENTS.gameStart,
+  GAME_SOCKET_EVENTS.diceRoll,
   GAME_SOCKET_EVENTS.turnStart,
   GAME_SOCKET_EVENTS.drawnTile,
   GAME_SOCKET_EVENTS.claimWindow,
@@ -92,6 +94,7 @@ function rememberGameSocketMessage(message) {
   if (!message?.type) return;
   const gameplayTypes = new Set([
     'game_start',
+    'dice_roll',
     'game_state',
     'turn_changed',
     'drawn_tile',
@@ -227,6 +230,10 @@ export function normalizeSocketMessage(message) {
 
   if (originalEvent === GAME_SOCKET_EVENTS.gameStart) {
     return { type: 'game_start', payload: normalizeGameState(payload), originalEvent };
+  }
+
+  if (originalEvent === GAME_SOCKET_EVENTS.diceRoll || originalEvent === 'dice_roll' || originalEvent === 'diceRoll') {
+    return { type: 'dice_roll', payload, originalEvent };
   }
 
   if (originalEvent === GAME_SOCKET_EVENTS.turnStart || originalEvent === 'turn_changed' || originalEvent === 'turnChanged') {

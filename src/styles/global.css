@@ -138,3 +138,215 @@
   text-align: center;
   text-shadow: 0 3px 8px rgba(0, 0, 0, 0.55);
 }
+
+/* Patch 4 — Dice roll start phase */
+.gameplay-dice-roll-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(circle at center, rgba(49, 20, 3, .34), rgba(0, 0, 0, .62));
+  pointer-events: none;
+  animation: gameplayDiceOverlayIn .18s ease-out both;
+}
+
+.gameplay-dice-roll-card {
+  width: min(620px, 86vw);
+  border-radius: 28px;
+  padding: 24px 28px 26px;
+  color: #fff6cf;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(98, 26, 8, .96), rgba(38, 8, 3, .96));
+  border: 2px solid rgba(255, 213, 93, .78);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .52), inset 0 0 0 1px rgba(255, 244, 184, .22);
+  transform-origin: center;
+  animation: gameplayDiceCardIn .22s ease-out both;
+}
+
+.gameplay-dice-roll-kicker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  color: #331400;
+  font-size: 12px;
+  font-weight: 1000;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, #fff3ad, #f5b629);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, .28);
+}
+
+.gameplay-dice-roll-card h2 {
+  margin: 14px 0 4px;
+  font-size: clamp(26px, 3.2vw, 38px);
+  font-weight: 1000;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  text-shadow: 0 3px 0 rgba(62, 7, 0, .65);
+}
+
+.gameplay-dice-roll-card p {
+  margin: 0 0 18px;
+  color: #ffe69d;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.gameplay-dice-roll-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.gameplay-dice-roll-player {
+  position: relative;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  row-gap: 8px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(255, 244, 192, .09);
+  border: 1px solid rgba(255, 232, 137, .28);
+}
+
+.gameplay-dice-roll-player.winner {
+  background: linear-gradient(180deg, rgba(255, 221, 88, .28), rgba(158, 58, 4, .24));
+  border-color: rgba(255, 232, 116, .88);
+  box-shadow: 0 0 20px rgba(255, 199, 44, .28);
+}
+
+.gameplay-dice-roll-player img {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 231, 145, .8);
+  background: rgba(0, 0, 0, .2);
+}
+
+.gameplay-dice-roll-player-info {
+  min-width: 0;
+  text-align: left;
+}
+
+.gameplay-dice-roll-player-info strong,
+.gameplay-dice-roll-player-info span {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.gameplay-dice-roll-player-info strong {
+  font-size: 15px;
+  font-weight: 1000;
+}
+
+.gameplay-dice-roll-player-info span {
+  color: #ffd978;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.gameplay-dice-values {
+  grid-column: 1 / 3;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.gameplay-dice-values b {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  color: #290d00;
+  font-size: 19px;
+  font-weight: 1000;
+  background: linear-gradient(180deg, #fff8df, #f2c75b);
+  border: 1px solid rgba(255, 255, 255, .7);
+  box-shadow: inset 0 -3px 0 rgba(128, 77, 0, .18), 0 4px 9px rgba(0, 0, 0, .25);
+}
+
+.gameplay-dice-roll-player em {
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  display: grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 7px;
+  border-radius: 999px;
+  color: #2b1000;
+  background: #ffe27c;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 1000;
+}
+
+@keyframes gameplayDiceOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes gameplayDiceCardIn {
+  from { opacity: 0; transform: translateY(10px) scale(.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 900px), (orientation: portrait) {
+  .gameplay-dice-roll-overlay {
+    padding: 14px;
+  }
+
+  .gameplay-dice-roll-card {
+    width: min(520px, 94vw);
+    padding: 18px;
+    border-radius: 22px;
+  }
+
+  .gameplay-dice-roll-card h2 {
+    font-size: 24px;
+  }
+
+  .gameplay-dice-roll-card p {
+    font-size: 15px;
+  }
+
+  .gameplay-dice-roll-list {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .gameplay-dice-roll-player {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    grid-template-rows: auto;
+    padding: 9px 42px 9px 9px;
+  }
+
+  .gameplay-dice-roll-player img {
+    width: 40px;
+    height: 40px;
+  }
+
+  .gameplay-dice-values {
+    grid-column: auto;
+  }
+
+  .gameplay-dice-values b {
+    width: 28px;
+    height: 28px;
+    font-size: 16px;
+  }
+}

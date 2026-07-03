@@ -1712,6 +1712,109 @@ const playerMatchesAnyId = (player, ids = []) => {
   return playerIds.some((id) => ids.includes(id));
 };
 
+
+const normalizeDiceRollNumber = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : 0;
+};
+
+const getDiceRollPlayerName = (roll = {}, players = []) => {
+  const ids = getEntityIds({ id: roll.userId || roll.playerId || roll.id || roll._id });
+  const matchedPlayer = ids.length ? toArray(players).find((player) => playerMatchesAnyId(player, ids)) : null;
+  return roll.name
+    || roll.username
+    || roll.displayName
+    || matchedPlayer?.name
+    || matchedPlayer?.username
+    || (ids[0] ? `Player ${String(ids[0]).slice(-4)}` : 'Player');
+};
+
+const getDiceRollAvatar = (roll = {}, players = []) => {
+  const ids = getEntityIds({ id: roll.userId || roll.playerId || roll.id || roll._id });
+  const matchedPlayer = ids.length ? toArray(players).find((player) => playerMatchesAnyId(player, ids)) : null;
+  return roll.avatar
+    || roll.avatarId
+    || matchedPlayer?.avatar
+    || matchedPlayer?.avatarId
+    || matchedPlayer?.avatarUrl
+    || null;
+};
+
+const normalizeDiceRollPhase = (payload = {}, players = [], options = {}) => {
+  const source = payload.diceRollPhase || payload.startPhase || payload;
+  const rawRolls = source.rolls || source.diceRolls || payload.diceRolls || payload.dealerRolls || [];
+  if (!Array.isArray(rawRolls) || !rawRolls.length) return null;
+
+  const presentationMs = Number(source.presentationMs || payload.presentationMs || 2400) || 2400;
+  const now = Date.now();
+  const explicitEndsAt = parseTimerTimestampMs(source.endsAt || source.visibleUntil || payload.endsAt || payload.visibleUntil);
+  const visibleUntil = options.forceVisible
+    ? Math.max(explicitEndsAt || 0, now + presentationMs)
+    : (explicitEndsAt && explicitEndsAt > now ? explicitEndsAt : now + Math.min(presentationMs, 1800));
+
+  const rolls = rawRolls.map((roll = {}, index) => {
+    const dice = Array.isArray(roll.dice)
+      ? roll.dice.map(normalizeDiceRollNumber).filter(Boolean)
+      : [roll.die1, roll.die2].map(normalizeDiceRollNumber).filter(Boolean);
+    const total = normalizeDiceRollNumber(roll.total ?? roll.diceTotal ?? dice.reduce((sum, value) => sum + value, 0));
+    const userId = normalizeId(roll.userId || roll.playerId || roll.id || roll._id);
+
+    return {
+      ...roll,
+      userId,
+      playerId: userId,
+      name: getDiceRollPlayerName({ ...roll, userId }, players),
+      avatar: getDiceRollAvatar({ ...roll, userId }, players),
+      dice,
+      total,
+      diceTotal: total,
+      seat: roll.seat || roll.seatWind || '',
+      seatLabel: roll.seatLabel || roll.seatName || '',
+      seatIndex: roll.seatIndex ?? index,
+      isDealer: Boolean(roll.isDealer || roll.isStartingPlayer || String(source.dealerUserId || source.winnerUserId || payload.dealerUserId || '') === userId),
+      isStartingPlayer: Boolean(roll.isStartingPlayer || roll.isDealer || String(source.startingPlayerId || source.dealerUserId || source.winnerUserId || payload.turnPlayerId || '') === userId),
+    };
+  }).sort((a, b) => {
+    if (Number(b.total) !== Number(a.total)) return Number(b.total) - Number(a.total);
+    return Number(a.seatIndex || 0) - Number(b.seatIndex || 0);
+  });
+
+  const winner = rolls.find((roll) => roll.isStartingPlayer || roll.isDealer) || rolls[0] || null;
+
+  return {
+    phase: 'dice_roll',
+    status: source.status || payload.status || 'complete',
+    method: source.method || payload.dealerSelectionMethod || 'dice_roll_highest_total',
+    rolls,
+    diceRolls: rolls,
+    winnerUserId: source.winnerUserId || source.dealerUserId || winner?.userId || '',
+    startingPlayerId: source.startingPlayerId || source.dealerUserId || winner?.userId || '',
+    dealerUserId: source.dealerUserId || source.winnerUserId || winner?.userId || '',
+    seatOrder: source.seatOrder || payload.seatOrder || [],
+    rotation: source.rotation || payload.rotation || 'counterclockwise',
+    visibleUntil,
+    receivedAt: now,
+  };
+};
+
+const mergeDiceRollPhase = (current = {}, payload = {}) => {
+  const phase = normalizeDiceRollPhase(payload, current.players || [], { forceVisible: true });
+  if (!phase) return current;
+
+  return {
+    ...(current || EMPTY_SOCKET_GAME_STATE),
+    diceRollPhase: phase,
+    diceRolls: phase.rolls,
+    dealerRolls: phase.rolls,
+    dealerUserId: phase.dealerUserId || current.dealerUserId,
+    startingPlayerId: phase.startingPlayerId || current.startingPlayerId,
+  };
+};
+
+const isDiceRollOverlayVisible = (phase = null) => (
+  Boolean(phase?.rolls?.length) && Number(phase.visibleUntil || 0) > Date.now()
+);
+
 const getCurrentPlayerSeat = (...sources) => {
   for (const source of sources) {
     const seat = source?.mySeat || source?.seat || source?.currentPlayerSeat || source?.selfSeat || source?.initialGameState?.mySeat || source?.initialGameState?.seat;
@@ -1802,6 +1905,54 @@ function TileFocusOverlay({ focus }) {
     >
       <span className="gameplay-tile-focus-label">{focus.label || (kind === 'draw' ? 'DRAW' : 'DISCARD')}</span>
       <GameplayTile name={focus.tileName} className="gameplay-tile--focus" />
+    </div>
+  );
+}
+
+
+function DiceRollOverlay({ phase = null, t }) {
+  if (!phase?.rolls?.length) return null;
+
+  const rolls = toArray(phase.rolls).filter(Boolean);
+  const winnerId = String(phase.startingPlayerId || phase.dealerUserId || phase.winnerUserId || rolls[0]?.userId || '');
+  const winner = rolls.find((roll) => String(roll.userId || roll.playerId || '') === winnerId) || rolls[0];
+
+  return (
+    <div className="gameplay-dice-roll-overlay" role="status" aria-live="polite">
+      <div className="gameplay-dice-roll-card">
+        <span className="gameplay-dice-roll-kicker">{t('diceRollPhase')}</span>
+        <h2>{t('highestDiceStarts')}</h2>
+        <p>{winner?.name || 'Player'} {t('startsFirst')}</p>
+
+        <div className="gameplay-dice-roll-list">
+          {rolls.map((roll, index) => {
+            const rollUserId = String(roll.userId || roll.playerId || index);
+            const isWinner = winner && String(winner.userId || winner.playerId || '') === rollUserId;
+            const dice = toArray(roll.dice).length ? toArray(roll.dice) : [roll.total || roll.diceTotal || 0];
+
+            return (
+              <article className={`gameplay-dice-roll-player ${isWinner ? 'winner' : ''}`} key={`dice-roll-${rollUserId}-${index}`}>
+                <img
+                  src={resolveProfileAvatarSrc(roll.avatar || roll.avatarId)}
+                  alt=""
+                  draggable="false"
+                  onError={(event) => handleProfileAvatarError(event)}
+                />
+                <div className="gameplay-dice-roll-player-info">
+                  <strong>{roll.name || roll.username || `Player ${index + 1}`}</strong>
+                  <span>{roll.seatLabel || roll.seat || (isWinner ? 'East' : '')}</span>
+                </div>
+                <div className="gameplay-dice-values" aria-label={`Dice total ${roll.total || roll.diceTotal || 0}`}>
+                  {dice.map((die, dieIndex) => (
+                    <b key={`die-${rollUserId}-${dieIndex}`}>{die}</b>
+                  ))}
+                </div>
+                <em>{roll.total || roll.diceTotal || 0}</em>
+              </article>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -2608,6 +2759,11 @@ function normalizeInitialSocketState(payload = {}, fallbackMatchId = '') {
     canDiscard: payload.canDiscard ?? normalized.canDiscard,
     canPlayBonus: payload.canPlayBonus ?? normalized.canPlayBonus,
     playableBonusTiles: payload.playableBonusTiles || normalized.playableBonusTiles || [],
+    diceRollPhase: normalizeDiceRollPhase(payload.diceRollPhase || payload, players),
+    diceRolls: payload.diceRolls || payload.dealerRolls || normalized.diceRolls || normalized.dealerRolls || [],
+    dealerRolls: payload.dealerRolls || payload.diceRolls || normalized.dealerRolls || [],
+    dealerUserId: payload.dealerUserId || normalized.dealerUserId,
+    startingPlayerId: payload.startingPlayerId || payload.dealerUserId || normalized.startingPlayerId,
     playerCount: payload.playerCount ?? normalized.playerCount ?? players.length,
     maxPlayers: payload.maxPlayers ?? payload.room?.maxPlayers ?? normalized.maxPlayers ?? normalized.room?.maxPlayers,
   };
@@ -2782,13 +2938,22 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         case 'game_start':
           setGameState((current) => {
             const normalizedStart = normalizeInitialSocketState(payload, resolvedMatchId);
+            const currentDiceRollPhase = current?.diceRollPhase;
+            const nextDiceRollPhase = isDiceRollOverlayVisible(currentDiceRollPhase)
+              ? currentDiceRollPhase
+              : (normalizedStart.diceRollPhase || currentDiceRollPhase || null);
             return {
               ...(current || EMPTY_SOCKET_GAME_STATE),
               ...normalizedStart,
+              diceRollPhase: nextDiceRollPhase,
               players: normalizedStart.players?.length ? normalizedStart.players : (current?.players || []),
               matchId: payload.matchId || payload.gameId || payload.roomId || current?.matchId || resolvedMatchId,
             };
           });
+          setGameError('');
+          break;
+        case 'dice_roll':
+          setGameState((current) => mergeDiceRollPhase(current || {}, payload));
           setGameError('');
           break;
         case 'game_state':
@@ -2872,6 +3037,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
 
     const socketHandlers = [
       ['game:start', (payload) => handleSocketMessage({ type: 'game_start', payload })],
+      ['game:dice_roll', (payload) => handleSocketMessage({ type: 'dice_roll', payload })],
       ['game:sync_state', (payload) => handleSocketMessage({ type: 'game_state', payload })],
       ['game:turn_start', (payload) => handleSocketMessage({ type: 'turn_changed', payload })],
       ['player:drawn_tile', (payload) => handleSocketMessage({ type: 'drawn_tile', payload })],
@@ -2931,6 +3097,24 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     const nextTimer = Number(gameState.timer ?? gameState.remainingSeconds ?? gameState.timeLimit ?? 0);
     setDisplayTimer(Number.isFinite(nextTimer) ? nextTimer : 0);
   }, [gameState.timerDeadlineMs, gameState.timer, gameState.remainingSeconds, gameState.timeLimit, gameState.activeTurnPosition, gameState.claimWindow, isMockGameplay]);
+
+
+  useEffect(() => {
+    const visibleUntil = Number(gameState.diceRollPhase?.visibleUntil || 0);
+    if (!visibleUntil) return undefined;
+
+    const delay = Math.max(0, visibleUntil - Date.now());
+    if (delay <= 0) {
+      setGameState((current) => current?.diceRollPhase ? ({ ...current, diceRollPhase: { ...current.diceRollPhase, visibleUntil: 0 } }) : current);
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setGameState((current) => current?.diceRollPhase ? ({ ...current, diceRollPhase: { ...current.diceRollPhase, visibleUntil: 0 } }) : current);
+    }, delay + 120);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [gameState.diceRollPhase?.visibleUntil]);
 
   const expectedPlayerCount = useMemo(() => getExpectedGameplayPlayerCount(
     gameState,
@@ -3417,6 +3601,8 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
       : ''
   );
 
+  const visibleDiceRollPhase = isDiceRollOverlayVisible(gameState.diceRollPhase) ? gameState.diceRollPhase : null;
+
   return (
     <section className={`gameplay-screen ${isMockGameplay ? 'gameplay-screen--mock' : ''}`} aria-label="Mahjong gameplay screen">
       <img className="gameplay-bg" src={asset('BG.png')} alt="" draggable="false" />
@@ -3426,6 +3612,8 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           <span key={index} />
         ))}
       </div>
+
+      <DiceRollOverlay phase={visibleDiceRollPhase} t={t} />
 
       {!areGameplayAssetsReady ? (
         <div className="gameplay-asset-preload" role="status" aria-live="polite">
