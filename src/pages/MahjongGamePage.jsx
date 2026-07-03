@@ -1869,6 +1869,26 @@ const isDiceRollOverlayVisible = (phase = null) => (
   Boolean(phase?.rolls?.length) && Number(phase.visibleUntil || 0) > Date.now()
 );
 
+const isDiceRollLockActive = (state = {}) => (
+  String(state.status || '').toUpperCase() === 'DICE_ROLL'
+  || isDiceRollOverlayVisible(state.diceRollPhase)
+);
+
+const isCurrentUserActiveTurn = (state = {}, currentIds = [], currentSeat = '') => {
+  const normalizedCurrentIds = toArray(currentIds).map(normalizeId).filter(Boolean);
+  const activeIds = getEntityIds({
+    id: state.currentTurnPlayerId || state.turnPlayerId || state.activeUserId || state.activePlayerId || state.turn?.playerId || state.turn?.userId,
+  });
+
+  if (activeIds.length && normalizedCurrentIds.length && activeIds.some((id) => normalizedCurrentIds.includes(id))) {
+    return true;
+  }
+
+  const activeSeat = normalizeSeat(state.activeSeat || state.currentTurnSeat || state.turnSeat || state.turn?.seat);
+  const ownSeat = normalizeSeat(currentSeat || getCurrentPlayerSeat(state));
+  return Boolean(activeSeat && ownSeat && activeSeat === ownSeat);
+};
+
 const getCurrentPlayerSeat = (...sources) => {
   for (const source of sources) {
     const seat = source?.mySeat || source?.seat || source?.currentPlayerSeat || source?.selfSeat || source?.initialGameState?.mySeat || source?.initialGameState?.seat;
@@ -1965,6 +1985,15 @@ function TileFocusOverlay({ focus }) {
 
 
 function DiceRollOverlay({ phase = null, t }) {
+  const [, setAnimationTick] = useState(0);
+
+  useEffect(() => {
+    if (!phase?.rolls?.length) return undefined;
+
+    const intervalId = window.setInterval(() => setAnimationTick((tick) => tick + 1), 120);
+    return () => window.clearInterval(intervalId);
+  }, [phase?.receivedAt, phase?.visibleUntil, phase?.activeRollIndex, phase?.status, phase?.rolls?.length]);
+
   if (!phase?.rolls?.length) return null;
 
   const rankedRolls = toArray(phase.rolls).filter(Boolean);
@@ -1978,13 +2007,19 @@ function DiceRollOverlay({ phase = null, t }) {
   const elapsed = Math.max(0, Date.now() - Number(phase.receivedAt || Date.now()));
   const computedStepIndex = Math.min(sequence.length, Math.floor(elapsed / stepMs));
   const activeIndex = Number(phase.activeRollIndex) >= 0 ? Number(phase.activeRollIndex) : computedStepIndex;
+  const stepElapsed = Number(phase.activeRollIndex) >= 0 ? Math.min(stepMs, elapsed) : (elapsed % stepMs);
   const isResultStage = String(phase.status || '').toLowerCase() === 'result' || activeIndex >= sequence.length || elapsed >= sequence.length * stepMs;
   const activeRoll = isResultStage ? winner : (sequence[Math.min(activeIndex, sequence.length - 1)] || sequence[0]);
+  const isActiveRollSettled = isResultStage || stepElapsed >= Math.floor(stepMs * 0.72);
+  const visibleDuringRoll = sequence.slice(0, Math.max(0, Math.min(activeIndex, sequence.length)));
+  if (!isResultStage && isActiveRollSettled && activeRoll) visibleDuringRoll.push(activeRoll);
   const visibleIds = new Set(
-    (isResultStage ? rankedRolls : sequence.slice(0, Math.min(activeIndex + 1, sequence.length)))
+    (isResultStage ? rankedRolls : visibleDuringRoll)
       .map((roll) => String(roll.userId || roll.playerId || ''))
   );
   const displayRolls = isResultStage ? rankedRolls : sequence;
+  const activeDice = toArray(activeRoll?.dice).length ? toArray(activeRoll?.dice) : [activeRoll?.total || activeRoll?.diceTotal || 0];
+  const pendingDice = activeDice.length > 1 ? activeDice : [0, 0];
 
   return (
     <div className={`gameplay-dice-roll-overlay ${isResultStage ? 'is-result' : 'is-rolling'}`} role="status" aria-live="polite">
@@ -2002,14 +2037,16 @@ function DiceRollOverlay({ phase = null, t }) {
           />
           <div className="gameplay-dice-roll-active-info">
             <strong>{activeRoll?.name || activeRoll?.username || 'Player'}</strong>
-            <span>{isResultStage ? `${activeRoll?.rankLabel || '1st'} · ${activeRoll?.seatLabel || 'East'} · ${activeRoll?.visualPosition || 'bottom'}` : t('rollingDice')}</span>
+            <span>{isResultStage ? `${activeRoll?.rankLabel || '1st'} · ${activeRoll?.seatLabel || 'East'} · ${activeRoll?.visualPosition || 'bottom'}` : (isActiveRollSettled ? t('rollRevealed') : t('rollingDice'))}</span>
           </div>
-          <div className={`gameplay-dice-values gameplay-dice-values--active ${isResultStage ? 'is-settled' : 'is-shaking'}`} aria-label={`Dice total ${activeRoll?.total || activeRoll?.diceTotal || 0}`}>
-            {(toArray(activeRoll?.dice).length ? toArray(activeRoll?.dice) : [activeRoll?.total || activeRoll?.diceTotal || 0]).map((die, dieIndex) => (
+          <div className={`gameplay-dice-values gameplay-dice-values--active ${isActiveRollSettled ? 'is-settled' : 'is-shaking'}`} aria-label={`Dice total ${isActiveRollSettled ? (activeRoll?.total || activeRoll?.diceTotal || 0) : 0}`}>
+            {isActiveRollSettled ? activeDice.map((die, dieIndex) => (
               <b key={`active-die-${activeRoll?.userId || dieIndex}-${dieIndex}`}>{die}</b>
+            )) : pendingDice.slice(0, 2).map((_, dieIndex) => (
+              <b key={`active-die-pending-${activeRoll?.userId || dieIndex}-${dieIndex}`}>?</b>
             ))}
           </div>
-          <em>{activeRoll?.total || activeRoll?.diceTotal || 0}</em>
+          <em>{isActiveRollSettled ? (activeRoll?.total || activeRoll?.diceTotal || 0) : '-'}</em>
         </div>
 
         <div className="gameplay-dice-roll-list gameplay-dice-roll-list--sequence">
@@ -3158,6 +3195,8 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     const socketHandlers = [
       ['game:start', (payload) => handleSocketMessage({ type: 'game_start', payload })],
       ['game:dice_roll', (payload) => handleSocketMessage({ type: 'dice_roll', payload })],
+      ['game:dice_roll_step', (payload) => handleSocketMessage({ type: 'dice_roll_step', payload })],
+      ['game:dice_roll_result', (payload) => handleSocketMessage({ type: 'dice_roll_result', payload })],
       ['game:sync_state', (payload) => handleSocketMessage({ type: 'game_state', payload })],
       ['game:turn_start', (payload) => handleSocketMessage({ type: 'turn_changed', payload })],
       ['player:drawn_tile', (payload) => handleSocketMessage({ type: 'drawn_tile', payload })],
@@ -3262,8 +3301,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
 
     return seatPlayersForGameplay(sourcePlayers, expectedPlayerCount, currentPlayerIds, currentPlayerSeat)
       .map((player) => {
-        const isCurrentPlayer = player.position === 'bottom'
-          || player.isCurrentPlayer
+        const isCurrentPlayer = player.isCurrentPlayer
           || player.isMe
           || player.isSelf
           || playerMatchesAnyId(player, currentPlayerIds);
@@ -3301,7 +3339,9 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     storedMatch,
     useMockFallback: gameApiAvailable || isMockGameplay,
   });
-  const isUserTurn = activeTurnPosition === 'bottom';
+  const isGameplayPausedForDice = isDiceRollLockActive(gameState);
+  const isUserTurnByIdentity = isCurrentUserActiveTurn(gameState, currentPlayerIds, currentPlayerSeat);
+  const isUserTurn = Boolean(isUserTurnByIdentity || (activeTurnPosition === 'bottom' && !currentPlayerIds.length));
   const activeTurnName = activeTurnPosition === 'top'
     ? (topPlayer?.name === 'BUNBUN' ? 'Bunbun' : topPlayer?.name || 'Waiting')
     : activeTurnPosition === 'left'
@@ -3354,17 +3394,17 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   const isReclaimFeiPending = Boolean(gameState.pendingReclaimFei);
   const isFeiReclaimBlocking = Boolean(reclaimFeiWindow?.active || isReclaimFeiPending);
   const hasUserDiscardedThisTurn = Boolean(gameState.hasDiscardedThisTurn || gameState.myTurnHasDiscarded);
-  const canUserDiscard = Boolean(isUserTurn && gameState.canDiscard !== false && !hasUserDiscardedThisTurn && !isClaimWindowOpen && !isFeiReclaimBlocking && !gameState.pendingDiscardTileId && !gameState.currentDiscard);
-  const canUserPlayBonus = Boolean(isUserTurn && gameState.canPlayBonus !== false && !hasUserDiscardedThisTurn && !isClaimWindowOpen && !isFeiReclaimBlocking && !gameState.pendingDiscardTileId && !gameState.pendingBonusTileId && !gameState.currentDiscard);
+  const canUserDiscard = Boolean(!isGameplayPausedForDice && isUserTurn && gameState.canDiscard !== false && !hasUserDiscardedThisTurn && !isClaimWindowOpen && !isFeiReclaimBlocking && !gameState.pendingDiscardTileId && !gameState.currentDiscard);
+  const canUserPlayBonus = Boolean(!isGameplayPausedForDice && isUserTurn && gameState.canPlayBonus !== false && !hasUserDiscardedThisTurn && !isClaimWindowOpen && !isFeiReclaimBlocking && !gameState.pendingDiscardTileId && !gameState.pendingBonusTileId && !gameState.currentDiscard);
   const baseAvailableActions = getAvailableActions(gameState, false);
-  const turnAvailableActions = isUserTurn && !hasUserDiscardedThisTurn && !isClaimWindowOpen && !isFeiReclaimBlocking
+  const turnAvailableActions = !isGameplayPausedForDice && isUserTurn && !hasUserDiscardedThisTurn && !isClaimWindowOpen && !isFeiReclaimBlocking
     ? baseAvailableActions.filter((action) => TURN_ONLY_ACTIONS.has(action))
     : [];
-  const claimAvailableActions = isClaimWindowOpen && !isFeiReclaimBlocking
+  const claimAvailableActions = !isGameplayPausedForDice && isClaimWindowOpen && !isFeiReclaimBlocking
     ? baseAvailableActions.filter((action) => CLAIM_WINDOW_ONLY_ACTIONS.has(action) || action === 'hu')
     : [];
   const localKongPayload = getLocalKongCandidatePayload(playerHandTiles, bottomOpenMelds);
-  const localKongAvailable = Boolean(isUserTurn && !hasUserDiscardedThisTurn && !isClaimWindowOpen && !isFeiReclaimBlocking && localKongPayload);
+  const localKongAvailable = Boolean(!isGameplayPausedForDice && isUserTurn && !hasUserDiscardedThisTurn && !isClaimWindowOpen && !isFeiReclaimBlocking && localKongPayload);
   const availableActions = localKongAvailable && !turnAvailableActions.includes('kong')
     ? [...turnAvailableActions, 'kong']
     : (isClaimWindowOpen ? claimAvailableActions : turnAvailableActions);
@@ -3376,7 +3416,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     }
 
     const status = String(gameState.status || '').toLowerCase();
-    const shouldRunTimer = ['playing', 'resolving', 'active'].includes(status) || isUserTurn || isClaimWindowOpen;
+    const shouldRunTimer = !isGameplayPausedForDice && (['playing', 'resolving', 'active'].includes(status) || isUserTurn || isClaimWindowOpen);
     const deadline = Number(gameState.timerDeadlineMs || 0);
 
     if (!shouldRunTimer) {
@@ -3399,7 +3439,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     }, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [gameState.timerDeadlineMs, gameState.status, gameState.turnStartedAt, isClaimWindowOpen, isMockGameplay, isUserTurn]);
+  }, [gameState.timerDeadlineMs, gameState.status, gameState.turnStartedAt, isClaimWindowOpen, isGameplayPausedForDice, isMockGameplay, isUserTurn]);
 
 
   useEffect(() => {
@@ -3722,6 +3762,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   );
 
   const visibleDiceRollPhase = isDiceRollOverlayVisible(gameState.diceRollPhase) ? gameState.diceRollPhase : null;
+  const compassTimer = isGameplayPausedForDice ? 0 : displayTimer;
 
   return (
     <section className={`gameplay-screen ${isMockGameplay ? 'gameplay-screen--mock' : ''}`} aria-label="Mahjong gameplay screen">
@@ -3827,7 +3868,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         <TileWall count={13} direction="vertical" className="wall-left" />
         <TileWall count={14} direction="horizontal" className="wall-bottom" />
 
-        <Compass round={gameState.round || 'East 1'} timer={displayTimer} turnLabel={activeTurnLabel} />
+        <Compass round={gameState.round || 'East 1'} timer={compassTimer} turnLabel={isGameplayPausedForDice ? t('diceRollPhase') : activeTurnLabel} />
 
         <div className="gameplay-upper-discard" aria-label="Top discard tiles">
           {topDiscardTiles.map((tile, index) => (
@@ -3908,7 +3949,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
               key={actionKey}
               onClick={() => handleMahjongAction(actionKey)}
               aria-pressed={isActive}
-              disabled={isFeiReclaimBlocking || hasUserDiscardedThisTurn || !availableActions.includes(actionKey) || (!isClaimWindowOpen && !isUserTurn)}
+              disabled={isGameplayPausedForDice || isFeiReclaimBlocking || hasUserDiscardedThisTurn || !availableActions.includes(actionKey) || (!isClaimWindowOpen && !isUserTurn)}
             >
               {t(action.labelKey)}
             </button>
