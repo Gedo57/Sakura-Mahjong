@@ -120,6 +120,13 @@ export default function CreateRoomPage() {
         enableBots: Boolean(room.enableBots || isSoloMode),
         isSolo: Boolean(room.isSolo || room.enableBots || isSoloMode),
         botCount: Number(room.botCount || (isSoloMode ? 2 : 0)),
+        entryFee: room.entryFee || null,
+        entryFeeAmount: room.entryFeeAmount ?? room.entryFee?.amount ?? selectedTier?.entryFee?.amount ?? 0,
+        currency: room.currency || room.entryFee?.currency || 'coins',
+        prizePool: room.prizePool ?? 0,
+        seatOrder: room.seatOrder || [],
+        turnOrderPositions: room.turnOrderPositions || [],
+        rotation: room.rotation || 'bottom_top_left',
         players: room.players || [],
         botPlayers: room.botPlayers || [],
       };

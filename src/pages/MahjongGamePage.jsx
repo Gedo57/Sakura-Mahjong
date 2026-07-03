@@ -2023,6 +2023,7 @@ function getRelativeSeatPosition(activeSeat, ownSeat, playerCount = 3) {
   if (!active || !own) return '';
   if (active === own) return 'bottom';
 
+  // 3P turn/visual contract: own seat is bottom, next turn is top, third is left.
   const seats = playerCount > 3 ? ['e', 's', 'w', 'n'] : ['e', 's', 'w'];
   const activeIndex = seats.indexOf(active);
   const ownIndex = seats.indexOf(own);
