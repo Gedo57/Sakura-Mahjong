@@ -5,6 +5,7 @@ import { clearActiveMatch, getActiveMatch, saveMatchmakingContext } from '../sto
 import { useLanguage } from '../i18n/useLanguage.js';
 import { getGameResult } from '../services/gameService.js';
 import { normalizeGameResult } from '../services/gameNormalizers.js';
+import { handleProfileAvatarError, resolveProfileAvatarSrc } from '../utils/avatarAssets.js';
 
 const asset = (name) => `/assets/win-screen/${name}`;
 
@@ -17,7 +18,7 @@ const EMPTY_RESULT = {
   summaryRows: [],
   totalScore: '',
 };
-function formatScore(value, fallback = '0') {
+function formatCoins(value, fallback = '0') {
   if (value === null || value === undefined || value === '') return fallback;
   if (typeof value === 'number') {
     const prefix = value > 0 ? '+' : '';
@@ -26,14 +27,8 @@ function formatScore(value, fallback = '0') {
   return String(value);
 }
 
-function resolveAvatarSrc(avatar, fallback = 'ic1.png') {
-  const value = avatar || fallback;
-
-  if (/^https?:\/\//i.test(value) || value.startsWith('/')) {
-    return value;
-  }
-
-  return asset(value);
+function resolveAvatarSrc(avatar, fallback = 'stevie') {
+  return resolveProfileAvatarSrc(avatar, fallback);
 }
 
 function translateMaybe(t, value) {
@@ -48,14 +43,16 @@ export default function ResultPage() {
   const location = useLocation();
   const activeMatch = getActiveMatch();
   const matchId = location.state?.matchId || activeMatch?.matchId;
-  const [resultState, setResultState] = useState(() => normalizeGameResult(location.state?.result || location.state || EMPTY_RESULT));
-  const [isLoading, setIsLoading] = useState(Boolean(matchId));
+  const inlineResult = useMemo(() => normalizeGameResult(location.state?.result || location.state || EMPTY_RESULT), [location.state]);
+  const hasInlineResult = Boolean(inlineResult.players?.length || Object.keys(inlineResult.payouts || {}).length || inlineResult.winnerId);
+  const [resultState, setResultState] = useState(() => inlineResult);
+  const [isLoading, setIsLoading] = useState(Boolean(matchId && !hasInlineResult));
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadResult() {
-      if (!matchId) {
+      if (!matchId || hasInlineResult) {
         setIsLoading(false);
         return;
       }
@@ -71,7 +68,6 @@ export default function ResultPage() {
           setResultState((current) => normalizeGameResult({
             ...(current || EMPTY_RESULT),
             matchId,
-            title: current?.title || 'Result unavailable',
           }));
         }
       } finally {
@@ -86,14 +82,19 @@ export default function ResultPage() {
     return () => {
       cancelled = true;
     };
-  }, [matchId]);
+  }, [matchId, hasInlineResult]);
 
   const result = useMemo(() => normalizeGameResult(resultState || EMPTY_RESULT), [resultState]);
   const winner = result.winner || result.players.find((player) => player.isWinner) || null;
   const losers = result.players.filter((player) => player.id !== winner?.id && !player.isWinner);
+  const myPlayerId = String(result.myPlayerId || result.selfPlayerId || '').trim();
+  const myPlayer = myPlayerId ? result.players.find((player) => [player.id, player.userId].map((value) => String(value || '').trim()).includes(myPlayerId)) : null;
   const summaryRows = result.summaryRows.length ? result.summaryRows : [];
-  const totalScore = result.totalScore !== undefined && result.totalScore !== null && result.totalScore !== '' ? formatScore(result.totalScore ?? winner?.score, '0') : '';
-  const didCurrentUserWin = result.result && result.result !== 'lose' && result.result !== 'loss' && result.result !== 'defeat';
+  const totalCoins = result.totalCoins !== undefined && result.totalCoins !== null && result.totalCoins !== ''
+    ? formatCoins(result.totalCoins, '0')
+    : formatCoins(myPlayer?.coinDelta ?? myPlayer?.scoreDelta ?? winner?.coinDelta ?? winner?.scoreDelta, '0');
+  const didCurrentUserWin = myPlayer ? myPlayer.isWinner : Boolean(winner);
+  const resultTitle = result.title || (winner ? (didCurrentUserWin ? t('youWin') : `${winner.name || 'Winner'} WINS`) : 'DRAW');
   const hasResultPlayers = Boolean(winner || result.players.length);
 
   return (
@@ -104,18 +105,18 @@ export default function ResultPage() {
       <header className='win-header lui-0221aed4'>      </header>
 
       <main className="win-content">
-        <h2 className="win-title">{isLoading ? t('loading') : (result.title || (result.titleKey ? t(result.titleKey) : didCurrentUserWin ? t('youWin') : 'Result unavailable'))}</h2>
+        <h2 className="win-title">{isLoading ? t('loading') : (result.titleKey ? t(result.titleKey) : resultTitle)}</h2>
 
         <section className="win-layout" aria-label="Win screen details">
           <section className="winner-panel" aria-label="Player results">
             {hasResultPlayers ? (
               <>
                 <div className="winner-main-row">
-                  <img className='winner-avatar lui-c8bd0ff4' src={resolveAvatarSrc(winner?.avatar, 'ic1.png')} alt={`${winner?.name || 'Winner'} avatar`} />
+                  <img className='winner-avatar lui-c8bd0ff4' src={resolveAvatarSrc(winner?.avatar, winner?.avatarId || 'stevie')} alt={`${winner?.name || 'Winner'} avatar`} onError={(event) => handleProfileAvatarError(event)} />
 
                   <div className="winner-info">
                     <strong className='winner-name lui-3a1371cc'>{winner?.name || 'Winner'}</strong>
-                    <span className='winner-score lui-28150694'>{formatScore(winner?.score ?? winner?.scoreDelta, '+0')}</span>
+                    <span className='winner-score lui-28150694'>{formatCoins(winner?.coinDelta ?? winner?.scoreDelta ?? winner?.score, '+0')}</span>
                     <em className='winner-badge lui-208c9614'>{t('winner')}</em>
                   </div>
                 </div>
@@ -123,9 +124,9 @@ export default function ResultPage() {
                 <div className="loser-list">
                   {losers.map((player, index) => (
                     <article className="loser-row" key={player.id || player.name || index}>
-                      <img className='loser-avatar lui-95d32e6f' src={resolveAvatarSrc(player.avatar, index === 0 ? 'ic2.png' : 'ic3.png')} alt={`${player.name} avatar`} />
+                      <img className='loser-avatar lui-95d32e6f' src={resolveAvatarSrc(player.avatar, player.avatarId || (index === 0 ? 'kiki' : 'panda'))} alt={`${player.name} avatar`} onError={(event) => handleProfileAvatarError(event)} />
                       <strong className='loser-name lui-f155ac3b'>{player.name}</strong>
-                      <span className="loser-score">{formatScore(player.score ?? player.scoreDelta, '0')}</span>
+                      <span className="loser-score">{formatCoins(player.coinDelta ?? player.scoreDelta ?? player.score, '0')}</span>
                     </article>
                   ))}
                 </div>
@@ -153,10 +154,10 @@ export default function ResultPage() {
 
               <div className="summary-footer-divider" aria-hidden="true"><span>✽</span></div>
               <div className="summary-total">
-                <strong className='lui-613d8f20'>{t('totalScore')}</strong>
+                <strong className='lui-613d8f20'>{t('totalCoins') || 'Total Coins'}</strong>
                 <span className='summary-total-value lui-8d5746d0'>
                   <span className="summary-coin" aria-hidden="true">✿</span>
-                  {String(totalScore || '0').replace(/^\+/, '')}
+                  {String(totalCoins || '0').replace(/^\+/, '')}
                 </span>
               </div>
             </div>

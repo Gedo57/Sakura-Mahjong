@@ -5,16 +5,18 @@ import { getStoredAuthUser } from '../services/authService.js';
 import { clearMatchmakingContext, getMatchmakingContext, saveActiveMatch } from '../store/gameStore.js';
 import { connectGameSocket, disconnectGameSocket, startPrivateGame, leaveLobby } from '../services/socket.js';
 import { useLanguage } from '../i18n/useLanguage.js';
+import { handleProfileAvatarError, resolveProfileAvatarSrc } from '../utils/avatarAssets.js';
 
-const PROFILE_ASSET_ROOT = '/assets/profile/';
-const DEFAULT_AVATAR = 'ICO.png';
+const DEFAULT_AVATAR = 'stevie';
 
 function getAvatarSrc(avatar) {
-  if (!avatar || typeof avatar !== 'string') return `${PROFILE_ASSET_ROOT}${DEFAULT_AVATAR}`;
-  const val = avatar.trim();
-  if (/^(https?:)?\/\//i.test(val) || val.startsWith('/')) return val;
-  if (/\.(png|jpe?g|webp|gif|svg)$/i.test(val)) return `${PROFILE_ASSET_ROOT}${val}`;
-  return `${PROFILE_ASSET_ROOT}${DEFAULT_AVATAR}`;
+  return resolveProfileAvatarSrc(avatar, DEFAULT_AVATAR);
+}
+
+function isBotLobbyPlayer(player = {}, playerId = '') {
+  return Boolean(player.isBot)
+    || String(playerId || player.userId || player.id || '').startsWith('bot:')
+    || /^bot[_:-]/i.test(String(playerId || player.userId || player.id || ''));
 }
 
 function getCurrentUser() {
@@ -313,12 +315,12 @@ export default function PrivateLobbyPage() {
             const firstPlayer = typeof players[0] === 'string' ? { userId: players[0] } : (players[0] || {});
             const pid = normalizedPlayer.userId || normalizedPlayer.id || normalizedPlayer._id || '';
             const isMe = pid === currentUser.id;
-            const isBot = Boolean(normalizedPlayer.isBot || /^bot_/i.test(String(pid)));
+            const isBot = isBotLobbyPlayer(normalizedPlayer, pid);
             const isPlayerHost = !isBot && (normalizedPlayer.isHost || (pid === firstPlayer.userId));
             return (
               <div key={pid || index} className={`lobby-player-card ${isMe ? 'lobby-player-me' : ''} ${isBot ? 'lobby-player-bot' : ''}`}>
                 <div className="lobby-player-avatar-wrap">
-                  <img src={getAvatarSrc(normalizedPlayer.avatar)} alt="" />
+                  <img src={getAvatarSrc(normalizedPlayer.avatar || normalizedPlayer.avatarId)} alt="" onError={(event) => handleProfileAvatarError(event)} />
                   {isPlayerHost && <span className="lobby-host-badge">HOST</span>}
                   {isBot && <span className="lobby-bot-badge">BOT</span>}
                 </div>

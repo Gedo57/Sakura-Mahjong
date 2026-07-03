@@ -5,11 +5,12 @@ import { getStoredAuthUser } from '../services/authService.js';
 import { clearActiveMatch, clearMatchmakingContext, getMatchmakingContext, saveActiveMatch } from '../store/gameStore.js';
 import { connectGameSocket, disconnectGameSocket, startPrivateGame } from '../services/socket.js';
 import { useLanguage } from '../i18n/useLanguage.js';
+import { resolveProfileAvatarSrc, handleProfileAvatarError } from '../utils/avatarAssets.js';
+import { preloadGameplayAssets } from '../utils/gameplayAssetPreloader.js';
 
 const asset = (name) => `/assets/matchmaking/${name}`;
 const DEFAULT_TIER_ID = ''; // No hardcoded tier. Real tierId must come from backend room tier selection.
 
-const PROFILE_ASSET_ROOT = '/assets/profile/';
 const PROFILE_AVATAR_STORAGE_KEY = 'sakura_profile_avatar';
 const DEFAULT_PROFILE_AVATAR = 'ICO.png';
 const GUEST_PLAYER_ID_STORAGE_KEY = 'sakura_guest_player_id';
@@ -125,6 +126,7 @@ function normalizeLobbyPlayer(player = {}, index = 0) {
     name: player.isSearching ? 'Searching' : getBackendLobbyPlayerName(player),
     username: player.username || getBackendLobbyPlayerName(player),
     avatar: player.avatar || player.avatarUrl || player.avatarId || player.imageUrl || player.photoUrl || player.icon,
+    avatarId: player.avatarId || player.avatar || player.avatarUrl || player.imageUrl || player.photoUrl || player.icon,
   };
 
   const placeholder = isSearchingPlaceholder(normalized);
@@ -156,28 +158,7 @@ function getPrivateHandPlayer(players = []) {
 }
 
 function getProfileAvatarSrc(avatar) {
-  if (typeof avatar !== 'string' || !avatar.trim()) {
-    return `${PROFILE_ASSET_ROOT}${DEFAULT_PROFILE_AVATAR}`;
-  }
-
-  const value = avatar.trim();
-
-  if (/^(https?:)?\/\//i.test(value) || value.startsWith('/')) {
-    return value;
-  }
-
-  if (/\.(png|jpe?g|webp|gif|svg)$/i.test(value)) {
-    return `${PROFILE_ASSET_ROOT}${value}`;
-  }
-
-  const avatarMap = {
-    stevie: 'avatar-stevie.png',
-    kiki: 'avatar-kiki.png',
-    bunbun: 'avatar-bunbun.png',
-    panda: 'avatar-panda.png',
-  };
-
-  return `${PROFILE_ASSET_ROOT}${avatarMap[value] || DEFAULT_PROFILE_AVATAR}`;
+  return resolveProfileAvatarSrc(avatar, 'stevie');
 }
 
 function getMatchAvatarSrc(player) {
@@ -198,7 +179,10 @@ function getMatchAvatarSrc(player) {
       return getProfileAvatarSrc(DEFAULT_PROFILE_AVATAR);
     }
 
-    if (/^(avatar-|ICO\.png)/i.test(value)) {
+    const normalizedProfileAvatar = value.toLowerCase();
+    if (/^(avatar-|ICO\.png)/i.test(value)
+      || ['stevie', 'kiki', 'bunbun', 'panda', 'default', 'default_avatar', 'dragon_avatar', 'avatar_1', 'bot_1', 'bot_2', 'bot_3'].includes(normalizedProfileAvatar)
+      || /^bot_\d+(\.png)?$/i.test(value)) {
       return getProfileAvatarSrc(value);
     }
 
@@ -304,7 +288,7 @@ function PlayerSlot({ variant, avatar, name, ready, isCurrentPlayer = false, del
   return (
     <article className={`match-slot match-slot-${variant}`} style={{ '--slot-delay': `${delay}ms` }}>
       <div className="match-avatar-wrap">
-        <img src={getMatchAvatarSrc({ avatar, isCurrentPlayer })} alt="" />
+        <img src={getMatchAvatarSrc({ avatar, isCurrentPlayer })} alt="" onError={(event) => handleProfileAvatarError(event)} />
       </div>
       <h2>{displayName}</h2>
       {ready ? (
@@ -339,6 +323,10 @@ export default function MatchmakingPage() {
   const latestSessionRef = useRef(session);
   const [errorMessage, setErrorMessage] = useState('');
   const [connectionStatus, setConnectionStatus] = useState('connecting');
+
+  useEffect(() => {
+    preloadGameplayAssets({ timeoutMs: 3000 }).catch(() => null);
+  }, []);
 
   useEffect(() => {
     latestSessionRef.current = session;

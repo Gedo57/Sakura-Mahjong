@@ -21,21 +21,10 @@ import {
 import { clearActiveMatch, clearMatchmakingContext, getActiveMatch, saveActiveMatch } from '../store/gameStore.js';
 import { useLanguage } from '../i18n/useLanguage.js';
 import { mockGameState as fullMockGameState } from '../mocks/mockGameState.js';
-import avatarBunbun from '../assets/profile/avatar-bunbun.png';
-import avatarKiki from '../assets/profile/avatar-kiki.png';
-import avatarPanda from '../assets/profile/avatar-panda.png';
-import avatarStevie from '../assets/profile/avatar-stevie.png';
+import { handleProfileAvatarError, isDefaultProfileAvatarValue, resolveProfileAvatarSrc } from '../utils/avatarAssets.js';
+import { preloadGameplayAssets } from '../utils/gameplayAssetPreloader.js';
 
 const asset = (name) => `/assets/gameplay/${name}`;
-
-const PLAYER_AVATAR_FALLBACKS = {
-  'Bunbun.png': avatarBunbun,
-  'KIKI.png': avatarKiki,
-  'Kiki.png': avatarKiki,
-  'Stevie.png': avatarStevie,
-  'STEIVE.png': avatarStevie,
-  'Panda.png': avatarPanda,
-};
 
 const STRICT_GAMEPLAY_PLAYER_COUNT = 3;
 
@@ -111,6 +100,7 @@ const normalizeGameplayPlayer = (player = {}, index = 0) => {
     name: getRealPlayerName(player),
     username: player.username || getRealPlayerName(player),
     avatar: player.avatar || player.avatarUrl || player.avatarId || player.imageUrl || player.photoUrl || player.icon || null,
+    avatarId: player.avatarId || player.avatar || player.avatarUrl || player.imageUrl || player.photoUrl || player.icon || null,
     title: player.title || player.rankTitle || player.profileTitle || '',
     coins: score,
     score,
@@ -286,40 +276,6 @@ const seatPlayersForGameplay = (sourcePlayers, expectedPlayerCount = 3, currentI
   });
 };
 
-function resolvePlayerAvatar(avatar, fallbackAvatar = 'Stevie.png') {
-  const value = String(avatar || '').trim();
-
-  if (!value || /^default(\.png)?$/i.test(value)) {
-    return PLAYER_AVATAR_FALLBACKS[fallbackAvatar] || avatarStevie;
-  }
-
-  if (/^(https?:|data:|blob:|\/)/i.test(value)) {
-    return value;
-  }
-
-  if (PLAYER_AVATAR_FALLBACKS[value]) {
-    return PLAYER_AVATAR_FALLBACKS[value];
-  }
-
-  const profileAvatarMap = {
-    stevie: avatarStevie,
-    'avatar-stevie.png': avatarStevie,
-    kiki: avatarKiki,
-    'avatar-kiki.png': avatarKiki,
-    bunbun: avatarBunbun,
-    'avatar-bunbun.png': avatarBunbun,
-    panda: avatarPanda,
-    'avatar-panda.png': avatarPanda,
-    ico: avatarStevie,
-    'ico.png': avatarStevie,
-  };
-  const lowerValue = value.toLowerCase();
-
-  return profileAvatarMap[lowerValue]
-    || PLAYER_AVATAR_FALLBACKS[fallbackAvatar]
-    || avatarStevie;
-}
-
 const DEFAULT_ACTIONS = ['chow', 'pong', 'kong', 'hu', 'pass'];
 const ACTION_TO_UI = {
   pung: 'pong',
@@ -459,6 +415,72 @@ const resolveTimerDeadlineMs = (payload = {}, fallbackSeconds = 0) => {
   const seconds = Number(payload.timeLimit ?? payload.timer ?? payload.remainingSeconds ?? fallbackSeconds ?? 0);
   return Number.isFinite(seconds) && seconds > 0 ? Date.now() + seconds * 1000 : 0;
 };
+
+
+const TIMER_PAYLOAD_FIELDS = [
+  'turnEndsAt',
+  'timerEndsAt',
+  'endsAt',
+  'expiresAt',
+  'deadline',
+  'claimEndsAt',
+  'timeLimit',
+  'remainingSeconds',
+];
+
+const hasExplicitTimerPayload = (payload = {}) => (
+  Boolean(payload && typeof payload === 'object')
+  && TIMER_PAYLOAD_FIELDS.some((key) => payload[key] !== undefined && payload[key] !== null && payload[key] !== '')
+);
+
+const getTurnIdentity = (state = {}) => ({
+  userId: String(state.turnPlayerId || state.currentTurnPlayerId || state.activeUserId || state.activePlayerId || '').trim(),
+  seat: String(state.activeSeat || state.currentTurnSeat || state.turnSeat || state.seat || '').trim(),
+  turnNumber: state.turnNumber ?? state.turnState?.turnNumber ?? state.turn?.number ?? null,
+});
+
+const isSameGameplayTurn = (current = {}, next = {}) => {
+  const currentTurn = getTurnIdentity(current);
+  const nextTurn = getTurnIdentity(next);
+
+  const samePlayer = currentTurn.userId && nextTurn.userId
+    ? currentTurn.userId === nextTurn.userId
+    : Boolean(currentTurn.seat && nextTurn.seat && currentTurn.seat === nextTurn.seat);
+
+  if (!samePlayer) return false;
+
+  if (currentTurn.turnNumber === null || nextTurn.turnNumber === null) return true;
+  return Number(currentTurn.turnNumber) === Number(nextTurn.turnNumber);
+};
+
+function mergeSynchronizedGameState(current = {}, payload = {}, fallbackMatchId = '') {
+  const normalizedSync = normalizeInitialSocketState(payload, fallbackMatchId);
+  const baseNext = {
+    ...EMPTY_SOCKET_GAME_STATE,
+    ...normalizedSync,
+    players: normalizedSync.players?.length ? normalizedSync.players : (current?.players || []),
+    matchId: payload.matchId || payload.gameId || payload.roomId || current?.matchId || fallbackMatchId,
+  };
+
+  const explicitTimer = hasExplicitTimerPayload(payload);
+  const timerLimit = Number(payload.timeLimit ?? payload.timer ?? payload.remainingSeconds ?? normalizedSync.timeLimit ?? normalizedSync.timer ?? 0) || 0;
+  const explicitDeadlineMs = explicitTimer ? resolveTimerDeadlineMs(payload, timerLimit) : 0;
+
+  if (explicitDeadlineMs) {
+    baseNext.timerDeadlineMs = explicitDeadlineMs;
+    baseNext.timer = getSecondsRemaining(explicitDeadlineMs);
+    baseNext.timeLimit = timerLimit || normalizedSync.timeLimit || current.timeLimit;
+  }
+
+  if (!explicitTimer && isSameGameplayTurn(current, baseNext)) {
+    baseNext.timer = current.timer;
+    baseNext.timeLimit = current.timeLimit;
+    baseNext.timerDeadlineMs = current.timerDeadlineMs;
+    baseNext.turnStartedAt = current.turnStartedAt;
+  }
+
+  return baseNext;
+}
 
 
 const TILE_ASSET_ALIASES = {
@@ -1747,7 +1769,22 @@ const actionDefinitions = {
 };
 
 function GameplayTile({ name, className = '', label = '' }) {
-  return <img className={`gameplay-tile ${className}`} src={asset(name)} alt={label} draggable="false" />;
+  const tileName = name || 'tile_back.png';
+
+  return (
+    <img
+      className={`gameplay-tile ${className}`}
+      src={asset(tileName)}
+      alt={label}
+      draggable="false"
+      onError={(event) => {
+        const img = event.currentTarget;
+        if (img.dataset.tileFallbackApplied === 'true') return;
+        img.dataset.tileFallbackApplied = 'true';
+        img.src = asset('tile_back.png');
+      }}
+    />
+  );
 }
 
 function TileFocusOverlay({ focus }) {
@@ -1938,7 +1975,13 @@ function PlayerBadge({ variant = 'small', avatar, name, title = '', seatLabel = 
           <span className="gameplay-turn-arrow" aria-hidden="true">➤</span>
         </>
       ) : null}
-      <img src={resolvePlayerAvatar(avatar)} alt="" className="gameplay-player-avatar" draggable="false" />
+      <img
+        src={resolveProfileAvatarSrc(avatar)}
+        alt=""
+        className="gameplay-player-avatar"
+        draggable="false"
+        onError={(event) => handleProfileAvatarError(event)}
+      />
       <div className="gameplay-player-info">
         <strong>{displayName}</strong>
         {subtitle ? <small>{subtitle}</small> : null}
@@ -2632,6 +2675,23 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   const [gameError, setGameError] = useState('');
   const [isLeavingGame, setIsLeavingGame] = useState(false);
   const [displayTimer, setDisplayTimer] = useState(() => Number(gameState.timer ?? gameState.timeLimit ?? 0) || 0);
+  const [areGameplayAssetsReady, setAreGameplayAssetsReady] = useState(() => typeof window === 'undefined');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    preloadGameplayAssets({ timeoutMs: 3000 })
+      .catch(() => null)
+      .finally(() => {
+        if (!cancelled) {
+          setAreGameplayAssetsReady(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isMockGameplay && !routeMatchId && resolvedMatchId) {
@@ -2732,15 +2792,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           setGameError('');
           break;
         case 'game_state':
-          setGameState((current) => {
-            const normalizedSync = normalizeInitialSocketState(payload, resolvedMatchId);
-            return {
-              ...EMPTY_SOCKET_GAME_STATE,
-              ...normalizedSync,
-              players: normalizedSync.players?.length ? normalizedSync.players : (current?.players || []),
-              matchId: payload.matchId || payload.gameId || payload.roomId || current?.matchId || resolvedMatchId,
-            };
-          });
+          setGameState((current) => mergeSynchronizedGameState(current || {}, payload, resolvedMatchId));
           setGameError('');
           break;
         case 'turn_changed':
@@ -2764,9 +2816,16 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         case 'game_finished':
           setGameState((current) => {
             const currentPlayers = toArray(current?.players);
+            const myPlayerId = payload.myPlayerId || payload.selfPlayerId || current?.myPlayerId || current?.selfPlayerId;
+            const ownSummary = myPlayerId
+              ? (payload.playerSummaries?.[myPlayerId] || payload.roundSummary?.playerStats?.[myPlayerId])
+              : null;
             const resultPayload = {
               ...payload,
+              myPlayerId,
+              selfPlayerId: myPlayerId,
               players: Array.isArray(payload.players) && payload.players.length ? payload.players : currentPlayers,
+              summaryRows: ownSummary?.summaryRows || payload.summaryRows || [],
               roomId: payload.roomId || current?.roomId || activeMatchBase.roomId,
               tierId: payload.tierId || current?.tierId || activeMatchBase.tierId,
               maxPlayers: payload.maxPlayers || current?.maxPlayers || activeMatchBase.maxPlayers,
@@ -2889,7 +2948,37 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
       ? livePlayers
       : [{ ...currentIdentity, isCurrentPlayer: true }];
 
-    return seatPlayersForGameplay(sourcePlayers, expectedPlayerCount, currentPlayerIds, currentPlayerSeat);
+    const currentIdentityAvatar = currentIdentity.avatar
+      || currentIdentity.avatarId
+      || currentIdentity.avatarUrl
+      || currentIdentity.imageUrl
+      || currentIdentity.photoUrl
+      || currentIdentity.icon
+      || '';
+
+    return seatPlayersForGameplay(sourcePlayers, expectedPlayerCount, currentPlayerIds, currentPlayerSeat)
+      .map((player) => {
+        const isCurrentPlayer = player.position === 'bottom'
+          || player.isCurrentPlayer
+          || player.isMe
+          || player.isSelf
+          || playerMatchesAnyId(player, currentPlayerIds);
+
+        if (!isCurrentPlayer || !currentIdentityAvatar) {
+          return player;
+        }
+
+        const currentAvatar = player.avatar || player.avatarId || player.avatarUrl || player.imageUrl || player.photoUrl || player.icon || '';
+        if (currentAvatar && !isDefaultProfileAvatarValue(currentAvatar)) {
+          return player;
+        }
+
+        return {
+          ...player,
+          avatar: currentIdentityAvatar,
+          avatarId: currentIdentity.avatarId || currentIdentityAvatar,
+        };
+      });
   }, [currentPlayerIds, currentPlayerSeat, expectedPlayerCount, gameApiAvailable, gameState, initialSocketPayload, location.state, storedMatch]);
 
   const fallbackCurrentPlayer = normalizeGameplayPlayer(getGameplayCurrentIdentity(gameState, location.state, storedMatch, initialSocketPayload), 0);
@@ -3337,6 +3426,12 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           <span key={index} />
         ))}
       </div>
+
+      {!areGameplayAssetsReady ? (
+        <div className="gameplay-asset-preload" role="status" aria-live="polite">
+          <span>{t('loading')}</span>
+        </div>
+      ) : null}
 
       {gameError ? <div className="gameplay-error" role="alert">{gameError}</div> : null}
       {shouldShowSyncWarning ? (

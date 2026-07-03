@@ -5,6 +5,7 @@ import { getProfile, normalizeProfileStats, updateProfile } from '../services/pr
 import { claimAchievement, getAchievements } from '../services/achievementsService.js';
 import { getStoredAuthUser, logout } from '../services/authService.js';
 import { useLanguage } from '../i18n/useLanguage.js';
+import { handleProfileAvatarError, resolveProfileAvatarSrc } from '../utils/avatarAssets.js';
 
 const asset = (name) => `/assets/profile/${name}`;
 const DEFAULT_PROFILE_AVATAR = 'ICO.png';
@@ -380,20 +381,7 @@ function getProfileAvatarFile(value) {
 
 function getAvatarSrc(profile) {
   const avatar = getProfileAvatarFile(profile?.avatarUrl || profile?.imageUrl || profile?.avatar || profile?.avatarId);
-
-  if (!avatar) {
-    return asset(DEFAULT_PROFILE_AVATAR);
-  }
-
-  if (/^(https?:)?\/\//i.test(avatar) || avatar.startsWith('/')) {
-    return avatar;
-  }
-
-  if (/\.(png|jpe?g|webp|gif|svg)$/i.test(avatar)) {
-    return asset(avatar);
-  }
-
-  return asset(DEFAULT_PROFILE_AVATAR);
+  return resolveProfileAvatarSrc(avatar, 'stevie');
 }
 
 function normalizeProfileTitle(title) {
@@ -497,7 +485,7 @@ function AvatarPickerPanel({ activeAvatar, onClose, onSelect, t }) {
                 type="button"
                 onClick={() => onSelect(option)}
               >
-                <img src={asset(option.file)} alt={option.label} />
+                <img src={resolveProfileAvatarSrc(option.id)} alt={option.label} onError={(event) => handleProfileAvatarError(event)} />
                 <span>{option.label}</span>
                 {isActive ? <strong>{t('selectedAvatar')}</strong> : null}
               </button>
@@ -787,7 +775,7 @@ export default function ProfilePage() {
         <header className="profile-header">
           <div className="profile-identity">
             <button className="profile-avatar-button" type="button" onClick={() => setIsAvatarPickerOpen(true)} aria-label={t('chooseAvatar')}>
-              <img className="profile-avatar" src={getAvatarSrc(profile)} alt={`${getDisplayName(profile)} avatar`} />
+              <img className="profile-avatar" src={getAvatarSrc(profile)} alt={`${getDisplayName(profile)} avatar`} onError={(event) => handleProfileAvatarError(event)} />
               <span className="profile-avatar-edit-badge">✎</span>
             </button>
             <div className="profile-name-block">

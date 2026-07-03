@@ -9,22 +9,11 @@ function normalizeAuthUser(response) {
     return null;
   }
 
-  // Keep the auth user small, but do not force backend avatar values into the UI
-  // unless they are real image URLs or filenames. Invalid avatar IDs were breaking
-  // the profile image by producing paths like /assets/profile/default.
-  const avatarValue = user.avatarUrl || user.imageUrl || user.avatar || user.avatarId;
-  const hasUsableAvatar = typeof avatarValue === 'string' && (
-    /^(https?:)?\/\//i.test(avatarValue.trim()) ||
-    avatarValue.trim().startsWith('/') ||
-    /\.(png|jpe?g|webp|gif|svg)$/i.test(avatarValue.trim())
-  );
-
-  if (hasUsableAvatar) {
-    return user;
-  }
-
-  const { avatar, avatarId, avatarUrl, imageUrl, ...restUser } = user;
-  return restUser;
+  // Keep avatarId/avatar/avatarUrl on the cached auth user. The gameplay/profile
+  // renderers now resolve unsupported backend avatar ids to a safe local fallback,
+  // so dropping avatarId here would make the selected profile avatar disappear
+  // when entering a live socket game.
+  return user;
 }
 
 function persistAuthUser(user) {

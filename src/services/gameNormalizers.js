@@ -55,9 +55,13 @@ export function normalizePlayer(player = {}, index = 0) {
     id: getPlayerId(player),
     userId: player.userId || player.id || player.playerId || player._id || player.uid || '',
     name: getBackendPlayerName(player),
-    username: player.username || getBackendPlayerName(player),
+    username: player.username || player.displayName || player.name || getBackendPlayerName(player),
+    displayName: player.displayName || player.username || player.name || getBackendPlayerName(player),
     avatar: player.avatar || player.avatarUrl || player.avatarId || player.imageUrl || player.icon || null,
+    avatarId: player.avatarId || player.avatar || player.avatarUrl || player.imageUrl || player.icon || null,
     title: player.title || player.rankTitle || player.profileTitle || '',
+    isBot: Boolean(player.isBot),
+    botIndex: player.botIndex || null,
     coins: score,
     score,
     position: normalizeLayoutPosition(player.position) || fallbackPositions[index] || 'bottom',
@@ -387,9 +391,18 @@ function normalizeScoreValue(value, fallback = 0) {
 
 export function normalizeResultPlayer(player = {}, index = 0, winnerId = null) {
   const id = normalizeId(player.id || player.userId || player.playerId || player._id || `result_player_${index + 1}`);
-  const score = normalizeScoreValue(
-    player.scoreDelta ?? player.delta ?? player.pointsDelta ?? player.payout ?? player.reward ?? player.score,
-    index === 0 ? 0 : 0
+  const coinDelta = normalizeScoreValue(
+    player.coinDelta
+      ?? player.coinChange
+      ?? player.coinsDelta
+      ?? player.moneyDelta
+      ?? player.scoreDelta
+      ?? player.delta
+      ?? player.pointsDelta
+      ?? player.payout
+      ?? player.reward
+      ?? player.score,
+    0
   );
   const totalScore = player.totalScore ?? player.finalScore ?? player.points ?? player.balance ?? player.scoreTotal;
 
@@ -399,12 +412,18 @@ export function normalizeResultPlayer(player = {}, index = 0, winnerId = null) {
     userId: player.userId || id,
     name: getBackendPlayerName(player) || (winnerId && id === normalizeId(winnerId) ? 'Winner' : 'Unknown player'),
     avatar: player.avatar || player.avatarUrl || player.avatarId || player.imageUrl || player.icon || player.resultAvatar || null,
+    avatarId: player.avatarId || player.avatar || player.avatarUrl || player.imageUrl || player.icon || player.resultAvatar || null,
     title: player.title || player.rankTitle || '',
-    score,
-    scoreDelta: score,
-    payout: player.payout ?? score,
+    coinDelta,
+    coinChange: player.coinChange ?? coinDelta,
+    coinsDelta: player.coinsDelta ?? coinDelta,
+    score: coinDelta,
+    scoreDelta: coinDelta,
+    payout: player.payout ?? coinDelta,
     totalScore,
     finalScore: player.finalScore ?? totalScore,
+    roundStats: player.roundStats || player.stats || {},
+    summaryRows: player.summaryRows || [],
     isWinner: Boolean(player.isWinner ?? player.winner ?? (winnerId && id === normalizeId(winnerId))),
   };
 }
@@ -432,7 +451,10 @@ function normalizeSummaryRows(result = {}) {
 }
 
 function buildResultPlayersFromMaps(result = {}, winnerId = null) {
-  const payouts = result.payouts && typeof result.payouts === 'object' ? result.payouts : {};
+  const coinPayouts = (result.coinPayouts || result.coinDeltas || result.moneyDeltas) && typeof (result.coinPayouts || result.coinDeltas || result.moneyDeltas) === 'object'
+    ? (result.coinPayouts || result.coinDeltas || result.moneyDeltas)
+    : null;
+  const payouts = coinPayouts || (result.payouts && typeof result.payouts === 'object' ? result.payouts : {});
   const finalScores = result.finalScores && typeof result.finalScores === 'object' ? result.finalScores : {};
   const sourcePlayers = toArray(result.players || result.results || result.standings || result.scoreboard || result.participants || result.room?.players || result.gameState?.players);
   const ids = Array.from(new Set([
@@ -444,14 +466,18 @@ function buildResultPlayersFromMaps(result = {}, winnerId = null) {
 
   if (!ids.length) return [];
 
-  return ids.map((id, index) => {
+  return ids.map((id) => {
     const existing = sourcePlayers.find((player) => [player.id, player.userId, player.playerId, player._id].map(normalizeId).includes(id)) || {};
+    const coinDelta = payouts[id] ?? existing.coinDelta ?? existing.coinChange ?? existing.coinsDelta ?? existing.scoreDelta ?? existing.delta;
     return {
       ...existing,
       id,
       userId: existing.userId || id,
-      scoreDelta: payouts[id] ?? existing.scoreDelta ?? existing.delta,
-      payout: payouts[id] ?? existing.payout,
+      coinDelta,
+      coinChange: existing.coinChange ?? coinDelta,
+      coinsDelta: existing.coinsDelta ?? coinDelta,
+      scoreDelta: coinDelta,
+      payout: payouts[id] ?? existing.payout ?? coinDelta,
       totalScore: finalScores[id] ?? existing.totalScore ?? existing.finalScore,
       finalScore: finalScores[id] ?? existing.finalScore ?? existing.totalScore,
       isWinner: normalizeId(winnerId) === id || existing.isWinner || existing.winner,
@@ -465,21 +491,29 @@ export function normalizeGameResult(response = {}) {
     ? safeResponse.result
     : safeResponse.gameResult || safeResponse.roundResult || safeResponse.data || safeResponse;
   const winnerId = result.winnerId || result.winner?.id || result.winner?.userId || safeResponse.winnerId;
+  const myPlayerId = normalizeId(result.myPlayerId || result.selfPlayerId || safeResponse.myPlayerId || safeResponse.selfPlayerId);
+  const playerSummaries = result.playerSummaries || result.roundSummary?.playerStats || {};
   const playerList = buildResultPlayersFromMaps(result, winnerId);
   const players = Array.isArray(playerList)
     ? playerList.map((player, index) => normalizeResultPlayer(player, index, winnerId))
     : [];
   const normalizedWinner = result.winner && typeof result.winner === 'object'
     ? normalizeResultPlayer(result.winner, 0, winnerId)
-    : players.find((player) => player.isWinner || normalizeId(player.id) === normalizeId(winnerId)) || players[0] || null;
+    : players.find((player) => player.isWinner || normalizeId(player.id) === normalizeId(winnerId)) || null;
+  const myPlayer = myPlayerId ? players.find((player) => normalizeId(player.id) === myPlayerId || normalizeId(player.userId) === myPlayerId) : null;
   const resultType = typeof result.result === 'string'
     ? result.result
-    : result.outcome || result.status || safeResponse.status || (normalizedWinner ? 'win' : '');
-  const totalScore = result.totalScore
-    ?? result.score
-    ?? result.finalScore
-    ?? (normalizedWinner ? (normalizedWinner.score ?? normalizedWinner.scoreDelta ?? normalizedWinner.payout) : undefined)
-    ?? result.rewards?.coins;
+    : result.outcome || result.status || safeResponse.status || (normalizedWinner ? 'win' : 'draw');
+  const totalScore = result.totalCoins
+    ?? result.totalScore
+    ?? myPlayer?.coinDelta
+    ?? myPlayer?.scoreDelta
+    ?? result.rewards?.coins
+    ?? normalizedWinner?.coinDelta;
+  const ownSummaryRows = myPlayerId && playerSummaries?.[myPlayerId]?.summaryRows
+    ? playerSummaries[myPlayerId].summaryRows
+    : myPlayer?.summaryRows;
+  const summaryRows = ownSummaryRows && ownSummaryRows.length ? ownSummaryRows : normalizeSummaryRows(result);
 
   return {
     ...result,
@@ -492,6 +526,8 @@ export function normalizeGameResult(response = {}) {
     reason: result.reason || safeResponse.reason,
     title: result.title || result.heading || (result.reason === 'forfeit' ? 'Won by forfeit' : undefined),
     titleKey: result.titleKey,
+    myPlayerId,
+    selfPlayerId: result.selfPlayerId || result.myPlayerId || safeResponse.selfPlayerId || safeResponse.myPlayerId,
     winnerId,
     winner: normalizedWinner,
     players,
@@ -500,10 +536,14 @@ export function normalizeGameResult(response = {}) {
     yaku: result.yaku || result.fan || [],
     han: result.han ?? result.totalFan,
     isTsumo: result.isTsumo,
-    payouts: result.payouts || {},
+    payouts: result.coinPayouts || result.coinDeltas || result.payouts || {},
+    coinPayouts: result.coinPayouts || result.coinDeltas || result.payouts || {},
+    currency: result.currency || 'coins',
     finalScores: result.finalScores || {},
-    summaryRows: normalizeSummaryRows(result),
+    playerSummaries,
+    summaryRows,
     rewards: result.rewards || result.reward || safeResponse.rewards || {},
     totalScore,
+    totalCoins: totalScore,
   };
 }
