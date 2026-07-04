@@ -2042,7 +2042,14 @@ function DealerRollOverlay({ state = {}, players = [], t }) {
   const status = String(state.status || '').toLowerCase();
   const reveal = state.dealerRollReveal || {};
   const phase = String(state.dealerRollPhase || reveal.phase || '').toLowerCase();
-  const isVisible = rows.length > 0 && (status === 'dealing' || phase === 'dealer_roll');
+  const revealEndsAt = Number(state.dealerRollEndsAt || reveal.endsAt || 0) || 0;
+  const revealStartedAt = Number(state.dealerRollStartedAt || reveal.startedAt || 0) || 0;
+  const revealDurationMs = Number(state.dealerRollRevealMs || reveal.revealDurationMs || 10000) || 10000;
+  const fallbackEndsAt = revealStartedAt ? revealStartedAt + revealDurationMs : 0;
+  const effectiveEndsAt = revealEndsAt || fallbackEndsAt;
+  const hasRevealExpired = effectiveEndsAt ? Date.now() >= effectiveEndsAt : false;
+  const isComplete = phase === 'complete' || phase === 'completed';
+  const isVisible = rows.length > 0 && !isComplete && !hasRevealExpired && (status === 'dealing' || phase === 'dealer_roll');
 
   if (!isVisible) return null;
 
@@ -2686,7 +2693,7 @@ function normalizeInitialSocketState(payload = {}, fallbackMatchId = '') {
     playableBonusTiles: payload.playableBonusTiles || normalized.playableBonusTiles || [],
     dealerRolls: payload.dealerRolls || normalized.dealerRolls || payload.dealerRollReveal?.dealerRolls || [],
     dealerRollReveal: payload.dealerRollReveal || normalized.dealerRollReveal || null,
-    dealerRollRevealMs: payload.dealerRollRevealMs || payload.dealerRollReveal?.revealDurationMs || normalized.dealerRollRevealMs || 3000,
+    dealerRollRevealMs: payload.dealerRollRevealMs || payload.dealerRollReveal?.revealDurationMs || normalized.dealerRollRevealMs || 10000,
     dealerRollStartedAt: payload.dealerRollStartedAt || payload.dealerRollReveal?.startedAt || normalized.dealerRollStartedAt || null,
     dealerRollEndsAt: payload.dealerRollEndsAt || payload.dealerRollReveal?.endsAt || normalized.dealerRollEndsAt || null,
     dealerRollPhase: payload.dealerRollPhase || payload.dealerRollReveal?.phase || normalized.dealerRollPhase || null,
@@ -2878,21 +2885,33 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           setGameError('');
           break;
         case 'dealer_roll':
-          setGameState((current) => ({
-            ...(current || EMPTY_SOCKET_GAME_STATE),
-            status: String(current?.status || '').toLowerCase() === 'playing' ? current.status : 'DEALING',
-            dealerRollReveal: payload,
-            dealerRolls: payload.dealerRolls || current?.dealerRolls || [],
-            dealerUserId: payload.dealerUserId || current?.dealerUserId,
-            dealerSelectionMethod: payload.dealerSelectionMethod || current?.dealerSelectionMethod,
-            dealerRollRevealMs: payload.revealDurationMs || current?.dealerRollRevealMs || 3000,
-            dealerRollStartedAt: payload.startedAt || current?.dealerRollStartedAt || null,
-            dealerRollEndsAt: payload.endsAt || current?.dealerRollEndsAt || null,
-            dealerRollPhase: payload.phase || 'DEALER_ROLL',
-            seatOrder: payload.seatOrder || current?.seatOrder || [],
-            turnOrderPositions: payload.turnOrderPositions || current?.turnOrderPositions || [],
-            rotation: payload.rotation || current?.rotation || 'bottom_top_left',
-          }));
+          setGameState((current) => {
+            const now = Date.now();
+            const payloadEndsAt = Number(payload.endsAt || 0) || 0;
+            const currentIsPlaying = String(current?.status || '').toLowerCase() === 'playing';
+
+            // Stale dealer-roll events can arrive after reconnect/navigation.
+            // Never let them reopen the overlay or rewind a live game.
+            if (currentIsPlaying && payloadEndsAt && payloadEndsAt <= now) {
+              return current || EMPTY_SOCKET_GAME_STATE;
+            }
+
+            return {
+              ...(current || EMPTY_SOCKET_GAME_STATE),
+              status: currentIsPlaying ? current.status : 'DEALING',
+              dealerRollReveal: payload,
+              dealerRolls: payload.dealerRolls || current?.dealerRolls || [],
+              dealerUserId: payload.dealerUserId || current?.dealerUserId,
+              dealerSelectionMethod: payload.dealerSelectionMethod || current?.dealerSelectionMethod,
+              dealerRollRevealMs: payload.revealDurationMs || current?.dealerRollRevealMs || 10000,
+              dealerRollStartedAt: payload.startedAt || current?.dealerRollStartedAt || null,
+              dealerRollEndsAt: payload.endsAt || current?.dealerRollEndsAt || null,
+              dealerRollPhase: payload.phase || 'DEALER_ROLL',
+              seatOrder: payload.seatOrder || current?.seatOrder || [],
+              turnOrderPositions: payload.turnOrderPositions || current?.turnOrderPositions || [],
+              rotation: payload.rotation || current?.rotation || 'bottom_top_left',
+            };
+          });
           setGameError('');
           break;
         case 'turn_changed':
