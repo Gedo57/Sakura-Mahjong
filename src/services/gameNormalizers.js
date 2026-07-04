@@ -30,6 +30,27 @@ function getPrivateHandTilesFromPlayers(players = []) {
 
 const MALAYSIAN_DISABLED_ACTIONS = new Set(['riichi']);
 
+const normalizeSeat = (value) => {
+  const seat = String(value || '').trim().toLowerCase();
+  const aliases = { east: 'e', south: 's', west: 'w' };
+  return aliases[seat] || seat;
+};
+
+const ABSOLUTE_SEAT_POSITIONS = {
+  e: 'bottom',
+  s: 'top',
+  w: 'left',
+};
+
+const ABSOLUTE_POSITION_ORDER = ['bottom', 'top', 'left'];
+
+const getAbsoluteSeatPosition = (seat) => ABSOLUTE_SEAT_POSITIONS[normalizeSeat(seat)] || '';
+
+const getAbsoluteSeatIndexPosition = (seatIndex) => {
+  const index = Number(seatIndex);
+  return Number.isFinite(index) ? (ABSOLUTE_POSITION_ORDER[index] || '') : '';
+};
+
 const normalizeLayoutPosition = (value) => {
   const position = String(value || '').toLowerCase();
   if (position === 'self' || position === 'me' || position === 'mine') return 'bottom';
@@ -64,7 +85,11 @@ export function normalizePlayer(player = {}, index = 0) {
     botIndex: player.botIndex || null,
     coins: score,
     score,
-    position: normalizeLayoutPosition(player.position) || fallbackPositions[index] || 'bottom',
+    position: getAbsoluteSeatPosition(player.seat || player.seatWind || player.wind || player.seatLabel)
+      || getAbsoluteSeatIndexPosition(player.seatIndex)
+      || normalizeLayoutPosition(player.position)
+      || fallbackPositions[index]
+      || 'bottom',
     ready: Boolean(player.ready ?? player.isReady ?? true),
     seat: player.seat,
     seatLabel: player.seatLabel || player.seatName || player.seatTitle || '',

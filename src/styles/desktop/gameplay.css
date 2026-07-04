@@ -2475,8 +2475,8 @@ animation: none;
 .app-shell[data-device='desktop'] .gameplay-bonus-rack--bottom .gameplay-bonus-rack-body {
   grid-template-columns: repeat(4, 30px) !important;
   grid-auto-rows: 47px !important;
-  max-width: 132px !important;
-  max-height: 47px !important;
+  max-width: 142px !important;
+  max-height: 57px !important;
 }
 
 .app-shell[data-device='desktop'] .gameplay-bonus-rack--left .gameplay-bonus-rack-body {
@@ -2583,7 +2583,7 @@ animation: none;
   --gp-hand-tile-w: 36.4px;
   --gp-hand-tile-h: 58.8px;
   --gp-rack-tile-w: 30px;
-  --gp-rack-tile-h: 47px;
+  --gp-rack-tile-h: 50px;
 }
 
 .app-shell[data-device='desktop'] .gameplay-room-title {
@@ -3011,7 +3011,7 @@ animation: none;
 .app-shell[data-device='desktop'] .gameplay-bonus-rack--top .gameplay-bonus-rack-body,
 .app-shell[data-device='desktop'] .gameplay-bonus-rack--bottom .gameplay-bonus-rack-body {
   grid-template-columns: repeat(4, var(--gp-rack-tile-w)) !important;
-  max-width: 132px !important;
+  max-width: 152px !important;
   max-height: var(--gp-rack-tile-h) !important;
 }
 
@@ -3032,7 +3032,7 @@ animation: none;
 }
 
 .app-shell[data-device='desktop'] .gameplay-bonus-rack--left {
-  left: 11.5% !important;
+  left: 4.5% !important;
   right: auto !important;
   top: 40% !important;
   bottom: auto !important;
@@ -3047,9 +3047,9 @@ animation: none;
 }
 
 .app-shell[data-device='desktop'] .gameplay-bonus-rack--bottom {
-  right: 84.5% !important;
+  right: 79.5% !important;
   left: auto !important;
-  bottom: 20% !important;
+  bottom: 22% !important;
   top: auto !important;
   transform: scale(1) !important;
   transform-origin: bottom right !important;
@@ -3099,7 +3099,7 @@ animation: none;
 
 .app-shell[data-device='desktop'] .gameplay-meld-rack--left {
   top: 35% !important;
-  left: 20% !important;
+  left: 16% !important;
   right: auto !important;
   bottom: auto !important;
   flex-direction: column !important;
@@ -3179,9 +3179,9 @@ animation: none;
 /* Patch 8 — dealer roll visual reveal */
 .app-shell[data-device='desktop'] .gameplay-dealer-chip {
   position: absolute;
-  right: 8px;
-  top: -11px;
-  z-index: 2;
+  right: 2222222px;
+  top: 12px;
+  z-index: 222;
   padding: 3px 8px;
   border-radius: 999px;
   border: 1px solid rgba(255, 218, 93, .9);

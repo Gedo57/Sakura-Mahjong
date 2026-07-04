@@ -237,35 +237,20 @@ const seatPlayersForGameplay = (sourcePlayers, expectedPlayerCount = 3, currentI
 
   if (!normalizedPlayers.length) return [];
 
-  const playersWithPosition = normalizedPlayers.map((player) => {
-    const seatPosition = player.seat && currentSeat
-      ? getRelativeSeatPosition(player.seat, currentSeat, expectedPlayerCount)
-      : '';
-    const requestedPosition = normalizePosition(player.position);
-    const isCurrent = player.isCurrentPlayer || player.isMe || player.isSelf || playerMatchesAnyId(player, currentIds);
-
-    return {
-      ...player,
-      position: isCurrent ? 'bottom' : (seatPosition || requestedPosition || ''),
-    };
+  // Patch 10: table seats are fixed by dealer-roll rank, not by the local user.
+  // East / highest dice is always bottom, South / second is top, West / third is left.
+  const sortedPlayers = [...normalizedPlayers].sort((a, b) => {
+    const aIndex = getAbsoluteSeatSortIndex(a);
+    const bIndex = getAbsoluteSeatSortIndex(b);
+    if (aIndex !== bIndex) return aIndex - bIndex;
+    return normalizedPlayers.indexOf(a) - normalizedPlayers.indexOf(b);
   });
 
-  let currentIndex = playersWithPosition.findIndex((player) => player.isCurrentPlayer || player.isMe || player.isSelf || playerMatchesAnyId(player, currentIds));
-
-  if (currentIndex === -1) {
-    currentIndex = playersWithPosition.findIndex((player) => player.position === 'bottom');
-  }
-
-  if (currentIndex > 0) {
-    const [currentPlayer] = playersWithPosition.splice(currentIndex, 1);
-    playersWithPosition.unshift({ ...currentPlayer, position: 'bottom' });
-  } else if (currentIndex === 0) {
-    playersWithPosition[0] = { ...playersWithPosition[0], position: 'bottom' };
-  }
-
   const usedPositions = new Set();
-  return playersWithPosition.map((player, index) => {
-    let position = normalizePosition(player.position);
+  return sortedPlayers.map((player, index) => {
+    const absolutePosition = getAbsolutePositionForPlayer(player);
+    const requestedPosition = normalizePosition(player.position);
+    let position = absolutePosition || requestedPosition;
 
     if (!position || usedPositions.has(position) || !allowedPositions.includes(position)) {
       position = allowedPositions.find((candidate) => !usedPositions.has(candidate)) || allowedPositions[index] || 'top';
@@ -1747,12 +1732,15 @@ const resolveActiveTurnPosition = ({ state, players, locationState, storedMatch,
     if (activePlayer?.position) return activePlayer.position;
 
     const currentIds = getCurrentPlayerIdCandidates(state, locationState, storedMatch);
-    if (activeIds.some((id) => currentIds.includes(id))) return 'bottom';
+    if (activeIds.some((id) => currentIds.includes(id))) {
+      const currentSeat = getCurrentPlayerSeat(state, locationState, storedMatch);
+      return getSeatPosition(currentSeat, state) || activePlayer?.position || '';
+    }
   }
 
   const currentSeat = getCurrentPlayerSeat(state, locationState, storedMatch);
-  if (currentSeat && activeSeat && String(currentSeat).toLowerCase() === String(activeSeat).toLowerCase()) {
-    return 'bottom';
+  if (currentSeat && activeSeat && normalizeSeat(currentSeat) === normalizeSeat(activeSeat)) {
+    return getSeatPosition(currentSeat, state);
   }
 
   return useMockFallback ? 'bottom' : '';
@@ -2025,7 +2013,7 @@ const getDealerRollRows = (state = {}, players = []) => {
       key: rollUserId || `${seatLabel || 'seat'}_${index}`,
       userId: rollUserId,
       name: player.name || player.username || roll.username || `Player ${index + 1}`,
-      position: normalizePosition(player.position) || getSeatPosition(roll.seatWind || player.seat, state) || '',
+      position: getSeatPosition(roll.seatWind || player.seat, state) || normalizePosition(player.position) || '',
       seatLabel,
       isDealer: Boolean(roll.isDealer || player.isDealer || rollUserId === normalizeId(state.dealerUserId || reveal.dealerUserId)),
       dice,
@@ -2098,6 +2086,39 @@ function normalizeSeat(value) {
   return aliases[seat] || seat;
 }
 
+const ABSOLUTE_SEAT_POSITIONS = {
+  e: 'bottom',
+  s: 'top',
+  w: 'left',
+};
+
+const ABSOLUTE_POSITION_ORDER = ['bottom', 'top', 'left'];
+
+function getAbsoluteSeatPosition(seat) {
+  return ABSOLUTE_SEAT_POSITIONS[normalizeSeat(seat)] || '';
+}
+
+function getAbsoluteSeatIndexPosition(seatIndex) {
+  const index = Number(seatIndex);
+  return Number.isFinite(index) ? (ABSOLUTE_POSITION_ORDER[index] || '') : '';
+}
+
+function getAbsolutePositionForPlayer(player = {}) {
+  return getAbsoluteSeatPosition(player.seat || player.seatWind || player.wind || player.seatLabel)
+    || getAbsoluteSeatIndexPosition(player.seatIndex);
+}
+
+function getAbsoluteSeatSortIndex(player = {}) {
+  const position = getAbsolutePositionForPlayer(player);
+  const positionIndex = ABSOLUTE_POSITION_ORDER.indexOf(position);
+  if (positionIndex >= 0) return positionIndex;
+
+  const seatIndex = Number(player.seatIndex);
+  if (Number.isFinite(seatIndex)) return seatIndex;
+
+  return 99;
+}
+
 function getRelativeSeatPosition(activeSeat, ownSeat, playerCount = 3) {
   const active = normalizeSeat(activeSeat);
   const own = normalizeSeat(ownSeat);
@@ -2123,20 +2144,15 @@ function getRelativeSeatPosition(activeSeat, ownSeat, playerCount = 3) {
 function getSeatPosition(seat, state = {}) {
   if (!seat) return '';
 
-  // Always prefer the relative seat calculation based on mySeat.
-  // This gives each client a DIFFERENT perspective (the whole point).
-  // Do NOT use player.position from state.players — those positions are
-  // assigned by array index during normalization and are the SAME on all clients.
-  const ownSeat = state.mySeat || state.seat || state.currentPlayerSeat || state.selfSeat;
-  if (ownSeat) {
-    const playerCount = getExpectedGameplayPlayerCount(state);
-    const relative = getRelativeSeatPosition(seat, ownSeat, playerCount);
-    if (relative) return relative;
-  }
+  const absolutePosition = getAbsoluteSeatPosition(seat);
+  if (absolutePosition) return absolutePosition;
 
-  // Fallback: check rendered player objects (only if mySeat is unknown)
+  const seatOrderEntry = toArray(state.seatOrder).find((entry) => normalizeSeat(entry.seatWind || entry.seat || entry.wind) === normalizeSeat(seat));
+  const seatOrderPosition = normalizePosition(seatOrderEntry?.turnPosition || seatOrderEntry?.position);
+  if (seatOrderPosition) return seatOrderPosition;
+
   const playerWithSeat = toArray(state.players).find((player) => normalizeSeat(player.seat) === normalizeSeat(seat));
-  if (playerWithSeat?.position) return playerWithSeat.position;
+  if (playerWithSeat?.position) return normalizePosition(playerWithSeat.position);
 
   return '';
 }
@@ -3078,8 +3094,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
 
     return seatPlayersForGameplay(sourcePlayers, expectedPlayerCount, currentPlayerIds, currentPlayerSeat)
       .map((player) => {
-        const isCurrentPlayer = player.position === 'bottom'
-          || player.isCurrentPlayer
+        const isCurrentPlayer = player.isCurrentPlayer
           || player.isMe
           || player.isSelf
           || playerMatchesAnyId(player, currentPlayerIds);
@@ -3117,12 +3132,19 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     storedMatch,
     useMockFallback: gameApiAvailable || isMockGameplay,
   });
-  const isUserTurn = activeTurnPosition === 'bottom';
+  const localPlayer = players.find((player) => player.isCurrentPlayer || player.isMe || player.isSelf || playerMatchesAnyId(player, currentPlayerIds)) || null;
+  const localPlayerPosition = localPlayer?.position || getSeatPosition(currentPlayerSeat, gameState) || '';
+  const activeTurnIds = getEntityIds({
+    id: gameState.currentTurnPlayerId || gameState.turnPlayerId || gameState.activeUserId || gameState.activePlayerId || gameState.turn?.playerId || gameState.turn?.userId,
+  });
+  const isUserTurn = activeTurnIds.length
+    ? activeTurnIds.some((id) => currentPlayerIds.includes(id))
+    : Boolean(localPlayerPosition && activeTurnPosition === localPlayerPosition);
   const activeTurnName = activeTurnPosition === 'top'
     ? (topPlayer?.name === 'BUNBUN' ? 'Bunbun' : topPlayer?.name || 'Waiting')
     : activeTurnPosition === 'left'
       ? (sidePlayer?.name || 'Waiting')
-      : 'Your';
+      : (bottomPlayer?.name || 'Waiting');
   const activeTurnLabel = activeTurnPosition
     ? (isUserTurn ? t('yourTurn') : `${activeTurnName}${t('turnSuffix')}`)
     : t('pleaseWaitMatch');
