@@ -14,9 +14,40 @@ export async function getFeaturedRooms() {
 }
 
 export async function getRooms() {
-  // The current API reference only exposes GET /rooms/tiers.
-  // Room list UI should use real backend tiers until a public rooms endpoint exists.
-  return getRoomTiers();
+  return getPublicRooms();
+}
+
+function normalizePublicRoom(room = {}) {
+  const entryFee = room.entryFee || { amount: room.entryFeeAmount || 0, currency: room.currency || 'coins' };
+  const roomCode = room.roomCode || room.code || '';
+  const roomId = room.roomId || room.id || roomCode;
+
+  return {
+    ...room,
+    id: roomId,
+    roomId,
+    code: roomCode,
+    roomCode,
+    name: room.roomName || room.name || room.tierName || 'Sakura Room',
+    roomName: room.roomName || room.name || room.tierName || 'Sakura Room',
+    tierName: room.tierName || room.name || room.tierId || '',
+    players: room.players || [],
+    playerCount: Number(room.playerCount ?? room.playersCount ?? room.players?.length ?? 0) || 0,
+    playersCount: Number(room.playersCount ?? room.playerCount ?? room.players?.length ?? 0) || 0,
+    maxPlayers: Number(room.maxPlayers || 3) || 3,
+    status: room.status || 'waiting',
+    visibility: room.visibility || 'public',
+    entryFee,
+    entryFeeAmount: entryFee.amount ?? room.entryFeeAmount ?? 0,
+    currency: entryFee.currency || room.currency || 'coins',
+    prizePool: room.prizePool ?? 0,
+  };
+}
+
+export async function getPublicRooms() {
+  const response = await apiRequest('/rooms/public');
+  const rawRooms = response?.rooms || response?.data?.rooms || response || [];
+  return Array.isArray(rawRooms) ? rawRooms.map(normalizePublicRoom) : [];
 }
 
 export async function createPrivateRoom(payload = {}) {
@@ -32,14 +63,20 @@ export async function createPrivateRoom(payload = {}) {
     || payload.type === 'solo'
   );
 
+  const visibility = String(payload.visibility || payload.roomVisibility || payload.type || payload.mode || 'private').toLowerCase() === 'public'
+    ? 'public'
+    : 'private';
+
   const requestPayload = {
     tierId,
     maxPlayers: 3,
     roomName: payload.roomName || payload.name || '',
+    visibility: enableBots ? 'private' : visibility,
+    roomVisibility: enableBots ? 'private' : visibility,
     enableBots,
     botsEnabled: enableBots,
-    mode: enableBots ? 'solo' : (payload.mode || 'private'),
-    type: enableBots ? 'solo' : (payload.type || 'private'),
+    mode: enableBots ? 'solo' : visibility,
+    type: enableBots ? 'solo' : visibility,
   };
 
   const response = await apiRequest('/rooms/private', {

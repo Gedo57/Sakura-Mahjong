@@ -299,11 +299,11 @@ html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='
 }
 
 html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .join-room-row {
-  min-height: 74px !important;
-  grid-template-columns: 80px minmax(0, 1fr) 74px !important;
+  min-height: 82px !important;
+  grid-template-columns: 82px minmax(0, 1fr) 76px !important;
   grid-template-areas:
     'status title count'
-    'status action action' !important;
+    'status fee action' !important;
   gap: 6px 12px !important;
   padding: 10px 14px !important;
   border-radius: 14px !important;
@@ -311,7 +311,8 @@ html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='
 
 html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .join-room-row strong { grid-area: status !important; }
 html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .join-room-row span { grid-area: title !important; }
-html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .join-room-row em { grid-area: count !important; }
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .join-room-row em:nth-of-type(1) { grid-area: count !important; }
+html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .join-room-row em:nth-of-type(2) { grid-area: fee !important; }
 html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .join-room-row button { grid-area: action !important; }
 
 html[data-device='mobile'][data-orientation='portrait'] .app-shell[data-device='mobile'] .join-room-row strong,

@@ -43,6 +43,7 @@ export default function PrivateLobbyPage() {
   const roomCodeRef = useRef(ctx.roomCode || '');
   const isHostRef = useRef(Boolean(ctx.isHost));
   const isSoloRef = useRef(isSoloPayload(ctx));
+  const visibilityRef = useRef(ctx.visibility || ctx.mode || ctx.type || 'private');
   const maxPlayersRef = useRef(3);
 
   const [roomId, setRoomId] = useState(roomIdRef.current);
@@ -50,6 +51,7 @@ export default function PrivateLobbyPage() {
   const [isHost, setIsHost] = useState(isHostRef.current);
   const [isSoloRoom, setIsSoloRoom] = useState(isSoloRef.current);
   const [botCount, setBotCount] = useState(Number(ctx.botCount || (isSoloRef.current ? 2 : 0)));
+  const [roomVisibility, setRoomVisibility] = useState(visibilityRef.current);
   const [maxPlayers, setMaxPlayers] = useState(maxPlayersRef.current);
   const [players, setPlayers] = useState(Array.isArray(ctx.players) ? ctx.players : []);
   const [status, setStatus] = useState('connecting');
@@ -74,6 +76,12 @@ export default function PrivateLobbyPage() {
       if (payload.maxPlayers) {
         maxPlayersRef.current = 3;
         setMaxPlayers(3);
+      }
+
+      if (payload.visibility || payload.mode || payload.type) {
+        const nextVisibility = payload.visibility || payload.mode || payload.type || 'private';
+        visibilityRef.current = nextVisibility;
+        setRoomVisibility(nextVisibility);
       }
 
       const payloadIsSolo = isSoloPayload(payload);
@@ -291,7 +299,7 @@ export default function PrivateLobbyPage() {
           <div className="lobby-room-meta">
             <span>{maxPlayers} Players</span>
             <span className="lobby-meta-divider">•</span>
-            <span>{isSoloRoom ? t('solo') : 'Private'}</span>
+            <span>{isSoloRoom ? t('solo') : roomVisibility === 'public' ? t('public') : t('private')}</span>
             {isSoloRoom && (
               <>
                 <span className="lobby-meta-divider">•</span>

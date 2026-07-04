@@ -72,6 +72,7 @@ export default function CreateRoomPage() {
 
   const handleBotModeChange = (nextValue) => {
     setEnableBots(nextValue);
+    if (nextValue) setRoomType('Private');
     setCreatedRoom(null);
     setRoomCode('');
     setSuccessMessage('');
@@ -81,6 +82,7 @@ export default function CreateRoomPage() {
   const bet = selectedTier?.entryFee?.amount ?? 100;
   const formattedBet = useMemo(() => Number(bet || 0).toLocaleString('en-US'), [bet]);
   const isSoloMode = Boolean(enableBots);
+  const roomVisibility = roomType === 'Public' && !isSoloMode ? 'public' : 'private';
   const previewRoomType = isSoloMode ? t('solo') : tx(roomType);
 
   const handleCreateRoom = async () => {
@@ -99,10 +101,12 @@ export default function CreateRoomPage() {
         tierId,
         roomName,
         maxPlayers: requestedMaxPlayers,
+        visibility: roomVisibility,
+        roomVisibility,
         enableBots: isSoloMode,
         botsEnabled: isSoloMode,
-        mode: isSoloMode ? 'solo' : 'private',
-        type: isSoloMode ? 'solo' : 'private',
+        mode: isSoloMode ? 'solo' : roomVisibility,
+        type: isSoloMode ? 'solo' : roomVisibility,
       });
 
       const nextRoomCode = room.roomCode || '';
@@ -114,10 +118,12 @@ export default function CreateRoomPage() {
         roomCode: nextRoomCode,
         tierId: room.tierId || selectedTierId,
         maxPlayers: requestedMaxPlayers,
-        source: isSoloMode ? 'solo-room' : 'private-room',
+        source: isSoloMode ? 'solo-room' : roomVisibility === 'public' ? 'public-created-room' : 'private-room',
         isHost: true,
-        type: room.type || (isSoloMode ? 'solo' : 'private'),
-        mode: room.mode || (isSoloMode ? 'solo' : 'private'),
+        visibility: room.visibility || roomVisibility,
+        isListed: Boolean(room.isListed || roomVisibility === 'public'),
+        type: room.type || (isSoloMode ? 'solo' : roomVisibility),
+        mode: room.mode || (isSoloMode ? 'solo' : roomVisibility),
         enableBots: Boolean(room.enableBots || isSoloMode),
         isSolo: Boolean(room.isSolo || room.enableBots || isSoloMode),
         botCount: Number(room.botCount || (isSoloMode ? 2 : 0)),
@@ -300,7 +306,7 @@ export default function CreateRoomPage() {
           <div className="create-form-row room-type-row">
             <label>{t('roomType')}</label>
             <div className="segmented-options room-type-options">
-              {['Private'].map((type) => (
+              {['Public', 'Private'].map((type) => (
                 <button
                   type="button"
                   key={type}
