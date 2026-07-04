@@ -1963,7 +1963,7 @@ function SideTool({ icon, label, onClick, className = '', disabled = false }) {
   );
 }
 
-function PlayerBadge({ variant = 'small', avatar, name, title = '', seatLabel = '', coins, className = '', isActiveTurn = false, turnLabel = '' }) {
+function PlayerBadge({ variant = 'small', avatar, name, title = '', seatLabel = '', coins, className = '', isActiveTurn = false, turnLabel = '', isDealer = false, dealerLabel = 'Dealer' }) {
   const displayName = String(name || '').trim() || 'Player';
   const subtitle = [title, seatLabel].filter(Boolean).join(' • ');
 
@@ -1982,6 +1982,7 @@ function PlayerBadge({ variant = 'small', avatar, name, title = '', seatLabel = 
         draggable="false"
         onError={(event) => handleProfileAvatarError(event)}
       />
+      {isDealer ? <span className="gameplay-dealer-chip">{dealerLabel}</span> : null}
       <div className="gameplay-player-info">
         <strong>{displayName}</strong>
         {subtitle ? <small>{subtitle}</small> : null}
@@ -2005,6 +2006,80 @@ function Compass({ round = 'East 1', timer = 30, turnLabel = 'YOUR TURN' }) {
       <em>{turnLabel}</em>
       <span className="south">S</span>
       <span className="west">W</span>
+    </div>
+  );
+}
+
+const getDealerRollRows = (state = {}, players = []) => {
+  const reveal = state.dealerRollReveal || {};
+  const rolls = toArray(reveal.dealerRolls).length ? reveal.dealerRolls : toArray(state.dealerRolls);
+
+  return rolls.map((roll = {}, index) => {
+    const rollUserId = normalizeId(roll.userId || roll.playerId || roll.id);
+    const player = toArray(players).find((candidate) => playerMatchesAnyId(candidate, [rollUserId])) || {};
+    const dice = toArray(roll.dice).map((value) => Number(value) || 0).filter(Boolean);
+    const total = Number(roll.total ?? roll.diceTotal ?? dice.reduce((sum, value) => sum + value, 0)) || 0;
+    const seatLabel = roll.seatLabel || player.seatLabel || roll.seatWind || player.seat || '';
+
+    return {
+      key: rollUserId || `${seatLabel || 'seat'}_${index}`,
+      userId: rollUserId,
+      name: player.name || player.username || roll.username || `Player ${index + 1}`,
+      position: normalizePosition(player.position) || getSeatPosition(roll.seatWind || player.seat, state) || '',
+      seatLabel,
+      isDealer: Boolean(roll.isDealer || player.isDealer || rollUserId === normalizeId(state.dealerUserId || reveal.dealerUserId)),
+      dice,
+      total,
+      rollAttempt: Number(roll.rollAttempt || roll.attempt || 1) || 1,
+      rerolled: Boolean(roll.rerolled),
+      seatIndex: Number.isFinite(Number(roll.seatIndex ?? player.seatIndex)) ? Number(roll.seatIndex ?? player.seatIndex) : index,
+    };
+  }).sort((a, b) => a.seatIndex - b.seatIndex);
+};
+
+function DealerRollOverlay({ state = {}, players = [], t }) {
+  const rows = getDealerRollRows(state, players);
+  const status = String(state.status || '').toLowerCase();
+  const reveal = state.dealerRollReveal || {};
+  const phase = String(state.dealerRollPhase || reveal.phase || '').toLowerCase();
+  const isVisible = rows.length > 0 && (status === 'dealing' || phase === 'dealer_roll');
+
+  if (!isVisible) return null;
+
+  const dealerRow = rows.find((row) => row.isDealer) || rows[0];
+
+  return (
+    <div className="gameplay-dealer-roll-overlay" role="status" aria-live="polite">
+      <div className="gameplay-dealer-roll-card">
+        <span className="gameplay-dealer-roll-kicker">{t('determiningDealer')}</span>
+        <h2>{t('dealerRollTitle')}</h2>
+        <p>{t('dealerRollBody')}</p>
+
+        <div className="gameplay-dealer-roll-list">
+          {rows.map((row) => (
+            <div className={`gameplay-dealer-roll-row ${row.isDealer ? 'is-dealer' : ''}`} key={row.key}>
+              <div className="gameplay-dealer-roll-player">
+                <strong>{row.name}</strong>
+                <span>{row.seatLabel}{row.position ? ` • ${row.position}` : ''}</span>
+              </div>
+              <div className="gameplay-dealer-roll-dice" aria-label={`Dice total ${row.total}`}>
+                {(row.dice.length ? row.dice : [0, 0]).map((die, index) => (
+                  <span className="gameplay-dealer-die" key={`${row.key}-die-${index}`}>{die || '?'}</span>
+                ))}
+              </div>
+              <strong className="gameplay-dealer-roll-total">{row.total}</strong>
+              {row.isDealer ? <em>{t('dealer')}</em> : null}
+            </div>
+          ))}
+        </div>
+
+        {dealerRow ? (
+          <div className="gameplay-dealer-roll-result">
+            <span>{t('highestRollDealer')}</span>
+            <strong>{dealerRow.name} — {dealerRow.seatLabel}</strong>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -2609,6 +2684,12 @@ function normalizeInitialSocketState(payload = {}, fallbackMatchId = '') {
     canDiscard: payload.canDiscard ?? normalized.canDiscard,
     canPlayBonus: payload.canPlayBonus ?? normalized.canPlayBonus,
     playableBonusTiles: payload.playableBonusTiles || normalized.playableBonusTiles || [],
+    dealerRolls: payload.dealerRolls || normalized.dealerRolls || payload.dealerRollReveal?.dealerRolls || [],
+    dealerRollReveal: payload.dealerRollReveal || normalized.dealerRollReveal || null,
+    dealerRollRevealMs: payload.dealerRollRevealMs || payload.dealerRollReveal?.revealDurationMs || normalized.dealerRollRevealMs || 3000,
+    dealerRollStartedAt: payload.dealerRollStartedAt || payload.dealerRollReveal?.startedAt || normalized.dealerRollStartedAt || null,
+    dealerRollEndsAt: payload.dealerRollEndsAt || payload.dealerRollReveal?.endsAt || normalized.dealerRollEndsAt || null,
+    dealerRollPhase: payload.dealerRollPhase || payload.dealerRollReveal?.phase || normalized.dealerRollPhase || null,
     playerCount: payload.playerCount ?? normalized.playerCount ?? players.length,
     maxPlayers: payload.maxPlayers ?? payload.room?.maxPlayers ?? normalized.maxPlayers ?? normalized.room?.maxPlayers,
   };
@@ -2796,6 +2877,24 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           setGameState((current) => mergeSynchronizedGameState(current || {}, payload, resolvedMatchId));
           setGameError('');
           break;
+        case 'dealer_roll':
+          setGameState((current) => ({
+            ...(current || EMPTY_SOCKET_GAME_STATE),
+            status: String(current?.status || '').toLowerCase() === 'playing' ? current.status : 'DEALING',
+            dealerRollReveal: payload,
+            dealerRolls: payload.dealerRolls || current?.dealerRolls || [],
+            dealerUserId: payload.dealerUserId || current?.dealerUserId,
+            dealerSelectionMethod: payload.dealerSelectionMethod || current?.dealerSelectionMethod,
+            dealerRollRevealMs: payload.revealDurationMs || current?.dealerRollRevealMs || 3000,
+            dealerRollStartedAt: payload.startedAt || current?.dealerRollStartedAt || null,
+            dealerRollEndsAt: payload.endsAt || current?.dealerRollEndsAt || null,
+            dealerRollPhase: payload.phase || 'DEALER_ROLL',
+            seatOrder: payload.seatOrder || current?.seatOrder || [],
+            turnOrderPositions: payload.turnOrderPositions || current?.turnOrderPositions || [],
+            rotation: payload.rotation || current?.rotation || 'bottom_top_left',
+          }));
+          setGameError('');
+          break;
         case 'turn_changed':
           setGameState((current) => mergeTurnStart(current || {}, payload));
           setGameError('');
@@ -2873,6 +2972,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
 
     const socketHandlers = [
       ['game:start', (payload) => handleSocketMessage({ type: 'game_start', payload })],
+      ['game:dealer_roll', (payload) => handleSocketMessage({ type: 'dealer_roll', payload })],
       ['game:sync_state', (payload) => handleSocketMessage({ type: 'game_state', payload })],
       ['game:turn_start', (payload) => handleSocketMessage({ type: 'turn_changed', payload })],
       ['player:drawn_tile', (payload) => handleSocketMessage({ type: 'drawn_tile', payload })],
@@ -3449,6 +3549,8 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         isPending={isReclaimFeiPending}
       />
 
+      <DealerRollOverlay state={gameState} players={players} t={t} />
+
       <header className="gameplay-room-title">
         <span>{t('room')}</span>
         <strong>{gameState.room?.name || 'My Sakura Room'}</strong>
@@ -3480,6 +3582,8 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           title={topPlayer.title}
           seatLabel={topPlayer.seatLabel}
           coins={topPlayer.coins}
+          isDealer={Boolean(topPlayer.isDealer)}
+          dealerLabel={t('dealer')}
           isActiveTurn={activeTurnPosition === 'top'}
           turnLabel={activeTurnPosition === 'top' ? activeTurnLabel : ''}
         />
@@ -3493,6 +3597,8 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         title={bottomPlayer.title}
         seatLabel={bottomPlayer.seatLabel}
         coins={bottomPlayer.coins}
+        isDealer={Boolean(bottomPlayer.isDealer)}
+        dealerLabel={t('dealer')}
         isActiveTurn={activeTurnPosition === 'bottom'}
         turnLabel={activeTurnPosition === 'bottom' ? activeTurnLabel : ''}
       />
