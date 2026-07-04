@@ -28,6 +28,7 @@ export const GAME_SOCKET_EVENTS = {
   dealerRoll: 'game:dealer_roll',
   turnStart: 'game:turn_start',
   drawnTile: 'player:drawn_tile',
+  bonusPlayed: 'player:bonus_played',
   claimWindow: 'game:claim_window',
   actionBroadcast: 'game:action_broadcast',
   syncState: 'game:sync_state',
@@ -53,6 +54,7 @@ const SERVER_EVENTS_TO_LISTEN = [
   GAME_SOCKET_EVENTS.dealerRoll,
   GAME_SOCKET_EVENTS.turnStart,
   GAME_SOCKET_EVENTS.drawnTile,
+  GAME_SOCKET_EVENTS.bonusPlayed,
   GAME_SOCKET_EVENTS.claimWindow,
   GAME_SOCKET_EVENTS.actionBroadcast,
   GAME_SOCKET_EVENTS.syncState,
@@ -242,6 +244,10 @@ export function normalizeSocketMessage(message) {
 
   if (originalEvent === GAME_SOCKET_EVENTS.drawnTile) {
     return { type: 'drawn_tile', payload, originalEvent };
+  }
+
+  if (originalEvent === GAME_SOCKET_EVENTS.bonusPlayed) {
+    return { type: 'action_broadcast', payload: { action: 'bonus_tile_played', ...(payload || {}) }, originalEvent };
   }
 
   if (originalEvent === GAME_SOCKET_EVENTS.claimWindow) {

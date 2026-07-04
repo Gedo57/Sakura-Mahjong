@@ -397,6 +397,14 @@ const resolveTimerDeadlineMs = (payload = {}, fallbackSeconds = 0) => {
     || payload.timerEndsAt
     || payload.claimEndsAt
   );
+  const serverNow = parseTimerTimestampMs(payload.serverNow || payload.serverTime || payload.now);
+
+  // Server timestamps are authoritative, but browser/device clocks can drift.
+  // When the backend sends serverNow, translate the server deadline into the
+  // current browser clock before rendering the countdown.
+  if (explicitDeadline && serverNow) {
+    return Date.now() + Math.max(0, explicitDeadline - serverNow);
+  }
 
   if (explicitDeadline) return explicitDeadline;
 
@@ -412,6 +420,8 @@ const TIMER_PAYLOAD_FIELDS = [
   'expiresAt',
   'deadline',
   'claimEndsAt',
+  'serverNow',
+  'serverTime',
   'timeLimit',
   'remainingSeconds',
 ];
@@ -2185,7 +2195,7 @@ function mergeTurnStart(current, payload = {}) {
     timeLimit: nextTimeLimit || current.timeLimit,
     timerDeadlineMs,
     wallRemaining: getWallRemainingValue(payload) ?? current.wallRemaining,
-    turnStartedAt: Date.now(),
+    turnStartedAt: payload.turnStartedAt || current.turnStartedAt || Date.now(),
     availableActions: [],
     validActions: [],
     claimWindow: null,
@@ -2225,6 +2235,8 @@ function mergeDrawnTile(current, payload = {}) {
     label: 'DRAW',
   });
 
+  const playableBonusTiles = nextHandTiles.filter((handTile) => isBonusTileName(handTile));
+
   return {
     ...current,
     drawnTile: tile,
@@ -2232,6 +2244,10 @@ function mergeDrawnTile(current, payload = {}) {
     tileFocus,
     handTiles: nextHandTiles,
     myHand: nextHandTiles,
+    playerHand: nextHandTiles,
+    playableBonusTiles,
+    canPlayBonus: playableBonusTiles.length ? true : current.canPlayBonus,
+    pendingBonusTileId: payload.source === 'bonus_replacement' ? null : current.pendingBonusTileId,
     wallRemaining: getWallRemainingValue(payload) ?? current.wallRemaining,
   };
 }
@@ -2437,15 +2453,18 @@ function mergeActionBroadcast(current, payload = {}) {
 
     const replacementTileId = payload.replacementTile || payload.replacementTileId || payload.drawnTile || payload.drawnTileId || payload.replacement;
     if (action !== 'bonus_tile_revealed' && isLocalActionPlayer) {
+      const payloadHandTiles = getFirstRawTileList(payload.handTiles, payload.myHand, payload.playerHand, payload.remainingHand, payload.currentPlayerHand, payload.hand);
       const currentHandTiles = getFirstRawTileList(current.handTiles, current.myHand, current.playerHand);
       const handWithoutBonus = removeOneTileFromHand(currentHandTiles, tileId, tileIdToAssetName(tileId));
-      next.handTiles = replacementTileId && !handWithoutBonus.some((handTile) => String(handTile) === String(replacementTileId))
-        ? [...handWithoutBonus, replacementTileId]
-        : handWithoutBonus;
+      next.handTiles = payloadHandTiles.length
+        ? payloadHandTiles
+        : (replacementTileId && !handWithoutBonus.some((handTile) => String(handTile) === String(replacementTileId))
+          ? [...handWithoutBonus, replacementTileId]
+          : handWithoutBonus);
       next.myHand = next.handTiles;
       next.playerHand = next.handTiles;
-      next.canPlayBonus = false;
-      next.playableBonusTiles = [];
+      next.playableBonusTiles = next.handTiles.filter((handTile) => isBonusTileName(handTile));
+      next.canPlayBonus = next.playableBonusTiles.length > 0;
       next.pendingBonusTileId = null;
     }
   }
@@ -3014,6 +3033,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
       ['game:sync_state', (payload) => handleSocketMessage({ type: 'game_state', payload })],
       ['game:turn_start', (payload) => handleSocketMessage({ type: 'turn_changed', payload })],
       ['player:drawn_tile', (payload) => handleSocketMessage({ type: 'drawn_tile', payload })],
+      ['player:bonus_played', (payload) => handleSocketMessage({ type: 'action_broadcast', payload: { action: 'bonus_tile_played', ...(payload || {}) } })],
       ['game:claim_window', (payload) => handleSocketMessage({ type: 'claim_window', payload })],
       ['game:fei_reclaim_window', (payload) => handleSocketMessage({ type: 'fei_reclaim_window', payload })],
       ['game:reclaim_fei_window', (payload) => handleSocketMessage({ type: 'fei_reclaim_window', payload })],
@@ -3166,7 +3186,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   const topDiscardTiles = getVisibleDiscardTilesByPosition(gameState, topPlayer, 'top');
   const sideDiscardTiles = hasSidePlayer ? getVisibleDiscardTilesByPosition(gameState, sidePlayer, 'left') : [];
   
-  const bottomBonusTiles = getFirstTileList(bottomPlayer?.bonusTiles, gameState.bonusTiles?.bottom, gameState.bonusTiles?.left);
+  const bottomBonusTiles = getFirstTileList(bottomPlayer?.bonusTiles, gameState.bonusTiles?.bottom);
   const topBonusTiles = getFirstTileList(topPlayer?.bonusTiles, gameState.bonusTiles?.top);
   const sideBonusTiles = hasSidePlayer ? getFirstTileList(sidePlayer?.bonusTiles, gameState.bonusTiles?.left) : [];
   const shouldShowBonusRacks = isMockGameplay || bottomBonusTiles.length || topBonusTiles.length || sideBonusTiles.length;
@@ -3231,16 +3251,9 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
       return () => window.clearInterval(intervalId);
     }
 
-    if (displayTimer <= 0) {
-      return undefined;
-    }
-
-    const intervalId = window.setInterval(() => {
-      setDisplayTimer((current) => Math.max(0, current - 1));
-    }, 1000);
-
-    return () => window.clearInterval(intervalId);
-  }, [gameState.timerDeadlineMs, gameState.status, gameState.turnStartedAt, isClaimWindowOpen, isMockGameplay, isUserTurn]);
+    setDisplayTimer(Number(gameState.timer ?? gameState.remainingSeconds ?? gameState.timeLimit ?? 0) || 0);
+    return undefined;
+  }, [gameState.timerDeadlineMs, gameState.timer, gameState.remainingSeconds, gameState.timeLimit, gameState.status, gameState.turnStartedAt, isClaimWindowOpen, isMockGameplay, isUserTurn]);
 
 
   useEffect(() => {
@@ -3348,10 +3361,37 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
 
       const sent = playBonusTile(tileId);
       if (sent) {
-        setGameState((current) => ({
-          ...(current || {}),
-          pendingBonusTileId: tileId,
-        }));
+        setGameState((current) => {
+          const currentHandTiles = getFirstRawTileList(current?.handTiles, current?.myHand, current?.playerHand);
+          const handTiles = removeOneTileFromHand(currentHandTiles, String(tileId), renderedTile);
+          const bonusPosition = normalizePosition(localPlayerPosition) || 'bottom';
+          const bonusTiles = { ...(current?.bonusTiles || {}) };
+          bonusTiles[bonusPosition] = appendUniqueTileList(bonusTiles[bonusPosition], [tileId]);
+          const nextPlayers = toArray(current?.players).map((player) => {
+            const isLocalPlayer = playerMatchesAnyId(player, currentPlayerIds)
+              || normalizePosition(player.position) === bonusPosition;
+            if (!isLocalPlayer) return player;
+            const currentBonusTiles = getFirstTileList(player.bonusTiles, player.revealedBonusTiles, player.revealedBonus);
+            return {
+              ...player,
+              bonusTiles: appendUniqueTileList(currentBonusTiles, [tileId]),
+              ...(playerMatchesAnyId(player, currentPlayerIds) ? { handTiles, hand: handTiles, tiles: handTiles } : {}),
+            };
+          });
+          const playableBonusTiles = handTiles.filter((handTile) => isBonusTileName(handTile));
+
+          return {
+            ...(current || {}),
+            handTiles,
+            myHand: handTiles,
+            playerHand: handTiles,
+            players: nextPlayers.length ? nextPlayers : current?.players,
+            bonusTiles,
+            playableBonusTiles,
+            canPlayBonus: playableBonusTiles.length > 0,
+            pendingBonusTileId: tileId,
+          };
+        });
         setGameError('');
       } else {
         setGameError(t('unablePlayBonusTile'));
