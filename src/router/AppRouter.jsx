@@ -13,7 +13,6 @@ import PrivateLobbyPage from '../pages/PrivateLobbyPage.jsx';
 import MatchmakingPage from '../pages/MatchmakingPage.jsx';
 import MahjongGamePage from '../pages/MahjongGamePage.jsx';
 import ResultPage from '../pages/ResultPage.jsx';
-import ShopPage from '../pages/ShopPage.jsx';
 import LeaderboardPage from '../pages/LeaderboardPage.jsx';
 import MissionsPage from '../pages/MissionsPage.jsx';
 import MatchHistoryPage from '../pages/MatchHistoryPage.jsx';
@@ -35,7 +34,6 @@ export default function AppRouter() {
         {/* Protected Routes */}
         <Route path={ROUTES.mainMenu} element={<ProtectedRoute><MainMenuPage /></ProtectedRoute>} />
         <Route path={ROUTES.profile} element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-        <Route path={ROUTES.shop} element={<ProtectedRoute><ShopPage /></ProtectedRoute>} />
         <Route path={ROUTES.leaderboard} element={<ProtectedRoute><LeaderboardPage /></ProtectedRoute>} />
         <Route path={ROUTES.missions} element={<ProtectedRoute><MissionsPage /></ProtectedRoute>} />
         <Route path={ROUTES.matchHistory} element={<ProtectedRoute><MatchHistoryPage /></ProtectedRoute>} />

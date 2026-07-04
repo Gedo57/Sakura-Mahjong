@@ -836,15 +836,6 @@ export default function MainMenuPage() {
             <CurrencyPill icon="coin.png" value={formatCurrencyValue(balances.coins)} />
             <CurrencyPill icon="gem.png" value={formatCurrencyValue(balances.diamonds)} />
             <button
-              className="square-top-button shop-menu-button"
-              type="button"
-              aria-label="Open shop"
-              onClick={() => navigate(ROUTES.shop)}
-              title="Open shop"
-            >
-              <img src="/assets/shop/icon-shop.png" alt="" />
-            </button>
-            <button
               className="square-top-button leaderboard-menu-button"
               type="button"
               aria-label="Open leaderboard"

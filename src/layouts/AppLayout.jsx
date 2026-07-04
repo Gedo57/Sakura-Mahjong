@@ -7,7 +7,6 @@ const routeBackgrounds = {
   [ROUTES.login]: '/assets/mock-login/BG.png',
   [ROUTES.loading]: '/assets/loading-screen/BG.png',
   [ROUTES.mainMenu]: '/assets/main-menu/bg.png',
-  [ROUTES.shop]: '/assets/shop/552134.png',
   [ROUTES.leaderboard]: '/assets/main-menu/bg.png',
   [ROUTES.profile]: '/assets/profile/BG.png',
   [ROUTES.achievements]: '/assets/profile/BG.png',

@@ -3,7 +3,6 @@ export const ROUTES = {
   login: '/login',
   loading: '/loading',
   mainMenu: '/main-menu',
-  shop: '/shop',
   leaderboard: '/leaderboard',
   missions: '/missions',
   matchHistory: '/profile/history',
