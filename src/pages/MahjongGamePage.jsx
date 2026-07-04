@@ -726,6 +726,94 @@ const isBonusTileName = (tile) => {
   return value.startsWith('fl_') || value.startsWith('sn_') || value.startsWith('an_');
 };
 
+const getHandTileSortParts = (tile) => {
+  const rawValue = String(getTileId(tile) || '').trim().toLowerCase().replace(/\.(png|jpe?g|webp|gif|svg)$/i, '');
+  const assetValue = String(normalizeTileName(tile) || '').trim().toLowerCase().replace(/\.(png|jpe?g|webp|gif|svg)$/i, '');
+  const value = rawValue || assetValue;
+  const assetParts = assetValue.split('_');
+  const rawParts = value.split('_');
+  const suit = rawParts[0] || assetParts[0] || '';
+  const rank = rawParts[1] || assetParts[1] || '';
+
+  return { value, assetValue, suit, rank };
+};
+
+const HAND_TILE_SORT_GROUP_ORDER = {
+  p: 10,
+  w: 20,
+  d: 30,
+  fei: 40,
+  joker: 45,
+  fl: 50,
+  sn: 60,
+  an: 70,
+};
+
+const WIND_TILE_SORT_ORDER = { e: 1, s: 2, w: 3, n: 4 };
+const DRAGON_TILE_SORT_ORDER = { r: 1, g: 2, w: 3 };
+const BONUS_TILE_SORT_ORDER = {
+  spring: 1,
+  summer: 2,
+  autumn: 3,
+  winter: 4,
+  plum: 1,
+  orchid: 2,
+  chrysanthemum: 3,
+  bamboo: 4,
+  cat: 1,
+  mouse: 2,
+  chicken: 3,
+  rooster: 3,
+  centipede: 4,
+};
+
+const getHandTileFaceKey = (tile) => {
+  const { assetValue, value } = getHandTileSortParts(tile);
+  return assetValue || value;
+};
+
+const getHandTileSortRank = (tile) => {
+  const { value, assetValue, suit, rank } = getHandTileSortParts(tile);
+  const group = HAND_TILE_SORT_GROUP_ORDER[suit] ?? 999;
+
+  if (suit === 'p' && /^\d+$/.test(rank)) {
+    return { group, rank: Number(rank), face: assetValue || `p_${rank}` };
+  }
+
+  if (suit === 'w') {
+    return { group, rank: WIND_TILE_SORT_ORDER[rank] ?? 99, face: assetValue || `w_${rank}` };
+  }
+
+  if (suit === 'd') {
+    return { group, rank: DRAGON_TILE_SORT_ORDER[rank] ?? 99, face: assetValue || `d_${rank}` };
+  }
+
+  if (suit === 'fl' || suit === 'sn' || suit === 'an') {
+    return { group, rank: BONUS_TILE_SORT_ORDER[rank] ?? 99, face: assetValue || value };
+  }
+
+  return {
+    group,
+    rank: suit === 'fei' ? 1 : suit === 'joker' ? 2 : 99,
+    face: assetValue || value,
+  };
+};
+
+const sortHandTilesForDisplay = (tiles = []) => (
+  toArray(tiles)
+    .map((tile, index) => ({ tile, index, sort: getHandTileSortRank(tile), faceKey: getHandTileFaceKey(tile) }))
+    .sort((a, b) => {
+      if (a.sort.group !== b.sort.group) return a.sort.group - b.sort.group;
+      if (a.sort.rank !== b.sort.rank) return a.sort.rank - b.sort.rank;
+      const faceCompare = String(a.faceKey || a.sort.face).localeCompare(String(b.faceKey || b.sort.face));
+      if (faceCompare !== 0) return faceCompare;
+
+      // Stable fallback keeps multiple physical copies of the same tile in their original order.
+      return a.index - b.index;
+    })
+    .map(({ tile }) => tile)
+);
+
 
 const getKongBaseFromTile = (tile) => {
   if (!tile || isFeiOrJokerTileName(tile)) return '';
@@ -3179,9 +3267,11 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     gameState.currentPlayerHand,
     ...(gameApiAvailable ? [getPlayerTileList(bottomPlayer, 'handTiles', 'hand', 'tiles')] : [])
   );
-  const playerHandTiles = rawPlayerHandTiles
-    .map((tile, index) => normalizeHandTileEntry(tile, index))
-    .filter(Boolean);
+  const playerHandTiles = sortHandTilesForDisplay(
+    rawPlayerHandTiles
+      .map((tile, index) => normalizeHandTileEntry(tile, index))
+      .filter(Boolean)
+  );
   const bottomDiscardTiles = getVisibleDiscardTilesByPosition(gameState, bottomPlayer, 'bottom');
   const topDiscardTiles = getVisibleDiscardTilesByPosition(gameState, topPlayer, 'top');
   const sideDiscardTiles = hasSidePlayer ? getVisibleDiscardTilesByPosition(gameState, sidePlayer, 'left') : [];
