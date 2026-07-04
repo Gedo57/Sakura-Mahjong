@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ROUTES } from '../router/routes.js';
+import { ROUTES, buildGameRoute } from '../router/routes.js';
 import { createPrivateRoom, getRoomTiers } from '../services/roomService.js';
-import { saveMatchmakingContext } from '../store/gameStore.js';
+import { saveActiveMatch, saveMatchmakingContext } from '../store/gameStore.js';
 import { useLanguage } from '../i18n/useLanguage.js';
+import { connectGameSocket } from '../services/socket.js';
 
 const asset = (name) => `/assets/create-room/${name}`;
 
@@ -129,11 +130,52 @@ export default function CreateRoomPage() {
         rotation: room.rotation || 'bottom_top_left',
         players: room.players || [],
         botPlayers: room.botPlayers || [],
+        socketMode: true,
       };
 
       setCreatedRoom(matchmakingState);
       saveMatchmakingContext(matchmakingState);
-      setSuccessMessage(isSoloMode ? t('soloRoomCreatedSuccessfully') : t('roomCreatedSuccessfully'));
+
+      if (isSoloMode) {
+        const activeMatch = {
+          ...matchmakingState,
+          matchId: roomId,
+          roomId,
+          socketMode: true,
+          directSolo: true,
+        };
+
+        saveActiveMatch(activeMatch);
+        setSuccessMessage(t('startingSoloGame'));
+
+        connectGameSocket({
+          matchId: roomId,
+          onOpen(socket) {
+            socket?.emit?.('room:join', { roomId });
+          },
+          onMessage(message = {}) {
+            const payload = message.payload || {};
+            if (message.type === 'game_start') {
+              saveActiveMatch({
+                ...activeMatch,
+                initialGameState: payload,
+                matchId: payload.matchId || payload.gameId || payload.roomId || roomId,
+                roomId: payload.roomId || roomId,
+              });
+            }
+          },
+        });
+
+        navigate(buildGameRoute(roomId), {
+          state: {
+            ...activeMatch,
+            source: 'solo-direct',
+          },
+        });
+        return;
+      }
+
+      setSuccessMessage(t('roomCreatedSuccessfully'));
       navigate(ROUTES.privateLobby, { state: matchmakingState });
     } catch (error) {
       console.error('Failed to create private room:', error);

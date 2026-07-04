@@ -171,7 +171,7 @@ export function normalizeGameState(response = {}) {
     dealerUserId: state.dealerUserId || state.dealer || safeResponse.dealerUserId || safeResponse.dealer,
     dealerRolls: state.dealerRolls || safeResponse.dealerRolls || [],
     dealerRollReveal: state.dealerRollReveal || safeResponse.dealerRollReveal || null,
-    dealerRollRevealMs: state.dealerRollRevealMs || state.dealerRollReveal?.revealDurationMs || safeResponse.dealerRollRevealMs || safeResponse.dealerRollReveal?.revealDurationMs || 10000,
+    dealerRollRevealMs: state.dealerRollRevealMs || state.dealerRollReveal?.revealDurationMs || safeResponse.dealerRollRevealMs || safeResponse.dealerRollReveal?.revealDurationMs || 7000,
     dealerRollStartedAt: state.dealerRollStartedAt || state.dealerRollReveal?.startedAt || safeResponse.dealerRollStartedAt || safeResponse.dealerRollReveal?.startedAt || null,
     dealerRollEndsAt: state.dealerRollEndsAt || state.dealerRollReveal?.endsAt || safeResponse.dealerRollEndsAt || safeResponse.dealerRollReveal?.endsAt || null,
     dealerRollPhase: state.dealerRollPhase || state.dealerRollReveal?.phase || safeResponse.dealerRollPhase || safeResponse.dealerRollReveal?.phase || null,

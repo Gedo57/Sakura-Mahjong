@@ -91,7 +91,9 @@ const getRealPlayerName = (player = {}) => {
 
 const normalizeGameplayPlayer = (player = {}, index = 0) => {
   const handTiles = player.handTiles || player.hand || player.tiles || [];
-  const score = player.score ?? player.points ?? player.balance ?? player.coins ?? '0';
+  const rawTitle = player.title || player.rankTitle || player.profileTitle || '';
+  const isBot = Boolean(player.isBot || String(player.userId || player.id || '').startsWith('bot:'));
+  const cleanTitle = isBot && /^cpu$/i.test(String(rawTitle || '').trim()) ? '' : rawTitle;
 
   return {
     ...player,
@@ -101,9 +103,10 @@ const normalizeGameplayPlayer = (player = {}, index = 0) => {
     username: player.username || getRealPlayerName(player),
     avatar: player.avatar || player.avatarUrl || player.avatarId || player.imageUrl || player.photoUrl || player.icon || null,
     avatarId: player.avatarId || player.avatar || player.avatarUrl || player.imageUrl || player.photoUrl || player.icon || null,
-    title: player.title || player.rankTitle || player.profileTitle || '',
-    coins: score,
-    score,
+    title: cleanTitle,
+    coins: '',
+    score: player.score ?? player.points ?? player.balance ?? player.coins ?? '',
+    isBot,
     seat: player.seat,
     seatLabel: player.seatLabel || player.seatName || '',
     seatIndex: player.seatIndex,
@@ -2032,7 +2035,7 @@ function DealerRollOverlay({ state = {}, players = [], t }) {
   const phase = String(state.dealerRollPhase || reveal.phase || '').toLowerCase();
   const revealEndsAt = Number(state.dealerRollEndsAt || reveal.endsAt || 0) || 0;
   const revealStartedAt = Number(state.dealerRollStartedAt || reveal.startedAt || 0) || 0;
-  const revealDurationMs = Number(state.dealerRollRevealMs || reveal.revealDurationMs || 10000) || 10000;
+  const revealDurationMs = Number(state.dealerRollRevealMs || reveal.revealDurationMs || 7000) || 7000;
   const fallbackEndsAt = revealStartedAt ? revealStartedAt + revealDurationMs : 0;
   const effectiveEndsAt = revealEndsAt || fallbackEndsAt;
   const hasRevealExpired = effectiveEndsAt ? Date.now() >= effectiveEndsAt : false;
@@ -2709,7 +2712,7 @@ function normalizeInitialSocketState(payload = {}, fallbackMatchId = '') {
     playableBonusTiles: payload.playableBonusTiles || normalized.playableBonusTiles || [],
     dealerRolls: payload.dealerRolls || normalized.dealerRolls || payload.dealerRollReveal?.dealerRolls || [],
     dealerRollReveal: payload.dealerRollReveal || normalized.dealerRollReveal || null,
-    dealerRollRevealMs: payload.dealerRollRevealMs || payload.dealerRollReveal?.revealDurationMs || normalized.dealerRollRevealMs || 10000,
+    dealerRollRevealMs: payload.dealerRollRevealMs || payload.dealerRollReveal?.revealDurationMs || normalized.dealerRollRevealMs || 7000,
     dealerRollStartedAt: payload.dealerRollStartedAt || payload.dealerRollReveal?.startedAt || normalized.dealerRollStartedAt || null,
     dealerRollEndsAt: payload.dealerRollEndsAt || payload.dealerRollReveal?.endsAt || normalized.dealerRollEndsAt || null,
     dealerRollPhase: payload.dealerRollPhase || payload.dealerRollReveal?.phase || normalized.dealerRollPhase || null,
@@ -2919,7 +2922,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
               dealerRolls: payload.dealerRolls || current?.dealerRolls || [],
               dealerUserId: payload.dealerUserId || current?.dealerUserId,
               dealerSelectionMethod: payload.dealerSelectionMethod || current?.dealerSelectionMethod,
-              dealerRollRevealMs: payload.revealDurationMs || current?.dealerRollRevealMs || 10000,
+              dealerRollRevealMs: payload.revealDurationMs || current?.dealerRollRevealMs || 7000,
               dealerRollStartedAt: payload.startedAt || current?.dealerRollStartedAt || null,
               dealerRollEndsAt: payload.endsAt || current?.dealerRollEndsAt || null,
               dealerRollPhase: payload.phase || 'DEALER_ROLL',
@@ -3622,7 +3625,6 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           name={topPlayer.name === 'BUNBUN' ? 'Bunbun' : topPlayer.name}
           title={topPlayer.title}
           seatLabel={topPlayer.seatLabel}
-          coins={topPlayer.coins}
           isDealer={Boolean(topPlayer.isDealer)}
           dealerLabel={t('dealer')}
           isActiveTurn={activeTurnPosition === 'top'}
@@ -3637,7 +3639,6 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         name={bottomPlayer.name === 'STEIVE' ? 'Stevie' : bottomPlayer.name}
         title={bottomPlayer.title}
         seatLabel={bottomPlayer.seatLabel}
-        coins={bottomPlayer.coins}
         isDealer={Boolean(bottomPlayer.isDealer)}
         dealerLabel={t('dealer')}
         isActiveTurn={activeTurnPosition === 'bottom'}
@@ -3652,7 +3653,6 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
           name={sidePlayer.name}
           title={sidePlayer.title}
           seatLabel={sidePlayer.seatLabel}
-          coins={sidePlayer.coins}
           isActiveTurn={activeTurnPosition === 'left'}
           turnLabel={activeTurnPosition === 'left' ? activeTurnLabel : ''}
         />
