@@ -30,6 +30,7 @@ export const GAME_SOCKET_EVENTS = {
   drawnTile: 'player:drawn_tile',
   bonusPlayed: 'player:bonus_played',
   claimWindow: 'game:claim_window',
+  claimAccepted: 'player:claim_accepted',
   actionBroadcast: 'game:action_broadcast',
   syncState: 'game:sync_state',
   gameOver: 'game:over',
@@ -56,6 +57,7 @@ const SERVER_EVENTS_TO_LISTEN = [
   GAME_SOCKET_EVENTS.drawnTile,
   GAME_SOCKET_EVENTS.bonusPlayed,
   GAME_SOCKET_EVENTS.claimWindow,
+  GAME_SOCKET_EVENTS.claimAccepted,
   GAME_SOCKET_EVENTS.actionBroadcast,
   GAME_SOCKET_EVENTS.syncState,
   GAME_SOCKET_EVENTS.gameOver,
@@ -101,6 +103,7 @@ function rememberGameSocketMessage(message) {
     'turn_changed',
     'drawn_tile',
     'claim_window',
+    'claim_accepted',
     'action_broadcast',
     'tile_discarded',
     'game_finished',
@@ -252,6 +255,10 @@ export function normalizeSocketMessage(message) {
 
   if (originalEvent === GAME_SOCKET_EVENTS.claimWindow) {
     return { type: 'claim_window', payload, originalEvent };
+  }
+
+  if (originalEvent === GAME_SOCKET_EVENTS.claimAccepted) {
+    return { type: 'claim_accepted', payload, originalEvent };
   }
 
   if (originalEvent === GAME_SOCKET_EVENTS.actionBroadcast) {
@@ -591,15 +598,6 @@ export function discardTile(tileId) {
 
 export function declareKong(payload = {}) {
   return emitOnActiveSocket('player:declare_kong', payload || {});
-}
-
-export function playBonusTile(tileId) {
-  if (!tileId) {
-    console.warn('[game-socket] playBonusTile called without tileId.');
-    return false;
-  }
-
-  return emitOnActiveSocket('player:play_bonus', { tileId });
 }
 
 export function claimDiscard(action) {

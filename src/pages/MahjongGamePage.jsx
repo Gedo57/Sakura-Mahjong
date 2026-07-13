@@ -14,7 +14,6 @@ import {
   getActiveGameSocket,
   getBufferedGameSocketMessages,
   passClaimWindow,
-  playBonusTile,
   reclaimFei,
   skipFeiReclaim,
 } from '../services/socket.js';
@@ -2293,8 +2292,8 @@ function mergeTurnStart(current, payload = {}) {
     turnEndedByDiscard: false,
     discardCountThisTurn: Number(payload.discardCountThisTurn || 0),
     canDiscard: payload.canDiscard ?? true,
-    canPlayBonus: payload.canPlayBonus,
-    playableBonusTiles: payload.playableBonusTiles || [],
+    canPlayBonus: false,
+    playableBonusTiles: [],
     pendingKong: null,
     pendingClaimAction: null,
     pendingReclaimFei: null,
@@ -2307,10 +2306,20 @@ function mergeDrawnTile(current, payload = {}) {
   if (!tile) return current;
 
   const handTiles = getFirstRawTileList(current.handTiles, current.myHand, current.playerHand);
+  const authoritativeHandTiles = getFirstRawTileList(
+    payload.handTiles,
+    payload.myHand,
+    payload.playerHand,
+    payload.remainingHand,
+    payload.currentPlayerHand,
+    payload.hand
+  );
 
-  const nextHandTiles = handTiles.some((existingTile) => String(existingTile) === String(tile))
-    ? handTiles
-    : [...handTiles, tile];
+  const nextHandTiles = authoritativeHandTiles.length
+    ? authoritativeHandTiles
+    : (handTiles.some((existingTile) => String(existingTile) === String(tile))
+      ? handTiles
+      : [...handTiles, tile]);
 
   const renderedTile = tileIdToAssetName(tile);
   const tileFocus = buildTileFocus({
@@ -2323,8 +2332,6 @@ function mergeDrawnTile(current, payload = {}) {
     label: 'DRAW',
   });
 
-  const playableBonusTiles = nextHandTiles.filter((handTile) => isBonusTileName(handTile));
-
   return {
     ...current,
     drawnTile: tile,
@@ -2333,9 +2340,9 @@ function mergeDrawnTile(current, payload = {}) {
     handTiles: nextHandTiles,
     myHand: nextHandTiles,
     playerHand: nextHandTiles,
-    playableBonusTiles,
-    canPlayBonus: playableBonusTiles.length ? true : current.canPlayBonus,
-    pendingBonusTileId: payload.source === 'bonus_replacement' ? null : current.pendingBonusTileId,
+    playableBonusTiles: [],
+    canPlayBonus: false,
+    pendingBonusTileId: null,
     wallRemaining: getWallRemainingValue(payload) ?? current.wallRemaining,
   };
 }
@@ -2384,24 +2391,37 @@ function mergeFeiReclaimWindow(current, payload = {}) {
 
 function mergeActionBroadcast(current, payload = {}) {
   const action = String(payload.action || '').toLowerCase();
-  const tileId = payload.tileId || payload.tile || payload.discardedTile || payload.claimedTile;
   const isMeldAction = ['pung', 'pong', 'pon', 'kong', 'kan', 'chow', 'chi'].includes(action);
+  const authoritativeMeld = isMeldAction && payload.openMeld && typeof payload.openMeld === 'object'
+    ? payload.openMeld
+    : (isMeldAction && payload.meld && typeof payload.meld === 'object' ? payload.meld : {});
+  const tileId = payload.tileId
+    || payload.tile
+    || payload.discardedTile
+    || payload.claimedTile
+    || authoritativeMeld.claimedTileId
+    || authoritativeMeld.claimedTile;
   const actionUserId = isMeldAction
-    ? (payload.userId || payload.playerId || payload.activeUserId || payload.claimedBy || payload.claimedByUserId || payload.claimedByPlayerId || payload.claimerId || payload.actorId || payload.actorUserId)
+    ? (authoritativeMeld.ownerId || authoritativeMeld.ownerUserId || authoritativeMeld.ownerPlayerId || payload.ownerId || payload.userId || payload.playerId || payload.activeUserId || payload.claimedBy || payload.claimedByUserId || payload.claimedByPlayerId || payload.claimerId || payload.actorId || payload.actorUserId)
     : (payload.userId || payload.playerId || payload.activeUserId || payload.discardedBy || payload.discardedByUserId || payload.discardedByPlayerId || payload.actorId || payload.actorUserId);
   const actionIds = getEntityIds({ id: actionUserId });
   const playerWithActionId = actionIds.length
     ? toArray(current.players).find((player) => playerMatchesAnyId(player, actionIds))
     : null;
   const seatPosition = getSeatPosition(
-    payload.seat || payload.claimedBySeat || payload.claimerSeat || payload.actorSeat || (!isMeldAction ? payload.discardedBySeat : ''),
+    authoritativeMeld.ownerSeat || payload.ownerSeat || payload.seat || payload.claimedBySeat || payload.claimerSeat || payload.actorSeat || (!isMeldAction ? payload.discardedBySeat : ''),
     current
   ) || playerWithActionId?.position || payload.position;
 
   if (!action) return current;
 
   const currentIds = getCurrentPlayerIdCandidates(current);
-  const isLocalActionPlayer = isBottomPosition(seatPosition) || (actionIds.length && actionIds.some((id) => currentIds.includes(id)));
+  // Table positions are absolute (East=bottom, South=top, West=left), so the
+  // bottom seat is not necessarily the user running this browser. Local/private
+  // state must only be updated when the action payload belongs to this account.
+  const isLocalActionPlayer = Boolean(
+    actionIds.length && actionIds.some((id) => currentIds.includes(id))
+  );
   const isLocalDiscard = action === 'discard' && isLocalActionPlayer;
 
   const next = {
@@ -2420,6 +2440,7 @@ function mergeActionBroadcast(current, payload = {}) {
     canDiscard: isLocalDiscard ? false : current.canDiscard,
     pendingKong: null,
     pendingClaimAction: null,
+    claimAccepted: null,
   };
 
   if (FEI_RECLAIM_AVAILABLE_ACTIONS.has(action)) {
@@ -2431,7 +2452,7 @@ function mergeActionBroadcast(current, payload = {}) {
     next.pendingReclaimFei = null;
     const payloadHandTiles = getFirstRawTileList(payload.handTiles, payload.myHand, payload.playerHand, payload.remainingHand, payload.currentPlayerHand, payload.hand);
     const isReclaimConfirm = ['fei_reclaimed', 'reclaim_fei', 'reclaim_fei_confirmed', 'replace_fei'].includes(action);
-    const isLocalReclaimPlayer = isBottomPosition(seatPosition) || (actionIds.length && actionIds.some((id) => currentIds.includes(id)));
+    const isLocalReclaimPlayer = isLocalActionPlayer;
     const replacementTileId = payload.replacementTileId || payload.actualTileId || payload.tileId;
     const feiTileId = payload.feiTileId || payload.feiTile || 'fei';
     const nextMeldTiles = getFirstTileList(payload.meldTiles, payload.tiles, payload.openMeld?.tiles, payload.meld?.tiles);
@@ -2495,7 +2516,13 @@ function mergeActionBroadcast(current, payload = {}) {
     }
   }
 
-  if (action === 'bonus_tile_revealed' || action === 'bonus_tile_played' || action === 'play_bonus') {
+  if (
+    action === 'bonus_tile_revealed'
+    || action === 'bonus_tile_played'
+    || action === 'play_bonus'
+    || action === 'bonus_tiles_auto_replaced'
+    || action === 'bonus_auto_retake'
+  ) {
     const revealedSource = [
       payload.revealedBonusTiles,
       payload.revealedBonus,
@@ -2529,6 +2556,7 @@ function mergeActionBroadcast(current, payload = {}) {
           bonusTiles: revealedTiles.length
             ? appendUniqueTileList(currentBonusTiles, revealedTiles)
             : currentBonusTiles,
+          ...(Number.isFinite(Number(payload.handSize)) ? { handSize: Number(payload.handSize) } : {}),
         };
       });
     }
@@ -2539,11 +2567,20 @@ function mergeActionBroadcast(current, payload = {}) {
       next.bonusTiles = bonusTilesByPosition;
     }
 
-    const replacementTileId = payload.replacementTile || payload.replacementTileId || payload.drawnTile || payload.drawnTileId || payload.replacement;
+    const replacementTileId = payload.finalReplacementTile || payload.replacementTile || payload.replacementTileId || payload.drawnTile || payload.drawnTileId || payload.replacement;
     if (action !== 'bonus_tile_revealed' && isLocalActionPlayer) {
       const payloadHandTiles = getFirstRawTileList(payload.handTiles, payload.myHand, payload.playerHand, payload.remainingHand, payload.currentPlayerHand, payload.hand);
       const currentHandTiles = getFirstRawTileList(current.handTiles, current.myHand, current.playerHand);
-      const handWithoutBonus = removeOneTileFromHand(currentHandTiles, tileId, tileIdToAssetName(tileId));
+      const revealedRawTiles = getFirstRawTileList(
+        payload.revealedBonusTiles,
+        payload.revealedBonus,
+        payload.tiles,
+        [payload.bonusTile || payload.revealedTile || payload.tileId || payload.tile].filter(Boolean)
+      );
+      const handWithoutBonus = revealedRawTiles.reduce(
+        (hand, bonusTile) => removeOneTileFromHand(hand, bonusTile, tileIdToAssetName(bonusTile)),
+        currentHandTiles
+      );
       next.handTiles = payloadHandTiles.length
         ? payloadHandTiles
         : (replacementTileId && !handWithoutBonus.some((handTile) => String(handTile) === String(replacementTileId))
@@ -2551,8 +2588,8 @@ function mergeActionBroadcast(current, payload = {}) {
           : handWithoutBonus);
       next.myHand = next.handTiles;
       next.playerHand = next.handTiles;
-      next.playableBonusTiles = next.handTiles.filter((handTile) => isBonusTileName(handTile));
-      next.canPlayBonus = next.playableBonusTiles.length > 0;
+      next.playableBonusTiles = [];
+      next.canPlayBonus = false;
       next.pendingBonusTileId = null;
     }
   }
@@ -2560,8 +2597,7 @@ function mergeActionBroadcast(current, payload = {}) {
   if (action === 'discard' && tileId) {
     const renderedTile = tileIdToAssetName(tileId);
     const discards = { ...(current.discards || {}) };
-    const currentIds = getCurrentPlayerIdCandidates(current);
-    const isLocalDiscard = isBottomPosition(seatPosition) || (actionIds.length && actionIds.some((id) => currentIds.includes(id)));
+    const isLocalDiscard = isLocalActionPlayer;
     const key = seatPosition || (isLocalDiscard ? 'bottom' : 'center');
 
     discards[key] = [...normalizeTileList(discards[key]), renderedTile];
@@ -2609,18 +2645,16 @@ function mergeActionBroadcast(current, payload = {}) {
   if (isMeldAction) {
     const uiAction = normalizeActionForUi(action);
     const meldTiles = getFirstTileList(
+      authoritativeMeld.tiles,
       payload.meldTiles,
       payload.tiles,
-      payload.openMeld?.tiles,
-      payload.meld?.tiles,
       payload.claimedTiles,
       payload.exposedTiles
     );
     const rawMeldTiles = getFirstRawTileList(
+      authoritativeMeld.tiles,
       payload.meldTiles,
       payload.tiles,
-      payload.openMeld?.tiles,
-      payload.meld?.tiles,
       payload.claimedTiles,
       payload.exposedTiles
     );
@@ -2632,33 +2666,48 @@ function mergeActionBroadcast(current, payload = {}) {
       && (payload.promotedFromPung || String(payload.kongType || '').toLowerCase() === 'promoted');
     const handRemovalClaimedTileId = isSelfDeclaredKong ? '' : tileId;
     const handRemovalClaimedTile = isSelfDeclaredKong ? '' : renderedClaimedTile;
+    const sourcePlayerId = authoritativeMeld.fromPlayerId
+      || authoritativeMeld.from
+      || payload.discardedBy
+      || payload.discardedByUserId
+      || payload.discardedByPlayerId
+      || payload.shooterId
+      || payload.fromPlayerId;
+    const sourceSeat = authoritativeMeld.fromSeat
+      || payload.discardedBySeat
+      || payload.shooterSeat
+      || payload.fromSeat;
+    const ownerSeat = authoritativeMeld.ownerSeat || payload.ownerSeat || payload.seat || payload.claimedBySeat || payload.claimerSeat || payload.actorSeat || '';
     const meldEntry = normalizeMeldEntry({
+      ...authoritativeMeld,
       type: uiAction,
       tiles: meldTiles,
-      rawTiles: rawMeldTiles,
-      claimedTile: tileId || payload.claimedTile || payload.discardedTile,
-      fromPlayerId: payload.discardedBy || payload.discardedByUserId || payload.discardedByPlayerId || payload.shooterId || payload.fromPlayerId,
-      fromSeat: payload.discardedBySeat || payload.shooterSeat || payload.fromSeat,
+      claimedTile: tileId || authoritativeMeld.claimedTileId || payload.claimedTile || payload.discardedTile,
+      claimedTileId: tileId || authoritativeMeld.claimedTileId || payload.claimedTile || payload.discardedTile,
+      from: sourcePlayerId,
+      fromPlayerId: sourcePlayerId,
+      fromSeat: sourceSeat,
+      ownerId: actionUserId,
+      ownerSeat,
     });
 
     if (meldEntry) {
       const sourceIds = getEntityIds({
-        id: payload.discardedBy || payload.discardedByUserId || payload.discardedByPlayerId || payload.shooterId || payload.fromPlayerId,
+        id: sourcePlayerId,
       });
-      const sourcePosition = getSeatPosition(payload.discardedBySeat || payload.shooterSeat || payload.fromSeat, current);
+      const sourcePosition = getSeatPosition(sourceSeat, current);
       const positionToUpdate = normalizePosition(seatPosition);
-      const ownerSeat = payload.seat || payload.claimedBySeat || payload.claimerSeat || payload.actorSeat || '';
       const ownedMeldEntry = {
         ...meldEntry,
-        ...(payload.meldId || payload.openMeld?.id || payload.meld?.id ? { id: payload.meldId || payload.openMeld?.id || payload.meld?.id } : {}),
+        ...(payload.meldId || authoritativeMeld.id || authoritativeMeld.meldId ? { id: payload.meldId || authoritativeMeld.id || authoritativeMeld.meldId } : {}),
         ...(actionUserId ? { ownerId: actionUserId } : {}),
         ...(ownerSeat ? { ownerSeat } : {}),
         ...(positionToUpdate ? { ownerPosition: positionToUpdate } : {}),
       };
       const hasActionIdentity = Boolean(actionIds.length || positionToUpdate);
-      const currentIds = getCurrentPlayerIdCandidates(current);
-      const isLocalActionPlayer = isBottomPosition(positionToUpdate)
-        || (actionIds.length && actionIds.some((id) => currentIds.includes(id)));
+      const isLocalActionPlayer = Boolean(
+        actionIds.length && actionIds.some((id) => currentIds.includes(id))
+      );
       const payloadHandTiles = getFirstRawTileList(
         payload.handTiles,
         payload.myHand,
@@ -2668,6 +2717,12 @@ function mergeActionBroadcast(current, payload = {}) {
         payload.hand,
         payload.player?.handTiles,
         payload.player?.hand
+      );
+      const payloadHandSize = getFirstNumber(
+        payload.handSize,
+        authoritativeMeld.handSize,
+        payload.player?.handSize,
+        payload.player?.handCount
       );
 
       if (isLocalActionPlayer) {
@@ -2687,10 +2742,12 @@ function mergeActionBroadcast(current, payload = {}) {
         let removedFromPlayerDiscard = false;
 
         next.players = current.players.map((player) => {
-          const isActionPlayer = (actionIds.length && playerMatchesAnyId(player, actionIds))
-            || (positionToUpdate && normalizePosition(player.position) === positionToUpdate);
-          const isSourcePlayer = (sourceIds.length && playerMatchesAnyId(player, sourceIds))
-            || (sourcePosition && normalizePosition(player.position) === sourcePosition);
+          const isActionPlayer = actionIds.length
+            ? playerMatchesAnyId(player, actionIds)
+            : Boolean(positionToUpdate && normalizePosition(player.position) === positionToUpdate);
+          const isSourcePlayer = sourceIds.length
+            ? playerMatchesAnyId(player, sourceIds)
+            : Boolean(sourcePosition && normalizePosition(player.position) === sourcePosition);
           const shouldFallbackRemove = !sourceIds.length
             && !sourcePosition
             && !isActionPlayer
@@ -2713,13 +2770,15 @@ function mergeActionBroadcast(current, payload = {}) {
                 : Math.max(0, rawMeldTiles.length - (tileId ? 1 : 0));
             const nextHandSize = shouldUpdatePlayerHand
               ? nextPlayerHand.length
-              : Math.max(0, Number(player.handSize ?? player.handCount ?? 0) - removedFromHandCount);
+              : payloadHandSize !== null
+                ? Math.max(0, payloadHandSize)
+                : Math.max(0, Number(player.handSize ?? player.handCount ?? 0) - removedFromHandCount);
 
             return {
               ...player,
               openMelds: upsertMeldEntry(currentOpenMelds, ownedMeldEntry, payload),
               ...(shouldUpdatePlayerHand ? { handTiles: nextPlayerHand, hand: nextPlayerHand, tiles: nextPlayerHand } : {}),
-              ...(Number.isFinite(nextHandSize) && nextHandSize > 0 ? { handSize: nextHandSize, handCount: nextHandSize } : {}),
+              ...(Number.isFinite(nextHandSize) && nextHandSize >= 0 ? { handSize: nextHandSize, handCount: nextHandSize } : {}),
             };
           }
 
@@ -3050,6 +3109,14 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
         case 'claim_window':
           setGameState((current) => mergeClaimWindow(current || {}, payload));
           break;
+        case 'claim_accepted':
+          setGameState((current) => ({
+            ...(current || {}),
+            pendingClaimAction: normalizeActionForUi(payload.action) || payload.action || current?.pendingClaimAction,
+            claimAccepted: payload,
+          }));
+          setGameError('');
+          break;
         case 'fei_reclaim_window':
           setGameState((current) => mergeFeiReclaimWindow(current || {}, payload));
           setGameError('');
@@ -3123,6 +3190,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
       ['player:drawn_tile', (payload) => handleSocketMessage({ type: 'drawn_tile', payload })],
       ['player:bonus_played', (payload) => handleSocketMessage({ type: 'action_broadcast', payload: { action: 'bonus_tile_played', ...(payload || {}) } })],
       ['game:claim_window', (payload) => handleSocketMessage({ type: 'claim_window', payload })],
+      ['player:claim_accepted', (payload) => handleSocketMessage({ type: 'claim_accepted', payload })],
       ['game:fei_reclaim_window', (payload) => handleSocketMessage({ type: 'fei_reclaim_window', payload })],
       ['game:reclaim_fei_window', (payload) => handleSocketMessage({ type: 'fei_reclaim_window', payload })],
       ['game:fei_reclaim_available', (payload) => handleSocketMessage({ type: 'fei_reclaim_window', payload })],
@@ -3306,7 +3374,6 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   const isFeiReclaimBlocking = Boolean(reclaimFeiWindow?.active || isReclaimFeiPending);
   const hasUserDiscardedThisTurn = Boolean(gameState.hasDiscardedThisTurn || gameState.myTurnHasDiscarded);
   const canUserDiscard = Boolean(isUserTurn && gameState.canDiscard !== false && !hasUserDiscardedThisTurn && !isClaimWindowOpen && !isFeiReclaimBlocking && !gameState.pendingDiscardTileId && !gameState.currentDiscard);
-  const canUserPlayBonus = Boolean(isUserTurn && gameState.canPlayBonus !== false && !hasUserDiscardedThisTurn && !isClaimWindowOpen && !isFeiReclaimBlocking && !gameState.pendingDiscardTileId && !gameState.pendingBonusTileId && !gameState.currentDiscard);
   const baseAvailableActions = getAvailableActions(gameState, false);
   const turnAvailableActions = isUserTurn && !hasUserDiscardedThisTurn && !isClaimWindowOpen && !isFeiReclaimBlocking
     ? baseAvailableActions.filter((action) => TURN_ONLY_ACTIONS.has(action))
@@ -3395,7 +3462,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   };
 
   const handleTileDiscard = (tileEntry) => {
-    if (!(canUserDiscard || canUserPlayBonus) || isFeiReclaimBlocking) return;
+    if (!canUserDiscard || isFeiReclaimBlocking) return;
 
     if (isClaimWindowOpen) {
       setGameError(t('claimWindowOpen'));
@@ -3422,70 +3489,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     if (!tileId) return;
 
     if (isBonusTile) {
-      if (!canUserPlayBonus) {
-        setGameError(t('bonusTileUnavailable'));
-        return;
-      }
-
-      if (isMockGameplay) {
-        setGameState((current) => {
-          const handTiles = removeOneTileFromHand(
-            getFirstRawTileList(current.handTiles, current.myHand, current.playerHand),
-            String(tileId),
-            renderedTile
-          );
-          const bonusTiles = { ...(current.bonusTiles || {}) };
-          bonusTiles.left = appendUniqueTileList(bonusTiles.left, [renderedTile]);
-
-          return {
-            ...(current || {}),
-            handTiles,
-            myHand: handTiles,
-            playerHand: handTiles,
-            bonusTiles,
-          };
-        });
-        setGameError('');
-        return;
-      }
-
-      const sent = playBonusTile(tileId);
-      if (sent) {
-        setGameState((current) => {
-          const currentHandTiles = getFirstRawTileList(current?.handTiles, current?.myHand, current?.playerHand);
-          const handTiles = removeOneTileFromHand(currentHandTiles, String(tileId), renderedTile);
-          const bonusPosition = normalizePosition(localPlayerPosition) || 'bottom';
-          const bonusTiles = { ...(current?.bonusTiles || {}) };
-          bonusTiles[bonusPosition] = appendUniqueTileList(bonusTiles[bonusPosition], [tileId]);
-          const nextPlayers = toArray(current?.players).map((player) => {
-            const isLocalPlayer = playerMatchesAnyId(player, currentPlayerIds)
-              || normalizePosition(player.position) === bonusPosition;
-            if (!isLocalPlayer) return player;
-            const currentBonusTiles = getFirstTileList(player.bonusTiles, player.revealedBonusTiles, player.revealedBonus);
-            return {
-              ...player,
-              bonusTiles: appendUniqueTileList(currentBonusTiles, [tileId]),
-              ...(playerMatchesAnyId(player, currentPlayerIds) ? { handTiles, hand: handTiles, tiles: handTiles } : {}),
-            };
-          });
-          const playableBonusTiles = handTiles.filter((handTile) => isBonusTileName(handTile));
-
-          return {
-            ...(current || {}),
-            handTiles,
-            myHand: handTiles,
-            playerHand: handTiles,
-            players: nextPlayers.length ? nextPlayers : current?.players,
-            bonusTiles,
-            playableBonusTiles,
-            canPlayBonus: playableBonusTiles.length > 0,
-            pendingBonusTileId: tileId,
-          };
-        });
-        setGameError('');
-      } else {
-        setGameError(t('unablePlayBonusTile'));
-      }
+      setGameError('Bonus tiles are replaced automatically by the server.');
       return;
     }
 
@@ -3839,7 +3843,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
             const isBonusTile = isBonusTileName(tile);
             const assetName = tile.assetName;
             const isDrawnTileHighlight = tileMatchesHighlight(tile, gameState.highlightedDrawnTile);
-            const isTileDisabled = isLockedFei || isFeiReclaimBlocking || (isBonusTile ? !canUserPlayBonus : !canUserDiscard);
+            const isTileDisabled = isLockedFei || isBonusTile || isFeiReclaimBlocking || !canUserDiscard;
 
             return (
               <button
@@ -3847,14 +3851,13 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
                 type="button"
                 key={`${tile.rawId || assetName}-${index}`}
                 data-tile-id={tile.rawId}
-                aria-label={isLockedFei ? `${t('feiLocked')} ${index + 1}` : isBonusTile ? `${t('playBonusTile')} ${index + 1}` : `Tile ${index + 1}`}
-                title={isLockedFei ? t('feiLocked') : isBonusTile ? t('playBonusTile') : undefined}
+                aria-label={isLockedFei ? `${t('feiLocked')} ${index + 1}` : isBonusTile ? `Automatic bonus tile ${index + 1}` : `Tile ${index + 1}`}
+                title={isLockedFei ? t('feiLocked') : isBonusTile ? 'Bonus tiles are replaced automatically' : undefined}
                 disabled={isTileDisabled}
                 onClick={() => handleTileDiscard(tile)}
               >
                 <GameplayTile name={assetName} className={`${isLockedFei ? 'gameplay-tile--fei' : ''} ${isBonusTile ? 'gameplay-tile--bonus' : ''} ${isDrawnTileHighlight ? 'gameplay-tile--drawn-highlight' : ''}`} />
                 {isLockedFei ? <span className="gameplay-fei-lock" aria-hidden="true">FEI</span> : null}
-                {isBonusTile ? <span className="gameplay-bonus-play-label" aria-hidden="true">BONUS</span> : null}
               </button>
             );
           })}
@@ -3878,7 +3881,13 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
               key={actionKey}
               onClick={() => handleMahjongAction(actionKey)}
               aria-pressed={isActive}
-              disabled={isFeiReclaimBlocking || hasUserDiscardedThisTurn || !availableActions.includes(actionKey) || (!isClaimWindowOpen && !isUserTurn)}
+              disabled={
+                isFeiReclaimBlocking
+                || Boolean(gameState.pendingClaimAction)
+                || (!isClaimWindowOpen && hasUserDiscardedThisTurn)
+                || !availableActions.includes(actionKey)
+                || (!isClaimWindowOpen && !isUserTurn)
+              }
             >
               {t(action.labelKey)}
             </button>
