@@ -44,22 +44,22 @@ html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-screen
 
   /*   PLAYER CARDS   */
   --pt-top-player-x: 50%;
-  --pt-top-player-y: 124px;
-  --pt-side-player-x: 20px;
-  --pt-side-player-y: 420px;
+  --pt-top-player-y: 104px;
+  --pt-side-player-x: 0px;
+  --pt-side-player-y: 408px;
   --pt-bottom-player-x: 22px;
-  --pt-bottom-player-y: 836px;
-  --pt-player-card-w: 124px;
-  --pt-player-card-min-h: 154px;
-  --pt-player-card-padding: 9px 7px 10px;
+  --pt-bottom-player-y: 858px;
+  --pt-player-card-w: 112px;
+  --pt-player-card-min-h: 13px;
+  --pt-player-card-padding: 8px 6px 9px;
   --pt-player-card-radius: 15px;
-  --pt-player-avatar-size: 82px;
-  --pt-player-avatar-margin: 0 auto 7px;
-  --pt-player-name-max-w: 108px;
-  --pt-player-name-font-size: 16px;
+  --pt-player-avatar-size: 66px;
+  --pt-player-avatar-margin: 0 auto 5px;
+  --pt-player-name-max-w: 96px;
+  --pt-player-name-font-size: 14px;
   --pt-player-subtitle-font-size: 9px;
   --pt-player-coin-font-size: 14px;
-  --pt-side-name-font-size: 17px;
+  --pt-side-name-font-size: 15px;
   --pt-side-subtitle-font-size: 10px;
   --pt-side-coin-font-size: 15px;
   --pt-turn-badge-h: 24px;
@@ -68,11 +68,17 @@ html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-screen
   --pt-turn-badge-y: -22px;
   --pt-side-turn-badge-x: -6px;
   --pt-side-turn-badge-y: -24px;
+  --pt-horizontal-player-w: 208px;
+  --pt-horizontal-player-h: 94px;
+  --pt-horizontal-player-padding: 8px 12px;
+  --pt-horizontal-avatar-size: 70px;
+  --pt-horizontal-player-gap: 10px;
+  --pt-horizontal-name-max-w: 108px;
 
   /*   TABLE + TIMER   */
   --pt-table-x: 50%;
-  --pt-table-y: 294px;
-  --pt-table-w: 684px;
+  --pt-table-y: 232px;
+  --pt-table-w: 704px;
   --pt-table-h: calc(var(--pt-table-w) * 1086 / 1448);
   --pt-wall-tile-w: 22px;
   --pt-wall-tile-h: 31px;
@@ -84,14 +90,14 @@ html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-screen
   --pt-wall-side-y: 48%;
   --pt-wall-side-transform: translate(-50%, -50%) scaleX(.56) scaleY(.50);
   --pt-wall-bottom-x: 55%;
-  --pt-wall-bottom-y: 65.5%;
+  --pt-wall-bottom-y: 59.5%;
   --pt-wall-bottom-transform: translateX(-50%) scaleX(.82) scaleY(.50);
   --pt-middle-x: 50%;
   --pt-middle-y: 49%;
-  --pt-middle-w: 312px;
-  --pt-middle-h: 210px;
-  --pt-timer-size: 62px;
-  --pt-timer-font-size: 27px;
+  --pt-middle-w: 330px;
+  --pt-middle-h: 224px;
+  --pt-timer-size: 70px;
+  --pt-timer-font-size: 30px;
 
   /*   DISCARD LANES   */
   --pt-discard-padding: 3px 6px;
@@ -106,21 +112,21 @@ html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-screen
   --pt-discard-bottom-y: 68.5%;
   --pt-discard-bottom-max-w: 340px;
   --pt-discard-bottom-transform: translateX(-50%) scale(.56);
-  --pt-discard-side-x: 31%;
-  --pt-discard-side-y: 38.25%;
-  --pt-discard-side-max-h: 156px;
+  --pt-discard-side-x: 32%;
+  --pt-discard-side-y: 32.25%;
+  --pt-discard-side-max-h: 356px;
   --pt-discard-side-transform: scale(.50);
   --pt-discard-side-tile-gap: 3px;
 
   /*   BONUS RACKS   */
-  --pt-bonus-top-x: 15.5%;
-  --pt-bonus-top-y: 7.5%;
+  --pt-bonus-top-x: 72.5%;
+  --pt-bonus-top-y: 14.5%;
   --pt-bonus-top-transform: translateX(-50%) scale(.72);
-  --pt-bonus-side-x: 14.5%;
-  --pt-bonus-side-y: 39.5%;
+  --pt-bonus-side-x: 15.5%;
+  --pt-bonus-side-y: 40%;
   --pt-bonus-side-transform: scale(.70);
-  --pt-bonus-bottom-x: 69%;
-  --pt-bonus-bottom-y: 65.5%;
+  --pt-bonus-bottom-x: 72%;
+  --pt-bonus-bottom-y: 68%;
   --pt-bonus-bottom-transform: scale(.70);
   --pt-bonus-rack-max-w: 146px;
   --pt-bonus-rack-max-h: 110px;
@@ -132,10 +138,10 @@ html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-screen
 
   /*   MELD RACKS   */
   --pt-meld-top-x: 53%;
-  --pt-meld-top-y: 18.5%;
+  --pt-meld-top-y: 19%;
   --pt-meld-top-transform: translateX(-50%) scale(.60);
-  --pt-meld-side-x: 24.5%;
-  --pt-meld-side-y: 39.25%;
+  --pt-meld-side-x: 24%;
+  --pt-meld-side-y: 40%;
   --pt-meld-side-transform: scale(.48);
   --pt-meld-bottom-x: 50%;
   --pt-meld-bottom-y: 74%;
@@ -154,22 +160,22 @@ html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-screen
 
   /*   HAND + ACTIONS   */
   --pt-hand-x: 50%;
-  --pt-hand-y: 435px;
-  --pt-hand-w: 658px;
-  --pt-hand-h: 82px;
-  --pt-hand-tile-w: 45px;
-  --pt-hand-tile-h: 73px;
+  --pt-hand-y: 448px;
+  --pt-hand-w: 688px;
+  --pt-hand-h: 88px;
+  --pt-hand-tile-w: 47px;
+  --pt-hand-tile-h: 77px;
   --pt-hand-tile-overlap: -3px;
   --pt-hand-drawn-offset: -7px;
   --pt-hand-hover-offset: -10px;
   --pt-actions-x: 50%;
-  --pt-actions-y: 838px;
-  --pt-actions-claim-y: 1018px;
-  --pt-actions-w: 540px;
-  --pt-actions-h: 70px;
-  --pt-actions-gap: 14px;
-  --pt-action-w: 112px;
-  --pt-action-h: 58px;
+  --pt-actions-y: 1030px;
+  --pt-actions-claim-y: 1030px;
+  --pt-actions-w: 650px;
+  --pt-actions-h: 76px;
+  --pt-actions-gap: 10px;
+  --pt-action-w: 118px;
+  --pt-action-h: 62px;
   --pt-action-padding: 0 6px;
   --pt-action-radius: 13px;
   --pt-action-font-size: 15px;
@@ -2580,3 +2586,70 @@ html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-fei-re
 }
 
 /*  Keep narrow real phones identical to the 720x1280 portrait composition.  */
+
+/* =========================================================
+   PORTRAIT MOBILE COMPOSITION — FINAL LAYOUT
+   Top and local-player cards use compact horizontal layouts.
+   The table, hand and actions remain independently adjustable
+   through the control-panel variables above.
+   ========================================================= */
+html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-player-badge.top,
+html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-player-badge.bottom {
+  width: var(--pt-horizontal-player-w) !important;
+  min-height: var(--pt-horizontal-player-h) !important;
+  height: var(--pt-horizontal-player-h) !important;
+  padding: var(--pt-horizontal-player-padding) !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: var(--pt-horizontal-player-gap) !important;
+  text-align: left !important;
+}
+
+html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-player-badge.top .gameplay-player-avatar,
+html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-player-badge.bottom .gameplay-player-avatar {
+  width: var(--pt-horizontal-avatar-size) !important;
+  height: var(--pt-horizontal-avatar-size) !important;
+  margin: 0 !important;
+}
+
+html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-player-badge.top .gameplay-player-info,
+html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-player-badge.bottom .gameplay-player-info {
+  width: auto !important;
+  flex: 1 1 auto !important;
+  align-items: flex-start !important;
+  text-align: left !important;
+}
+
+html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-player-badge.top .gameplay-player-info strong,
+html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-player-badge.top .gameplay-player-info small,
+html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-player-badge.bottom .gameplay-player-info strong,
+html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-player-badge.bottom .gameplay-player-info small {
+  max-width: var(--pt-horizontal-name-max-w) !important;
+  text-align: left !important;
+}
+
+html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-player-badge.top .gameplay-player-info span,
+html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-player-badge.bottom .gameplay-player-info span {
+  justify-content: flex-start !important;
+}
+
+html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-player-badge.bottom {
+  z-index: 58 !important;
+}
+
+html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-table-zone {
+  max-width: calc(100% - 16px) !important;
+}
+
+html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-hand {
+  padding-inline: 4px !important;
+  box-sizing: border-box !important;
+}
+
+html[data-layout='portrait'] .app-shell[data-layout='portrait'] .gameplay-actions {
+  padding-inline: 8px !important;
+  box-sizing: border-box !important;
+  flex-wrap: nowrap !important;
+}
+

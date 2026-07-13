@@ -118,7 +118,7 @@
 
   /*   MELD RACKS   */
   --gp-meld-top-x: 78%;
-  --gp-meld-top-y: 29.8%;
+  --gp-meld-top-y: 19.8%;
   --gp-meld-top-transform: translateX(-50%) scale(.58);
   --gp-meld-left-x: 16%;
   --gp-meld-left-y: 35%;
@@ -1724,7 +1724,7 @@
 .app-shell[data-layout='landscape'] .gameplay-meld-rack--top,
 .app-shell[data-layout='landscape'] .gameplay-meld-rack--bottom {
   max-width: 340px !important;
-  max-height: 128px !important;
+  max-height: 328px !important;
   flex-wrap: wrap !important;
 }
 
@@ -2147,7 +2147,7 @@
 
 .app-shell[data-layout='landscape'] .gameplay-bonus-rack {
   max-width: 154px !important;
-  max-height: 102px !important;
+  max-height: 302px !important;
   overflow: hidden !important;
   box-sizing: border-box !important;
 }
@@ -2213,7 +2213,7 @@
 
 .app-shell[data-layout='landscape'] .gameplay-meld-rack {
   max-width: 300px !important;
-  max-height: 142px !important;
+  max-height: 242px !important;
   overflow: hidden !important;
   align-content: flex-start !important;
   gap: 6px !important;
@@ -2247,7 +2247,7 @@
   top: var(--gp-meld-top-y) !important;
   left: var(--gp-meld-top-x) !important;
   max-width: 340px !important;
-  max-height: 128px !important;
+  max-height: 300px !important;
   flex-wrap: wrap !important;
   transform: var(--gp-meld-top-transform) !important;
   transform-origin: top center !important;
@@ -2269,7 +2269,7 @@
 .app-shell[data-layout='landscape'] .gameplay-meld-rack--left .gameplay-meld-tiles {
   flex-direction: column !important;
   max-width: 48px !important;
-  max-height: 154px !important;
+  max-height: 200px !important;
 }
 
 .app-shell[data-layout='landscape'] .gameplay-meld-rack--left .gameplay-meld-tiles .gameplay-tile {
@@ -2281,7 +2281,7 @@
   left: var(--gp-meld-bottom-x) !important;
   bottom: var(--gp-meld-bottom-bottom) !important;
   max-width: 340px !important;
-  max-height: 128px !important;
+  max-height: 328px !important;
   flex-wrap: wrap !important;
   transform: var(--gp-meld-bottom-transform) !important;
   transform-origin: bottom center !important;
