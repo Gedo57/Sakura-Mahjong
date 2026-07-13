@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ROUTES, buildGameRoute } from '../router/routes.js';
 import { getStoredAuthUser } from '../services/authService.js';
@@ -15,6 +15,7 @@ import {
   getBufferedGameSocketMessages,
   passClaimWindow,
   reclaimFei,
+  requestGameSync,
   skipFeiReclaim,
 } from '../services/socket.js';
 import { clearActiveMatch, clearMatchmakingContext, getActiveMatch, saveActiveMatch } from '../store/gameStore.js';
@@ -2759,6 +2760,7 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
   const [gameError, setGameError] = useState('');
   const [isLeavingGame, setIsLeavingGame] = useState(false);
   const [displayTimer, setDisplayTimer] = useState(() => Number(gameState.timer ?? gameState.timeLimit ?? 0) || 0);
+  const timerRecoveryRef = useRef({ signature: '', lastRequestedAt: 0, timeoutId: null });
   const [areGameplayAssetsReady, setAreGameplayAssetsReady] = useState(() => typeof window === 'undefined');
 
   useEffect(() => {
@@ -3221,6 +3223,88 @@ export default function MahjongGamePage({ mockMode = false } = {}) {
     setDisplayTimer(Number(gameState.timer ?? gameState.remainingSeconds ?? gameState.timeLimit ?? 0) || 0);
     return undefined;
   }, [gameState.timerDeadlineMs, gameState.timer, gameState.remainingSeconds, gameState.timeLimit, gameState.status, gameState.turnStartedAt, isClaimWindowOpen, isMockGameplay, isUserTurn]);
+
+  // Client-side safety net only: the server remains authoritative. If the UI
+  // stays at zero, ask the backend to restore/finalize the Redis-backed timer.
+  useEffect(() => {
+    const recoveryState = timerRecoveryRef.current;
+    if (recoveryState.timeoutId) {
+      window.clearTimeout(recoveryState.timeoutId);
+      recoveryState.timeoutId = null;
+    }
+
+    const status = String(gameState.status || '').toLowerCase();
+    const isActiveStatus = ['playing', 'resolving', 'active'].includes(status);
+    if (isMockGameplay || !isActiveStatus || Number(displayTimer) > 0) return undefined;
+
+    const roomId = gameState.roomId
+      || gameState.matchId
+      || location.state?.roomId
+      || storedMatch?.roomId
+      || resolvedMatchId;
+    if (!roomId) return undefined;
+
+    const activeUserId = gameState.turnPlayerId
+      || gameState.currentTurnPlayerId
+      || gameState.activeUserId
+      || '';
+    const deadline = Number(
+      gameState.claimWindow?.expiresAt
+      || gameState.claimWindow?.claimEndsAt
+      || gameState.timerDeadlineMs
+      || gameState.turnEndsAt
+      || gameState.timerEndsAt
+      || 0
+    ) || 0;
+    const signature = [
+      roomId,
+      status,
+      gameState.turnNumber || 0,
+      activeUserId,
+      deadline,
+      Boolean(gameState.claimWindow),
+    ].join('|');
+
+    const now = Date.now();
+    if (recoveryState.signature === signature && now - recoveryState.lastRequestedAt < 8000) {
+      return undefined;
+    }
+
+    recoveryState.timeoutId = window.setTimeout(() => {
+      recoveryState.signature = signature;
+      recoveryState.lastRequestedAt = Date.now();
+      recoveryState.timeoutId = null;
+      requestGameSync(roomId, {
+        reason: 'timer_zero_client_watchdog',
+        turnNumber: gameState.turnNumber,
+        activeUserId,
+      });
+    }, 1800);
+
+    return () => {
+      if (recoveryState.timeoutId) {
+        window.clearTimeout(recoveryState.timeoutId);
+        recoveryState.timeoutId = null;
+      }
+    };
+  }, [
+    displayTimer,
+    gameState.activeUserId,
+    gameState.claimWindow,
+    gameState.currentTurnPlayerId,
+    gameState.matchId,
+    gameState.roomId,
+    gameState.status,
+    gameState.timerDeadlineMs,
+    gameState.timerEndsAt,
+    gameState.turnEndsAt,
+    gameState.turnNumber,
+    gameState.turnPlayerId,
+    isMockGameplay,
+    location.state,
+    resolvedMatchId,
+    storedMatch,
+  ]);
 
 
   useEffect(() => {

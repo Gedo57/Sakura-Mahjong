@@ -587,6 +587,16 @@ export function startPrivateGame(roomId) {
   return emitOnActiveSocket('start_private_game', { roomId });
 }
 
+export function requestGameSync(roomId, metadata = {}) {
+  return emitOnActiveSocket('game:request_sync', {
+    roomId: roomId || undefined,
+    reason: metadata.reason || 'client_request',
+    turnNumber: metadata.turnNumber,
+    activeUserId: metadata.activeUserId,
+    requestedAt: Date.now(),
+  });
+}
+
 export function discardTile(tileId) {
   if (!tileId) {
     console.warn('[game-socket] discardTile called without tileId.');
