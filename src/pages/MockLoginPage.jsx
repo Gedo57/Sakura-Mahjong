@@ -29,8 +29,8 @@ export default function MockLoginPage() {
 
   const handleLogin = async (formData) => {
     await login({
-      email: formData.get('email'),
-      password: formData.get('password'),
+      email: String(formData.get('email') || '').trim(),
+      password: String(formData.get('password') || ''),
       rememberMe,
     });
 
@@ -105,7 +105,7 @@ export default function MockLoginPage() {
 
           <label className="mock-login-input">
             <span aria-hidden="true">✉</span>
-            <input name="email" type="email" inputMode="email" defaultValue={isRegisterMode ? '' : 'Stevie22@gmail.com'} placeholder={t('email')} autoComplete="email" autoCapitalize="none" spellCheck="false" enterKeyHint="next" required />
+            <input name="email" type="email" inputMode="email" defaultValue={isRegisterMode ? '' : ''} placeholder={t('email')} autoComplete="email" autoCapitalize="none" spellCheck="false" enterKeyHint="next" required />
           </label>
 
           <label className="mock-login-input">
@@ -113,7 +113,7 @@ export default function MockLoginPage() {
             <input
               name="password"
               type={showPassword ? 'text' : 'password'}
-              defaultValue={isRegisterMode ? '' : 'password123'}
+              defaultValue={isRegisterMode ? '' : ''}
               placeholder={t('password')}
               autoComplete={isRegisterMode ? 'new-password' : 'current-password'}
               minLength={4}

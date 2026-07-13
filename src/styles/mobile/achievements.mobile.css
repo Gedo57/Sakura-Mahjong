@@ -1,0 +1,77 @@
+/* Achievements full page mobile */
+.app-shell[data-device='mobile'] .achievements-page .achievements-page__content {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 140px minmax(0, 1fr);
+}
+
+.app-shell[data-device='mobile'] .profile-content--compact {
+  grid-template-rows: 150px minmax(0, 1fr);
+}
+
+.app-shell[data-device='mobile'] .profile-tabs--nav {
+  margin-top: 30px;
+}
+
+.app-shell[data-device='mobile'] .profile-tabs--nav button {
+  min-height: 56px;
+}
+
+.app-shell[data-device='mobile'] .achievements-page__panel {
+  min-height: 0;
+  padding: 0 18px 18px 20px;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.app-shell[data-device='mobile'] .achievements-page__scroll {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
+.app-shell[data-device='mobile'] .achievements-page__grid {
+  height: auto;
+  grid-template-columns: repeat(4, 197px);
+  gap: 34px;
+  padding: 10px 8px 28px 0;
+}
+
+.app-shell[data-device='mobile'] .achievements-page__header {
+  padding-bottom: 6px;
+}
+
+
+/* Scroll and profile-avatar sync fixes */
+.app-shell[data-device='mobile'] .achievements-page,
+.app-shell[data-device='mobile'] .achievements-page__content {
+  height: 100%;
+  overflow: hidden;
+}
+
+.app-shell[data-device='mobile'] .achievements-page__panel {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell[data-device='mobile'] .achievements-page__scroll {
+  height: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+
+.app-shell[data-device='mobile'] .achievements-page__scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.app-shell[data-device='mobile'] .achievements-page__scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+}
+
+.app-shell[data-device='mobile'] .achievements-page__scroll::-webkit-scrollbar-thumb {
+  background: rgba(205, 162, 255, 0.72);
+  border-radius: 999px;
+}

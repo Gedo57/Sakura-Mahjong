@@ -1,0 +1,348 @@
+.app-shell[data-device='mobile'] .leaderboard-page-ui {
+  width: 100%;
+  height: 100%;
+  padding: 22px 34px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  color: #fff8e6;
+  font-family: Georgia, "Times New Roman", serif;
+  background: radial-gradient(circle at 50% 5%, rgba(255, 203, 92, 0.2), rgba(6, 4, 22, 0.84) 46%, rgba(3, 2, 12, 0.92));
+}
+
+.app-shell[data-device='mobile'] .leaderboard-header {
+  height: 92px;
+  display: grid;
+  grid-template-columns: 150px 1fr 210px;
+  align-items: center;
+  gap: 18px;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-back-button {
+  height: 44px;
+  border: 1px solid rgba(255, 226, 144, 0.36);
+  border-radius: 12px;
+  color: #fff4ce;
+  background: rgba(19, 11, 37, 0.76);
+  font-size: 16px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.24);
+}
+
+.app-shell[data-device='mobile'] .leaderboard-title-wrap {
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-title-wrap img {
+  width: 70px;
+  height: 70px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 18px rgba(255, 192, 67, 0.48));
+}
+
+.app-shell[data-device='mobile'] .leaderboard-title-wrap h1 {
+  margin: 0;
+  font-size: 44px;
+  line-height: 0.95;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-shadow: 0 4px 22px rgba(0, 0, 0, 0.7), 0 0 22px rgba(255, 182, 52, 0.34);
+}
+
+.app-shell[data-device='mobile'] .leaderboard-title-wrap p {
+  margin: 6px 0 0;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: rgba(255, 244, 204, 0.72);
+  text-transform: uppercase;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-my-rank-card {
+  min-height: 70px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 220, 126, 0.28);
+  border-radius: 16px;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  background: linear-gradient(180deg, rgba(86, 50, 14, 0.78), rgba(18, 10, 34, 0.82));
+  box-shadow: inset 0 0 26px rgba(255, 229, 156, 0.08), 0 14px 34px rgba(0, 0, 0, 0.26);
+}
+
+.app-shell[data-device='mobile'] .leaderboard-my-rank-card span,
+.app-shell[data-device='mobile'] .leaderboard-my-rank-card small {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: rgba(255, 247, 218, 0.7);
+  text-transform: uppercase;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-my-rank-card strong {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 26px;
+  line-height: 1;
+  color: #fff2b8;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-content {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 246px minmax(0, 1fr);
+  gap: 18px;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-podium {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 18px;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-top-card {
+  position: relative;
+  min-height: 202px;
+  padding: 22px 18px 18px;
+  border: 1px solid rgba(255, 229, 151, 0.36);
+  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(255, 188, 80, 0.24), rgba(61, 27, 92, 0.34) 42%, rgba(13, 8, 32, 0.84));
+  box-shadow: inset 0 0 34px rgba(255, 239, 188, 0.09), 0 18px 38px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-top-card-rank-1 {
+  min-height: 236px;
+  transform: translateY(-8px);
+  border-color: rgba(255, 239, 175, 0.62);
+  box-shadow: inset 0 0 42px rgba(255, 239, 188, 0.12), 0 22px 46px rgba(0, 0, 0, 0.36), 0 0 28px rgba(255, 193, 63, 0.18);
+}
+
+.app-shell[data-device='mobile'] .leaderboard-top-rank {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  height: 32px;
+  min-width: 58px;
+  padding: 0 12px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: #3a2100;
+  background: linear-gradient(180deg, #fff6c8, #ffa930);
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 1000;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+}
+
+.app-shell[data-device='mobile'] .leaderboard-top-avatar-wrap {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin-bottom: 12px;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-top-card-rank-1 .leaderboard-top-avatar-wrap {
+  width: 116px;
+  height: 116px;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-top-avatar {
+  width: 100%;
+  height: 100%;
+  border: 4px solid rgba(255, 239, 188, 0.82);
+  border-radius: 999px;
+  object-fit: cover;
+  background: rgba(15, 8, 30, 0.8);
+}
+
+.app-shell[data-device='mobile'] .leaderboard-top-icon {
+  position: absolute;
+  right: -14px;
+  bottom: -10px;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(255, 183, 44, 0.64));
+}
+
+.app-shell[data-device='mobile'] .leaderboard-top-name {
+  max-width: 100%;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 21px;
+  font-weight: 1000;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-top-trophies {
+  margin-top: 7px;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  color: #ffdf81;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-list-panel {
+  min-height: 0;
+  border: 1px solid rgba(255, 228, 150, 0.22);
+  border-radius: 22px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(9, 6, 25, 0.78);
+  box-shadow: inset 0 0 28px rgba(255, 255, 255, 0.04), 0 18px 40px rgba(0, 0, 0, 0.26);
+}
+
+.app-shell[data-device='mobile'] .leaderboard-list-header {
+  height: 34px;
+  padding: 0 18px;
+  display: grid;
+  grid-template-columns: 120px 1fr 150px;
+  align-items: center;
+  color: rgba(255, 245, 212, 0.68);
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 1000;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-list-header span:last-child {
+  text-align: right;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-list-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+  display: grid;
+  gap: 8px;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-row {
+  min-height: 58px;
+  padding: 8px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 15px;
+  display: grid;
+  grid-template-columns: 80px 42px 46px 1fr 150px;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.025));
+}
+
+.app-shell[data-device='mobile'] .leaderboard-row-rank,
+.app-shell[data-device='mobile'] .leaderboard-row-name,
+.app-shell[data-device='mobile'] .leaderboard-row-trophies {
+  font-family: Inter, system-ui, sans-serif;
+  font-weight: 1000;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-row-rank {
+  color: #ffe398;
+  font-size: 16px;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-row-icon {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 9px rgba(255, 180, 50, 0.42));
+}
+
+.app-shell[data-device='mobile'] .leaderboard-row-avatar {
+  width: 42px;
+  height: 42px;
+  border: 2px solid rgba(255, 231, 158, 0.5);
+  border-radius: 999px;
+  object-fit: cover;
+  background: rgba(15, 8, 30, 0.8);
+}
+
+.app-shell[data-device='mobile'] .leaderboard-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+  color: #ffffff;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-row-trophies {
+  justify-self: end;
+  color: #ffdb72;
+  font-size: 16px;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-empty-top,
+.app-shell[data-device='mobile'] .leaderboard-empty-list,
+.app-shell[data-device='mobile'] .leaderboard-error-state {
+  min-height: 76px;
+  border: 1px dashed rgba(255, 229, 151, 0.28);
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 247, 218, 0.76);
+  font-family: Inter, system-ui, sans-serif;
+  font-weight: 900;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-empty-top {
+  grid-column: 1 / -1;
+  min-height: 202px;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-error-state {
+  color: #ffd8d8;
+  border-color: rgba(255, 120, 120, 0.32);
+}
+
+.app-shell[data-device='mobile'] .leaderboard-page-ui {
+  padding: 18px 26px 20px;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-header {
+  height: 78px;
+  grid-template-columns: 130px 1fr 190px;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-title-wrap h1 {
+  font-size: 38px;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-title-wrap img {
+  width: 60px;
+  height: 60px;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-content {
+  grid-template-rows: 228px minmax(0, 1fr);
+  gap: 14px;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-top-card {
+  min-height: 188px;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-top-card-rank-1 {
+  min-height: 218px;
+}
+
+.app-shell[data-device='mobile'] .leaderboard-row {
+  min-height: 54px;
+}

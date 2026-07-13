@@ -130,6 +130,18 @@ margin: 6px 0 10px;
   letter-spacing: 0.06em;
 }
 
+
+.app-shell[data-device='desktop'] .profile-user-id {
+margin: -4px 0 8px;
+  max-width: 360px;
+  color: rgba(236, 232, 250, 0.68);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
 .app-shell[data-device='desktop'] .profile-rank-row {
 display: flex;
   align-items: center;
@@ -697,7 +709,7 @@ align-self: flex-start;
 .app-shell[data-device='desktop'] .profile-rank-xp-bar {
   width: 176px;
   height: 18px;
-  margin: 4px 0 0 -10px;
+  margin: 3px 0 0 0;
   border-radius: 999px;
 }
 
@@ -980,4 +992,18 @@ align-self: flex-start;
 
 .app-shell[data-device='desktop'] .profile-logout-button:hover {
   filter: brightness(1.08);
+}
+
+
+/* Profile recent achievements scroll safety */
+.app-shell[data-device='desktop'] .profile-content--compact .achievements-section {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell[data-device='desktop'] .profile-content--compact .achievements-section .profile-achievement-grid {
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 100%;
+  scrollbar-width: thin;
 }

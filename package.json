@@ -11,14 +11,14 @@
     "dev:lan": "vite --host 0.0.0.0 --port 5173 --strictPort"
   },
   "dependencies": {
+    "@react-three/drei": "latest",
+    "@react-three/fiber": "latest",
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
     "react": "latest",
     "react-dom": "latest",
     "react-router-dom": "latest",
+    "socket.io-client": "^4.8.3",
     "three": "latest",
-    "@react-three/fiber": "latest",
-    "@react-three/drei": "latest"
-  },
-  "devDependencies": {}
+    "vite": "latest"
+  }
 }

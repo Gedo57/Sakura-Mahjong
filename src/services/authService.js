@@ -1,4 +1,4 @@
-import { clearAuthTokens, getAuthToken, getRefreshToken, isMockApiEnabled, postToApi, setAuthTokens } from './api.js';
+import { clearAuthTokens, getAuthToken, getRefreshToken, isMockApiEnabled, postToApi, setAuthTokens, getFromApi } from './api.js';
 
 const AUTH_USER_STORAGE_KEY = 'sakura_auth_user';
 
@@ -9,22 +9,11 @@ function normalizeAuthUser(response) {
     return null;
   }
 
-  // Keep the auth user small, but do not force backend avatar values into the UI
-  // unless they are real image URLs or filenames. Invalid avatar IDs were breaking
-  // the profile image by producing paths like /assets/profile/default.
-  const avatarValue = user.avatarUrl || user.imageUrl || user.avatar || user.avatarId;
-  const hasUsableAvatar = typeof avatarValue === 'string' && (
-    /^(https?:)?\/\//i.test(avatarValue.trim()) ||
-    avatarValue.trim().startsWith('/') ||
-    /\.(png|jpe?g|webp|gif|svg)$/i.test(avatarValue.trim())
-  );
-
-  if (hasUsableAvatar) {
-    return user;
-  }
-
-  const { avatar, avatarId, avatarUrl, imageUrl, ...restUser } = user;
-  return restUser;
+  // Keep avatarId/avatar/avatarUrl on the cached auth user. The gameplay/profile
+  // renderers now resolve unsupported backend avatar ids to a safe local fallback,
+  // so dropping avatarId here would make the selected profile avatar disappear
+  // when entering a live socket game.
+  return user;
 }
 
 function persistAuthUser(user) {
@@ -118,7 +107,8 @@ export async function login(credentials) {
 }
 
 export async function refreshToken() {
-  const response = await postToApi('/auth/refresh', undefined, (mockApi) => mockApi.refreshToken(), {
+  const storedRefreshToken = getRefreshToken();
+  const response = await postToApi('/auth/refresh', { refreshToken: storedRefreshToken }, (mockApi) => mockApi.refreshToken(), {
     retryOnUnauthorized: false,
   });
 
@@ -143,4 +133,22 @@ export async function continueAsGuest() {
 export function logout() {
   clearAuthTokens();
   persistAuthUser(null);
+  
+  // Clear all storages to ensure no stale data remains
+  localStorage.clear();
+  sessionStorage.clear();
+  
+  // Clean up any lingering websocket connections globally
+  import('./socket.js').then(({ disconnectGameSocket }) => {
+    disconnectGameSocket();
+  }).catch(() => {});
+}
+
+export async function getUserMatchHistory() {
+  if (isMockApiEnabled()) {
+    return { success: true, history: [] }; // Return mock data for now
+  }
+  
+  const response = await getFromApi('/auth/history', () => ({ success: true, history: [] }));
+  return response?.history || [];
 }

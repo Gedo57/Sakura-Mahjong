@@ -167,17 +167,18 @@ function extractRefreshToken(payload) {
 }
 
 async function requestFreshAccessToken() {
-  const storedRefreshToken = getRefreshToken();
-  const body = storedRefreshToken ? { refreshToken: storedRefreshToken } : undefined;
+  const refreshToken = getRefreshToken();
+
+  if (!refreshToken) {
+    clearAuthTokens();
+    throw new Error('Session expired. Please login again.');
+  }
 
   const response = await fetch(buildUrl('/auth/refresh'), {
     method: 'POST',
     credentials: 'include',
-    headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-      ...(storedRefreshToken ? { Authorization: `Bearer ${storedRefreshToken}` } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refreshToken }),
   });
 
   const payload = await parseResponse(response);

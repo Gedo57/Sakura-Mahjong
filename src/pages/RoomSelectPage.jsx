@@ -4,14 +4,11 @@ import { ROUTES } from '../router/routes.js';
 import ScreenHeader from '../components/ScreenHeader.jsx';
 import PrimaryButton from '../components/PrimaryButton.jsx';
 import FlowNav from '../components/FlowNav.jsx';
-import { getRooms, joinRoom } from '../services/roomService.js';
+import { getRooms } from '../services/roomService.js';
+import { saveMatchmakingContext } from '../store/gameStore.js';
 import { useLanguage } from '../i18n/useLanguage.js';
 
-const fallbackRooms = [
-  { name: 'Beginner Room', bet: '100 coins', status: 'Available' },
-  { name: 'Classic Room', bet: '500 coins', status: 'Available' },
-  { name: 'Expert Room', bet: '1,000 coins', status: 'Locked placeholder' },
-];
+const fallbackRooms = [];
 
 export default function RoomSelectPage() {
   const navigate = useNavigate();
@@ -39,12 +36,19 @@ export default function RoomSelectPage() {
       return;
     }
 
-    await joinRoom(room.roomId || room.tierId || room.id || room.name);
-    navigate(ROUTES.matchmaking);
+    const roomId = room.roomId || room.tierId || room.id || room.name;
+    const matchmakingState = {
+      roomId,
+      tierId: room.tierId || room.id || room.roomId || '',
+      maxPlayers: Number(room.maxPlayers) || 3,
+      source: 'room-select',
+    };
+    saveMatchmakingContext(matchmakingState);
+    navigate(ROUTES.matchmaking, { state: matchmakingState });
   };
 
   return (
-    <section className="screen">
+    <section className="screen room-select-screen">
       <ScreenHeader
         eyebrow={t('lobby')}
         title={t('selectRoom')}
@@ -52,7 +56,7 @@ export default function RoomSelectPage() {
       />
 
       <div className="room-grid">
-        {rooms.map((room) => (
+        {rooms.length ? rooms.map((room) => (
           <article className="room-card" key={room.name}>
             <h2>{tx(room.name)}</h2>
             <p>{tx(room.bet)}</p>
@@ -61,7 +65,14 @@ export default function RoomSelectPage() {
               {t('select')}
             </PrimaryButton>
           </article>
-        ))}
+        )) : (
+          <article className="room-card">
+            <h2>No rooms available</h2>
+            <p>Backend did not return room tiers.</p>
+            <span>Unavailable</span>
+            <PrimaryButton disabled>{t('select')}</PrimaryButton>
+          </article>
+        )}
       </div>
 
       <div className="split-actions">

@@ -1,7 +1,4 @@
-import { mockAchievements, mockPlayerProfile, mockProfileStats } from './mockProfile.js';
 import { mockFeaturedRooms, mockRoomList, mockRoomTiers } from './mockRooms.js';
-import { mockMatchFound, mockMatchmakingSession } from './mockMatchmaking.js';
-import { mockGameResult, mockGameState } from './mockGameState.js';
 
 const delay = (ms = 220) => new Promise((resolve) => {
   window.setTimeout(resolve, ms);
@@ -16,9 +13,9 @@ export const mockApi = {
       message: 'User registered successfully',
       userId: createId('user'),
       user: {
-        ...mockPlayerProfile,
         id: createId('user'),
-        username: payload.username || mockPlayerProfile.username,
+        username: payload.username || payload.email || 'Player',
+        name: payload.username || payload.email || 'Player',
         email: payload.email || 'player1@example.com',
       },
     };
@@ -31,10 +28,10 @@ export const mockApi = {
       accessToken: 'mock_access_token',
       refreshToken: 'mock_refresh_token',
       user: {
-        ...mockPlayerProfile,
-        username: credentials.username || mockPlayerProfile.username,
-        name: credentials.username || mockPlayerProfile.name,
-        email: credentials.email || 'Stevie22@gmail.com',
+        id: 'mock_user',
+        username: credentials.username || credentials.email || 'Player',
+        name: credentials.username || credentials.email || 'Player',
+        email: credentials.email || 'player1@example.com',
       },
     };
   },
@@ -53,8 +50,8 @@ export const mockApi = {
       accessToken: 'mock_guest_access_token',
       refreshToken: 'mock_guest_refresh_token',
       user: {
-        ...mockPlayerProfile,
         id: 'guest_player',
+        username: 'Guest',
         name: 'Guest',
       },
     };
@@ -62,46 +59,18 @@ export const mockApi = {
 
   async getProfile() {
     await delay();
-    return {
-      success: true,
-      profile: mockPlayerProfile,
-    };
+    throw new Error('Profile is unavailable right now. Please try again later.');
   },
 
-  async updateProfile(payload = {}) {
+  async updateProfile() {
     await delay();
-    return {
-      success: true,
-      message: 'Profile updated',
-      profile: {
-        ...mockPlayerProfile,
-        ...payload,
-      },
-    };
+    throw new Error('Profile update is unavailable right now. Please try again later.');
   },
 
-  async getPublicProfile(userId) {
+  async getPublicProfile() {
     await delay();
-    return {
-      success: true,
-      profile: {
-        ...mockPlayerProfile,
-        id: userId,
-        trophies: 500,
-      },
-    };
+    throw new Error('Public profile is unavailable right now. Please try again later.');
   },
-
-  async getProfileStats() {
-    await delay();
-    return mockProfileStats;
-  },
-
-  async getAchievements() {
-    await delay();
-    return mockAchievements;
-  },
-
 
   async getBalances() {
     await delay();
@@ -150,13 +119,14 @@ export const mockApi = {
         diamonds: 0,
         chest: null,
       },
+      claimableDay: 3,
       rewardSchedule: [
         { day: 1, coins: 300, diamonds: 0, chest: null },
-        { day: 2, coins: 0, diamonds: 10, chest: null },
+        { day: 2, coins: 0, diamonds: 5, chest: null },
         { day: 3, coins: 500, diamonds: 0, chest: null },
-        { day: 4, coins: 700, diamonds: 0, chest: null },
-        { day: 5, coins: 0, diamonds: 20, chest: null },
-        { day: 6, coins: 0, diamonds: 0, chest: 'basic_chest' },
+        { day: 4, coins: 500, diamonds: 0, chest: null },
+        { day: 5, coins: 0, diamonds: 10, chest: null },
+        { day: 6, coins: 0, diamonds: 0, chest: 'chest_bronze' },
         { day: 7, coins: 1000, diamonds: 0, chest: null },
       ],
     };
@@ -169,7 +139,9 @@ export const mockApi = {
       streak: {
         current: 4,
       },
+      claimableDay: 4,
       rewards: {
+        day: 4,
         coinsAdded: 500,
         diamondsAdded: 0,
         chestGiven: null,
@@ -218,6 +190,62 @@ export const mockApi = {
     };
   },
 
+
+
+  async getMissions() {
+    await delay();
+    return {
+      success: true,
+      missions: [
+        { id: 'daily_play_7_games', title: 'Play 7 Games', progress: 3, target: 7, type: 'daily', reward: { type: 'season_xp', amount: 120 } },
+        { id: 'daily_win_3_games', title: 'Win 3 Games', progress: 1, target: 3, type: 'daily', reward: { type: 'season_xp', amount: 160 } },
+        { id: 'daily_spend_200_coins', title: 'Spend 200 Coins', progress: 200, target: 200, type: 'daily', reward: { type: 'season_xp', amount: 100 } },
+        { id: 'daily_earn_500_prize', title: 'Earn 500 Prize', progress: 260, target: 500, type: 'daily', reward: { type: 'season_xp', amount: 140 } },
+        { id: 'daily_claim_daily_reward', title: 'Claim Daily Reward', progress: 1, target: 1, type: 'daily', reward: { type: 'season_xp', amount: 80 } },
+        { id: 'weekly_play_35_games', title: 'Play 35 Games', progress: 12, target: 35, type: 'weekly', reward: { type: 'season_xp', amount: 600 } },
+        { id: 'weekly_win_15_games', title: 'Win 15 Games', progress: 4, target: 15, type: 'weekly', reward: { type: 'season_xp', amount: 750 } },
+        { id: 'weekly_spend_1500_coins', title: 'Spend 1,500 Coins', progress: 600, target: 1500, type: 'weekly', reward: { type: 'season_xp', amount: 500 } },
+        { id: 'weekly_earn_5000_prize', title: 'Earn 5,000 Prize', progress: 1900, target: 5000, type: 'weekly', reward: { type: 'season_xp', amount: 650 } },
+        { id: 'weekly_claim_5_daily_rewards', title: 'Claim 5 Daily Rewards', progress: 2, target: 5, type: 'weekly', reward: { type: 'season_xp', amount: 450 } },
+      ],
+    };
+  },
+
+  async claimMission(missionId) {
+    await delay();
+    return {
+      success: true,
+      missionId,
+      reward: { type: 'season_xp', amount: 100 },
+    };
+  },
+
+  async getGlobalLeaderboard() {
+    await delay();
+    return {
+      success: true,
+      leaderboard: [
+        { rank: 1, username: 'SakuraKing', trophies: 5000, avatar: 'avatar-panda.png' },
+        { rank: 2, username: 'BambooFox', trophies: 4620, avatar: 'avatar-kiki.png' },
+        { rank: 3, username: 'DragonBun', trophies: 4310, avatar: 'avatar-bunbun.png' },
+        { rank: 4, username: 'TileMaster', trophies: 3890, avatar: 'avatar-stevie.png' },
+        { rank: 5, username: 'LuckyPanda', trophies: 3580, avatar: 'avatar-panda.png' },
+        { rank: 6, username: 'GoldenWind', trophies: 3260, avatar: 'avatar-kiki.png' },
+        { rank: 7, username: 'MoonTable', trophies: 2980, avatar: 'avatar-bunbun.png' },
+        { rank: 8, username: 'RedFlower', trophies: 2640, avatar: 'avatar-stevie.png' },
+      ],
+    };
+  },
+
+  async getMyRank() {
+    await delay();
+    return {
+      success: true,
+      rank: 521,
+      trophies: 1200,
+    };
+  },
+
   async getRoomTiers() {
     await delay();
     return { success: true, tiers: mockRoomTiers };
@@ -260,71 +288,5 @@ export const mockApi = {
     };
   },
 
-  async startMatchmaking(payload = {}) {
-    await delay(260);
-    return {
-      ...mockMatchmakingSession,
-      roomId: payload.roomId || 'quick_match',
-      maxPlayers: payload.maxPlayers || 3,
-    };
-  },
 
-  async getMatchmakingStatus(sessionId) {
-    await delay(300);
-    return {
-      ...mockMatchFound,
-      id: sessionId || mockMatchFound.id,
-    };
-  },
-
-  async cancelMatchmaking(sessionId) {
-    await delay();
-    return {
-      id: sessionId,
-      status: 'cancelled',
-    };
-  },
-
-  async getGameState(matchId = mockGameState.matchId) {
-    await delay();
-    return {
-      ...mockGameState,
-      matchId,
-    };
-  },
-
-  async getGameResult(matchId = mockGameResult.matchId) {
-    await delay();
-    return {
-      ...mockGameResult,
-      matchId,
-    };
-  },
-
-  async sendGameAction(matchId, action) {
-    await delay(120);
-    return {
-      matchId,
-      accepted: true,
-      action,
-      serverTime: new Date().toISOString(),
-    };
-  },
-
-  async leaveGame(matchId) {
-    await delay();
-    return {
-      matchId,
-      status: 'left',
-    };
-  },
-
-  async finishGame(matchId, payload = {}) {
-    await delay();
-    return {
-      ...mockGameResult,
-      matchId,
-      ...payload,
-    };
-  },
 };

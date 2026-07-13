@@ -204,7 +204,29 @@
 }
 
 .app-shell[data-device='desktop'] .join-room-list-panel h2 {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+}
+
+.app-shell[data-device='desktop'] .join-room-refresh-status {
+  min-height: 18px;
+  margin: 0 0 8px;
+  color: rgba(222, 190, 255, .72);
+  font-size: 13px;
+  font-weight: 850;
+  letter-spacing: .04em;
+  text-align: center;
+}
+
+.app-shell[data-device='desktop'] .join-room-empty-row {
+  min-height: 43px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed rgba(185, 88, 255, .38);
+  border-radius: 10px;
+  color: rgba(242, 231, 255, .72);
+  background: rgba(18, 9, 38, .58);
+  font-size: 16px;
+  font-weight: 900;
 }
 
 .app-shell[data-device='desktop'] .join-room-scroll-shell {
@@ -236,7 +258,7 @@
 .app-shell[data-device='desktop'] .join-room-row {
   min-height: 43px;
   display: grid;
-  grid-template-columns: 142px 1fr 92px 92px;
+  grid-template-columns: 108px 1fr 70px 92px 78px;
   align-items: center;
   gap: 10px;
   padding: 0 18px;

@@ -163,7 +163,8 @@ width: 210px;
   filter: drop-shadow(0 0 18px rgba(232, 77, 255, 0.34));
 }
 
-.app-shell[data-device='mobile'] .match-slot-ready .match-avatar-wrap {
+.app-shell[data-device='mobile'] .match-slot-ready .match-avatar-wrap,
+.app-shell[data-device='mobile'] .match-slot-current .match-avatar-wrap {
 width: 250px;
   height: 250px;
   margin-top: -18px;
@@ -344,7 +345,8 @@ filter: brightness(1.08);
   height: 170px;
 }
 
-.app-shell[data-device='mobile'] .match-slot-ready .match-avatar-wrap {
+.app-shell[data-device='mobile'] .match-slot-ready .match-avatar-wrap,
+.app-shell[data-device='mobile'] .match-slot-current .match-avatar-wrap {
   width: 198px;
   height: 198px;
   margin-top: -12px;
@@ -388,4 +390,27 @@ filter: brightness(1.08);
   margin-top: 18px;
   border-radius: 9px;
   font-size: 27px;
+}
+
+.app-shell[data-device='mobile'] .match-start-button {
+  width: 354px;
+  height: 88px;
+  margin-top: 30px;
+  border: 2px solid rgba(242, 224, 112, 0.92);
+  border-radius: 11px;
+  color: #2b1602;
+  background: linear-gradient(180deg, rgba(255, 235, 129, 0.96), rgba(217, 146, 46, 0.94));
+  box-shadow: inset 0 0 28px rgba(255, 255, 255, 0.18), 0 18px 38px rgba(0, 0, 0, 0.3);
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+}
+
+.app-shell[data-device='mobile'] .match-start-button + .match-cancel-button {
+  margin-top: 18px;
+}
+
+.app-shell[data-device='mobile'] .match-start-button:hover {
+  filter: brightness(1.08);
 }

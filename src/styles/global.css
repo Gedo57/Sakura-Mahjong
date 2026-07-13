@@ -12,14 +12,19 @@
 @import './desktop/login-screen.css';
 @import './desktop/loading-screen.css';
 @import './desktop/main-menu.css';
-@import './desktop/shop.css';
+@import './desktop/leaderboard.css';
+@import './desktop/missions.css';
 @import './desktop/daily-login.css';
 @import './desktop/profile-screen.css';
+@import './desktop/match-history.css';
+@import './desktop/achievements.css';
 @import './desktop/create-room.css';
 @import './desktop/join-room.css';
 @import './desktop/room-select.css';
-@import './desktop/gameplay.css';
+@import './gameplay/gameplay.shared.css';
+@import './gameplay/gameplay.landscape.css';
 @import './desktop/matchmaking.css';
+@import './desktop/private-lobby.css';
 @import './desktop/help-screen.css';
 @import './desktop/win-screen.css';
 
@@ -28,13 +33,78 @@
 @import './mobile/login-screen.mobile.css';
 @import './mobile/loading-screen.mobile.css';
 @import './mobile/main-menu.mobile.css';
-@import './mobile/shop.mobile.css';
+@import './mobile/leaderboard.mobile.css';
+@import './mobile/missions.mobile.css';
 @import './mobile/daily-login.mobile.css';
 @import './mobile/profile-screen.mobile.css';
+@import './mobile/achievements.mobile.css';
 @import './mobile/create-room.mobile.css';
 @import './mobile/join-room.mobile.css';
 @import './mobile/room-select.mobile.css';
-@import './mobile/gameplay.mobile.css';
+@import './gameplay/gameplay.portrait.css';
 @import './mobile/matchmaking.mobile.css';
 @import './mobile/help-screen.mobile.css';
 @import './mobile/win-screen.mobile.css';
+@import './mobile/portrait-main-flow.mobile.css';
+@import './mobile/portrait-rooms-flow.mobile.css';
+@import './mobile/portrait-profile-economy.mobile.css';
+@import './mobile/portrait-visual-polish.mobile.css';
+@import './mobile/portrait-result-screen.mobile.css';
+
+.friends-api-status,
+.friends-empty-state {
+  margin: 8px 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+
+.profile-achievement-claim-state {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.82rem;
+  margin: 0.25rem 0 0.75rem;
+  text-align: center;
+}
+
+.profile-achievement-claim-state--error {
+  color: #ffd6d6;
+}
+
+.profile-achievement-complete-button:disabled {
+  cursor: wait;
+  filter: grayscale(0.25);
+  opacity: 0.68;
+}
+
+.profile-achievement-claimed-label {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-weight: 800;
+  justify-content: center;
+  letter-spacing: 0.08em;
+  min-height: 1.65rem;
+  padding: 0.2rem 0.8rem;
+  text-transform: uppercase;
+}
+
+
+.profile-achievements-empty {
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  color: rgba(255, 255, 255, 0.82);
+  display: flex;
+  font-size: 0.9rem;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 120px;
+  padding: 1rem;
+  text-align: center;
+}

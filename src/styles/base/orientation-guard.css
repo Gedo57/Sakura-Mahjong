@@ -1,7 +1,7 @@
-/* Mobile web games cannot reliably force hardware rotation in every browser.
-   This guard follows the standard UX: block portrait mode and allow play in landscape. */
+/* Portrait and landscape are both supported. Keep the old markup dormant only. */
 .rotate-device-overlay {
-  display: none;
+  display: none !important;
+  pointer-events: none !important;
 }
 
 .rotate-device-card,
@@ -13,133 +13,7 @@
   box-sizing: border-box;
 }
 
-@media screen and (orientation: portrait) {
-  html[data-device='mobile'] .rotate-device-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 2147483647;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100vw;
-    height: 100vh;
-    height: 100dvh;
-    padding: 24px;
-    background:
-      radial-gradient(circle at 50% 18%, rgba(255, 196, 87, 0.16), transparent 34%),
-      linear-gradient(180deg, rgba(11, 6, 31, 0.98), rgba(5, 2, 15, 0.99));
-    color: #fff8e8;
-    text-align: center;
-    pointer-events: auto;
-  }
-
-  html[data-device='mobile'] .rotate-device-card {
-    width: min(82vw, 380px);
-    min-height: 300px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 34px 24px 32px;
-    border: 1px solid rgba(255, 226, 153, 0.24);
-    border-radius: 28px;
-    background: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45), inset 0 0 42px rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-  }
-
-  html[data-device='mobile'] .rotate-device-icon {
-    position: relative;
-    width: 116px;
-    height: 116px;
-    margin-bottom: 22px;
-  }
-
-  html[data-device='mobile'] .rotate-device-phone {
-    position: absolute;
-    left: 31px;
-    top: 18px;
-    width: 54px;
-    height: 82px;
-    border: 5px solid #ffe6a5;
-    border-radius: 14px;
-    box-shadow: 0 0 22px rgba(255, 202, 86, 0.45);
-    transform: rotate(-12deg);
-    transform-origin: center center;
-    animation: rotate-phone-hint 1.8s ease-in-out infinite;
-  }
-
-  html[data-device='mobile'] .rotate-device-phone::after {
-    content: '';
-    position: absolute;
-    left: 50%;
-    bottom: 6px;
-    width: 10px;
-    height: 10px;
-    border-radius: 999px;
-    background: #ffe6a5;
-    transform: translateX(-50%);
-  }
-
-  html[data-device='mobile'] .rotate-device-arrow {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    width: 42px;
-    height: 42px;
-    display: grid;
-    place-items: center;
-    border-radius: 999px;
-    background: rgba(255, 202, 86, 0.18);
-    color: #ffe6a5;
-    font-size: 32px;
-    font-weight: 900;
-    line-height: 1;
-  }
-
-  html[data-device='mobile'] .rotate-device-title {
-    margin: 0 0 10px;
-    color: #ffe6a5;
-    font-size: 28px;
-    font-weight: 900;
-    line-height: 1.05;
-    letter-spacing: 0.02em;
-    text-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
-  }
-
-  html[data-device='mobile'] .rotate-device-copy {
-    max-width: 280px;
-    margin: 0;
-    color: rgba(255, 248, 232, 0.84);
-    font-size: 15px;
-    font-weight: 700;
-    line-height: 1.45;
-  }
-
-  html[data-device='mobile'] .game-frame {
-    visibility: hidden !important;
-    pointer-events: none !important;
-  }
-}
-
-@media screen and (orientation: landscape) {
-  html[data-device='mobile'] .rotate-device-overlay {
-    display: none !important;
-  }
-
-  html[data-device='mobile'] .game-frame {
-    visibility: visible !important;
-    pointer-events: auto !important;
-  }
-}
-
-@keyframes rotate-phone-hint {
-  0%,
-  100% {
-    transform: rotate(-12deg) scale(1);
-  }
-
-  50% {
-    transform: rotate(78deg) scale(1.04);
-  }
+html[data-physical-device='mobile'] .game-frame {
+  visibility: visible !important;
+  pointer-events: auto !important;
 }

@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ROUTES } from '../router/routes.js';
+import { ROUTES, buildGameRoute } from '../router/routes.js';
 import { createPrivateRoom, getRoomTiers } from '../services/roomService.js';
-import { saveMatchmakingContext } from '../store/gameStore.js';
+import { saveActiveMatch, saveMatchmakingContext } from '../store/gameStore.js';
 import { useLanguage } from '../i18n/useLanguage.js';
+import { connectGameSocket } from '../services/socket.js';
 
 const asset = (name) => `/assets/create-room/${name}`;
 
@@ -12,15 +13,17 @@ export default function CreateRoomPage() {
   const { t, tx } = useLanguage();
   const [maxPlayers, setMaxPlayers] = useState(3);
   const [tiers, setTiers] = useState([]);
-  const [selectedTierId, setSelectedTierId] = useState('sakura_garden_3p');
+  const [selectedTierId, setSelectedTierId] = useState('');
   const [roomType, setRoomType] = useState('Private');
   const [roomName, setRoomName] = useState('My Sakura Room');
   const [roomCode, setRoomCode] = useState('');
-  const [password, setPassword] = useState('');
+  const [enableBots, setEnableBots] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [createdRoom, setCreatedRoom] = useState(null);
+  const [isTierDropdownOpen, setIsTierDropdownOpen] = useState(false);
+  const tierDropdownRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -28,11 +31,12 @@ export default function CreateRoomPage() {
     getRoomTiers()
       .then((roomTiers) => {
         if (!isMounted) return;
-        setTiers(roomTiers || []);
+        const threePlayerTiers = (roomTiers || []).filter((tier) => Number(tier?.maxPlayers || 3) === 3 && !/_2p$/i.test(String(tier?.tierId || tier?.id || '')));
+        setTiers(threePlayerTiers);
 
-        if (roomTiers?.[0]?.tierId) {
-          setSelectedTierId(roomTiers[0].tierId);
-          setMaxPlayers(roomTiers[0].maxPlayers || 3);
+        if (threePlayerTiers?.[0]?.tierId) {
+          setSelectedTierId(threePlayerTiers[0].tierId);
+          setMaxPlayers(3);
         }
       })
       .catch((error) => {
@@ -44,13 +48,42 @@ export default function CreateRoomPage() {
     };
   }, []);
 
-  const selectedTier = useMemo(
-    () => tiers.find((tier) => tier.tierId === selectedTierId) || tiers[0] || null,
-    [selectedTierId, tiers]
+  const roomTierOptions = useMemo(
+    () => tiers,
+    [tiers]
   );
+
+  const selectedTier = useMemo(
+    () => roomTierOptions.find((tier) => tier.tierId === selectedTierId) || roomTierOptions[0] || null,
+    [roomTierOptions, selectedTierId]
+  );
+
+  const selectTier = (tierId) => {
+    setSelectedTierId(tierId);
+    setMaxPlayers(3);
+    setIsTierDropdownOpen(false);
+  };
+
+  const handleTierDropdownBlur = (event) => {
+    if (!tierDropdownRef.current?.contains(event.relatedTarget)) {
+      setIsTierDropdownOpen(false);
+    }
+  };
+
+  const handleBotModeChange = (nextValue) => {
+    setEnableBots(nextValue);
+    if (nextValue) setRoomType('Private');
+    setCreatedRoom(null);
+    setRoomCode('');
+    setSuccessMessage('');
+    setErrorMessage('');
+  };
 
   const bet = selectedTier?.entryFee?.amount ?? 100;
   const formattedBet = useMemo(() => Number(bet || 0).toLocaleString('en-US'), [bet]);
+  const isSoloMode = Boolean(enableBots);
+  const roomVisibility = roomType === 'Public' && !isSoloMode ? 'public' : 'private';
+  const previewRoomType = isSoloMode ? t('solo') : tx(roomType);
 
   const handleCreateRoom = async () => {
     setErrorMessage('');
@@ -58,9 +91,22 @@ export default function CreateRoomPage() {
     setIsCreatingRoom(true);
 
     try {
+      const tierId = selectedTierId || selectedTier?.tierId;
+      if (!tierId) {
+        throw new Error('No backend room tier is selected.');
+      }
+
+      const requestedMaxPlayers = 3;
       const room = await createPrivateRoom({
-        tierId: selectedTierId || selectedTier?.tierId || 'sakura_garden_3p',
-        maxPlayers,
+        tierId,
+        roomName,
+        maxPlayers: requestedMaxPlayers,
+        visibility: roomVisibility,
+        roomVisibility,
+        enableBots: isSoloMode,
+        botsEnabled: isSoloMode,
+        mode: isSoloMode ? 'solo' : roomVisibility,
+        type: isSoloMode ? 'solo' : roomVisibility,
       });
 
       const nextRoomCode = room.roomCode || '';
@@ -71,13 +117,72 @@ export default function CreateRoomPage() {
         roomId,
         roomCode: nextRoomCode,
         tierId: room.tierId || selectedTierId,
-        maxPlayers: room.maxPlayers || maxPlayers,
-        source: 'private-room',
+        maxPlayers: requestedMaxPlayers,
+        source: isSoloMode ? 'solo-room' : roomVisibility === 'public' ? 'public-created-room' : 'private-room',
+        isHost: true,
+        visibility: room.visibility || roomVisibility,
+        isListed: Boolean(room.isListed || roomVisibility === 'public'),
+        type: room.type || (isSoloMode ? 'solo' : roomVisibility),
+        mode: room.mode || (isSoloMode ? 'solo' : roomVisibility),
+        enableBots: Boolean(room.enableBots || isSoloMode),
+        isSolo: Boolean(room.isSolo || room.enableBots || isSoloMode),
+        botCount: Number(room.botCount || (isSoloMode ? 2 : 0)),
+        entryFee: room.entryFee || null,
+        entryFeeAmount: room.entryFeeAmount ?? room.entryFee?.amount ?? selectedTier?.entryFee?.amount ?? 0,
+        currency: room.currency || room.entryFee?.currency || 'coins',
+        prizePool: room.prizePool ?? 0,
+        seatOrder: room.seatOrder || [],
+        turnOrderPositions: room.turnOrderPositions || [],
+        rotation: room.rotation || 'bottom_top_left',
+        players: room.players || [],
+        botPlayers: room.botPlayers || [],
+        socketMode: true,
       };
 
       setCreatedRoom(matchmakingState);
       saveMatchmakingContext(matchmakingState);
+
+      if (isSoloMode) {
+        const activeMatch = {
+          ...matchmakingState,
+          matchId: roomId,
+          roomId,
+          socketMode: true,
+          directSolo: true,
+        };
+
+        saveActiveMatch(activeMatch);
+        setSuccessMessage(t('startingSoloGame'));
+
+        connectGameSocket({
+          matchId: roomId,
+          onOpen(socket) {
+            socket?.emit?.('room:join', { roomId });
+          },
+          onMessage(message = {}) {
+            const payload = message.payload || {};
+            if (message.type === 'game_start') {
+              saveActiveMatch({
+                ...activeMatch,
+                initialGameState: payload,
+                matchId: payload.matchId || payload.gameId || payload.roomId || roomId,
+                roomId: payload.roomId || roomId,
+              });
+            }
+          },
+        });
+
+        navigate(buildGameRoute(roomId), {
+          state: {
+            ...activeMatch,
+            source: 'solo-direct',
+          },
+        });
+        return;
+      }
+
       setSuccessMessage(t('roomCreatedSuccessfully'));
+      navigate(ROUTES.privateLobby, { state: matchmakingState });
     } catch (error) {
       console.error('Failed to create private room:', error);
       setErrorMessage(error.message || 'Failed to create private room');
@@ -104,7 +209,7 @@ export default function CreateRoomPage() {
         <button type="button" className="create-back-button" onClick={() => navigate(ROUTES.mainMenu)} aria-label={t('backToMainMenu')}>
           ←
         </button>
-        <h1>{t('createRoomTitle')}</h1>
+        <h1>{isSoloMode ? t('playSolo') : t('createRoomTitle')}</h1>
       </header>
 
       <main className="create-room-layout">
@@ -127,43 +232,63 @@ export default function CreateRoomPage() {
               id="room-code"
               value={roomCode}
               readOnly
-              placeholder="Auto generated after create"
+              placeholder={isSoloMode ? t('soloRoomCodeHint') : 'Auto generated after create'}
               aria-label={t('roomCode')}
             />
           </div>
 
-
           <div className="create-form-row">
-            <label htmlFor="room-tier">{t('gameMode')}</label>
-            <div className="create-select-wrap">
-              <select
-                id="room-tier"
-                value={selectedTierId}
-                onChange={(event) => {
-                  const tierId = event.target.value;
-                  const tier = tiers.find((item) => item.tierId === tierId);
-                  setSelectedTierId(tierId);
-                  setMaxPlayers(tier?.maxPlayers || 3);
-                }}
-                aria-label={t('gameMode')}
+            <label id="room-tier-label">{t('gameMode')}</label>
+            <div
+              className={`create-select-wrap${isTierDropdownOpen ? ' open' : ''}`}
+              ref={tierDropdownRef}
+              onBlur={handleTierDropdownBlur}
+            >
+              <button
+                type="button"
+                className="create-tier-trigger"
+                aria-labelledby="room-tier-label"
+                aria-haspopup="listbox"
+                aria-expanded={isTierDropdownOpen}
+                onClick={() => setIsTierDropdownOpen((value) => !value)}
               >
-                {(tiers.length ? tiers : [{ tierId: 'sakura_garden_3p', name: 'Sakura Garden', maxPlayers: 3 }]).map((tier) => (
-                  <option key={tier.tierId} value={tier.tierId}>{tx(tier.name || tier.tierId)}</option>
-                ))}
-              </select>
-              <span>⌄</span>
+                <span className="create-tier-selected">{tx(selectedTier?.name || selectedTierId)}</span>
+                <span className="create-tier-arrow" aria-hidden="true">⌄</span>
+              </button>
+
+              {isTierDropdownOpen && (
+                <div className="create-tier-menu" role="listbox" aria-labelledby="room-tier-label">
+                  {roomTierOptions.map((tier) => {
+                    const isActive = tier.tierId === selectedTierId;
+
+                    return (
+                      <button
+                        type="button"
+                        key={tier.tierId}
+                        role="option"
+                        aria-selected={isActive}
+                        className={`create-tier-option${isActive ? ' active' : ''}`}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => selectTier(tier.tierId)}
+                      >
+                        {tx(tier.name || tier.tierId)}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="create-form-row players-row">
             <label>{t('maxPlayers')}</label>
             <div className="segmented-options">
-              {[2, 3].map((value) => (
+              {[3].map((value) => (
                 <button
                   type="button"
                   key={value}
-                  className={maxPlayers === value ? 'active' : ''}
-                  onClick={() => setMaxPlayers(value)}
+                  className="active"
+                  onClick={() => setMaxPlayers(3)}
                 >
                   {value} {t('players')}
                 </button>
@@ -178,31 +303,40 @@ export default function CreateRoomPage() {
             </div>
           </div>
 
-          <div className="create-form-row">
-            <label htmlFor="room-password">{t('passwordOptional')}</label>
-            <input
-              id="room-password"
-              type="password"
-              placeholder={t('enterPassword')}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              aria-label={t('passwordOptional')}
-            />
-          </div>
-
           <div className="create-form-row room-type-row">
             <label>{t('roomType')}</label>
             <div className="segmented-options room-type-options">
-              {['Private'].map((type) => (
+              {['Public', 'Private'].map((type) => (
                 <button
                   type="button"
                   key={type}
-                  className={roomType === type ? 'active' : ''}
+                  className={!isSoloMode && roomType === type ? 'active' : ''}
                   onClick={() => setRoomType(type)}
+                  disabled={isSoloMode}
                 >
                   <span>●</span>{tx(type)}
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="create-form-row bot-mode-row">
+            <label>{t('botMode')}</label>
+            <div className="segmented-options bot-mode-options" role="group" aria-label={t('botMode')}>
+              <button
+                type="button"
+                className={!isSoloMode ? 'active' : ''}
+                onClick={() => handleBotModeChange(false)}
+              >
+                {t('botOff')}
+              </button>
+              <button
+                type="button"
+                className={isSoloMode ? 'active' : ''}
+                onClick={() => handleBotModeChange(true)}
+              >
+                {t('botOn')}
+              </button>
             </div>
           </div>
 
@@ -216,10 +350,10 @@ export default function CreateRoomPage() {
               onClick={handleCreateRoom}
               disabled={isCreatingRoom}
             >
-              {isCreatingRoom ? t('creatingRoom') : createdRoom ? t('createAnotherRoom') : t('createRoom')}
+              {isCreatingRoom ? t('creatingRoom') : isSoloMode ? t('playSolo') : createdRoom ? t('createAnotherRoom') : t('createRoom')}
             </button>
 
-            {roomCode && (
+            {!isSoloMode && roomCode && (
               <button type="button" className="copy-room-code-button" onClick={handleCopyRoomCode}>
                 {t('copyCode')}
               </button>
@@ -233,11 +367,12 @@ export default function CreateRoomPage() {
 
           <dl className="preview-list">
             <div><dt>{t('roomName')}</dt><dd>{roomName || tx('My Sakura Room')}</dd></div>
-            <div><dt>{t('roomCode')}</dt><dd>{roomCode || '—'}</dd></div>
+            <div><dt>{t('roomCode')}</dt><dd>{isSoloMode ? '—' : roomCode || '—'}</dd></div>
             <div><dt>{t('mode')}</dt><dd>{tx(selectedTier?.name || selectedTierId)}</dd></div>
             <div><dt>{t('players')}</dt><dd>{maxPlayers} {t('players')}</dd></div>
             <div><dt>{t('bet')}</dt><dd className="preview-bet"><span>●</span>{formattedBet}</dd></div>
-            <div><dt>{t('type')}</dt><dd>{tx(roomType)}</dd></div>
+            <div><dt>{t('type')}</dt><dd>{previewRoomType}</dd></div>
+            <div><dt>{t('botMode')}</dt><dd>{isSoloMode ? t('botOn') : t('botOff')}</dd></div>
           </dl>
         </aside>
       </main>

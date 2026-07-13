@@ -1,17 +1,112 @@
+function getBackendPlayerName(player = {}) {
+  const value = player.username
+    || player.name
+    || player.displayName
+    || player.nickname
+    || player.email
+    || player.userId
+    || player.id
+    || player._id
+    || '';
+  const normalized = String(value || '').trim();
+  return /^slot[_\s-]*\d+$/i.test(normalized) || /^player\s*\d+$/i.test(normalized) ? '' : normalized;
+}
+
+const toArray = (value) => (Array.isArray(value) ? value : []);
+const normalizeId = (value) => String(value ?? '').trim();
+
+const getPlayerId = (player = {}) => player.id || player.userId || player.playerId || player._id || player.uid || player.socketId || '';
+
+function getPrivateHandPlayer(players = []) {
+  return toArray(players).find((player) => Array.isArray(player?.hand) && player.hand.length)
+    || toArray(players).find((player) => Array.isArray(player?.handTiles) && player.handTiles.length)
+    || null;
+}
+
+function getPrivateHandTilesFromPlayers(players = []) {
+  const privatePlayer = getPrivateHandPlayer(players);
+  return privatePlayer?.hand || privatePlayer?.handTiles || privatePlayer?.tiles || [];
+}
+
+const MALAYSIAN_DISABLED_ACTIONS = new Set(['riichi']);
+
+const normalizeSeat = (value) => {
+  const seat = String(value || '').trim().toLowerCase();
+  const aliases = { east: 'e', south: 's', west: 'w' };
+  return aliases[seat] || seat;
+};
+
+const ABSOLUTE_SEAT_POSITIONS = {
+  e: 'bottom',
+  s: 'top',
+  w: 'left',
+};
+
+const ABSOLUTE_POSITION_ORDER = ['bottom', 'top', 'left'];
+
+const getAbsoluteSeatPosition = (seat) => ABSOLUTE_SEAT_POSITIONS[normalizeSeat(seat)] || '';
+
+const getAbsoluteSeatIndexPosition = (seatIndex) => {
+  const index = Number(seatIndex);
+  return Number.isFinite(index) ? (ABSOLUTE_POSITION_ORDER[index] || '') : '';
+};
+
+const normalizeLayoutPosition = (value) => {
+  const position = String(value || '').toLowerCase();
+  if (position === 'self' || position === 'me' || position === 'mine') return 'bottom';
+  return ['bottom', 'top', 'left'].includes(position) ? position : '';
+};
+
+function normalizeActionList(actions) {
+  return toArray(actions)
+    .map((action) => (typeof action === 'string' ? action : action?.type || action?.key || action?.name || action?.action))
+    .map((action) => String(action || '').trim())
+    .filter(Boolean)
+    .filter((action) => !MALAYSIAN_DISABLED_ACTIONS.has(String(action || '').toLowerCase()))
+    .filter((action, index, list) => list.indexOf(action) === index);
+}
+
 export function normalizePlayer(player = {}, index = 0) {
-  const fallbackPositions = ['top', 'left', 'right', 'bottom'];
+  const fallbackPositions = ['bottom', 'top', 'left'];
+  const handTiles = player.handTiles || player.hand || player.tiles || [];
+  const score = player.score ?? player.points ?? player.balance ?? player.coins ?? '0';
 
   return {
     ...player,
-    id: player.id || player.userId || player.playerId || `player_${index + 1}`,
-    name: player.name || player.username || player.displayName || `Player ${index + 1}`,
-    avatar: player.avatar || player.avatarUrl || player.icon || 'Stevie.png',
-    coins: player.coins ?? player.balance ?? player.score ?? '0',
-    position: player.position || fallbackPositions[index] || 'left',
-    ready: Boolean(player.ready ?? player.isReady),
-    handTiles: player.handTiles || player.hand || player.tiles || [],
-    handCount: player.handCount ?? player.tileCount ?? player.tilesCount ?? player.handTiles?.length ?? player.hand?.length ?? 0,
+    id: getPlayerId(player),
+    userId: player.userId || player.id || player.playerId || player._id || player.uid || '',
+    name: getBackendPlayerName(player),
+    username: player.username || player.displayName || player.name || getBackendPlayerName(player),
+    displayName: player.displayName || player.username || player.name || getBackendPlayerName(player),
+    avatar: player.avatar || player.avatarUrl || player.avatarId || player.imageUrl || player.icon || null,
+    avatarId: player.avatarId || player.avatar || player.avatarUrl || player.imageUrl || player.icon || null,
+    title: player.title || player.rankTitle || player.profileTitle || '',
+    isBot: Boolean(player.isBot),
+    botIndex: player.botIndex || null,
+    coins: score,
+    score,
+    position: getAbsoluteSeatPosition(player.seat || player.seatWind || player.wind || player.seatLabel)
+      || getAbsoluteSeatIndexPosition(player.seatIndex)
+      || normalizeLayoutPosition(player.position)
+      || fallbackPositions[index]
+      || 'bottom',
+    ready: Boolean(player.ready ?? player.isReady ?? true),
+    seat: player.seat,
+    seatLabel: player.seatLabel || player.seatName || player.seatTitle || '',
+    seatIndex: player.seatIndex,
+    isDealer: Boolean(player.isDealer ?? player.dealer),
+    isDisconnected: Boolean(player.isDisconnected ?? player.disconnected),
+    handTiles,
+    hand: player.hand || player.handTiles || [],
+    handSize: player.handSize ?? player.handCount ?? player.tileCount ?? player.tilesCount ?? handTiles.length ?? 0,
+    handCount: player.handCount ?? player.handSize ?? player.tileCount ?? player.tilesCount ?? handTiles.length ?? 0,
     discardTiles: player.discardTiles || player.discards || player.discardPile || player.discardedTiles || [],
+    discards: player.discards || player.discardTiles || player.discardPile || player.discardedTiles || [],
+    openMelds: player.openMelds || player.exposedMelds || player.declaredMelds || player.openSets || player.sets || [],
+    bonusTiles: player.bonusTiles || player.revealedBonusTiles || player.revealedBonus || player.bonus || player.flowers || player.seasons || player.animals || [],
+    currentFan: player.currentFan ?? player.totalFan ?? player.fanCount ?? player.fanValue,
+    minimumFan: player.minimumFan ?? player.minFan ?? player.requiredFan,
+    fanInfo: player.fanInfo || player.fanSummary || player.handEvaluation || null,
   };
 }
 
@@ -21,20 +116,106 @@ export function normalizeGameState(response = {}) {
   const players = Array.isArray(state.players)
     ? state.players.map(normalizePlayer)
     : [];
+  const privateHandPlayer = getPrivateHandPlayer(players);
+  const privateHand = getPrivateHandTilesFromPlayers(players);
+  const claimWindow = state.claimWindow || state.claim || safeResponse.claimWindow || null;
+  const actionSources = [
+    claimWindow?.yourValidActions,
+    claimWindow?.validActions,
+    claimWindow?.actions,
+    state.yourValidActions,
+    state.validActions,
+    state.availableActions,
+    state.actions,
+    state.allowedActions,
+    state.turnActions,
+    state.allowedTurnActions,
+  ];
+  const availableActions = normalizeActionList(
+    actionSources.find((actions) => Array.isArray(actions) && actions.length) || []
+  );
+  const feiReclaim = state.reclaimFei
+    || state.feiReclaim
+    || state.feiReclaimWindow
+    || state.reclaimFeiWindow
+    || safeResponse.reclaimFei
+    || safeResponse.feiReclaimWindow
+    || null;
 
   return {
     ...state,
-    matchId: state.matchId || state.id || safeResponse.matchId,
-    room: state.room || safeResponse.room || { id: state.roomId, name: state.roomName },
+    matchId: state.matchId || state.id || state.gameId || state.roomId || safeResponse.matchId,
+    roomId: state.roomId || state.room?.roomId || state.room?.id || safeResponse.roomId,
+    tierId: state.tierId || state.room?.tierId || safeResponse.tierId,
+    room: state.room || safeResponse.room || { id: state.roomId, roomId: state.roomId, name: state.roomName },
     players,
+    myPlayerId: state.myPlayerId || state.selfPlayerId || state.localPlayerId || getPlayerId(privateHandPlayer || {}),
+    selfPlayerId: state.selfPlayerId || state.myPlayerId || getPlayerId(privateHandPlayer || {}),
+    mySeat: state.mySeat || state.selfSeat || privateHandPlayer?.seat || state.seat,
+    seat: state.seat || state.mySeat || privateHandPlayer?.seat,
     activeTurnPosition: state.activeTurnPosition || state.currentTurnPosition || state.turnPosition,
-    currentTurnPlayerId: state.currentTurnPlayerId || state.turnPlayerId,
-    round: state.round || state.windRound || 'East 1',
-    timer: state.timer ?? state.remainingSeconds ?? 18,
-    handTiles: state.handTiles || state.playerHand || state.myHand || state.currentPlayerHand || [],
+    currentTurnPlayerId: state.currentTurnPlayerId || state.turnPlayerId || state.activeUserId || state.activePlayerId,
+    turnPlayerId: state.turnPlayerId || state.currentTurnPlayerId || state.activeUserId || state.activePlayerId,
+    activeUserId: state.activeUserId || state.turnPlayerId || state.currentTurnPlayerId || state.activePlayerId,
+    activeSeat: state.activeSeat || state.currentTurnSeat || state.turnSeat || state.turn?.seat,
+    round: state.round || state.windRound || state.roundWind || 'East 1',
+    roundWind: state.roundWind || state.windRound,
+    seatOrder: state.seatOrder || safeResponse.seatOrder || [],
+    rotation: state.rotation || safeResponse.rotation || 'bottom_top_left',
+    turnOrderPositions: state.turnOrderPositions || safeResponse.turnOrderPositions || [],
+    hasNorthPlayer: Boolean(state.hasNorthPlayer ?? safeResponse.hasNorthPlayer ?? false),
+    entryFee: state.entryFee || safeResponse.entryFee || null,
+    entryFeeAmount: state.entryFeeAmount ?? state.entryFee?.amount ?? safeResponse.entryFeeAmount ?? safeResponse.entryFee?.amount ?? 0,
+    currency: state.currency || state.entryFee?.currency || safeResponse.currency || safeResponse.entryFee?.currency || 'coins',
+    prizePool: state.prizePool ?? safeResponse.prizePool ?? 0,
+    dealerUserId: state.dealerUserId || state.dealer || safeResponse.dealerUserId || safeResponse.dealer,
+    dealerRolls: state.dealerRolls || safeResponse.dealerRolls || [],
+    dealerRollReveal: state.dealerRollReveal || safeResponse.dealerRollReveal || null,
+    dealerRollRevealMs: state.dealerRollRevealMs || state.dealerRollReveal?.revealDurationMs || safeResponse.dealerRollRevealMs || safeResponse.dealerRollReveal?.revealDurationMs || 7000,
+    dealerRollStartedAt: state.dealerRollStartedAt || state.dealerRollReveal?.startedAt || safeResponse.dealerRollStartedAt || safeResponse.dealerRollReveal?.startedAt || null,
+    dealerRollEndsAt: state.dealerRollEndsAt || state.dealerRollReveal?.endsAt || safeResponse.dealerRollEndsAt || safeResponse.dealerRollReveal?.endsAt || null,
+    dealerRollPhase: state.dealerRollPhase || state.dealerRollReveal?.phase || safeResponse.dealerRollPhase || safeResponse.dealerRollReveal?.phase || null,
+    dealerSelectionMethod: state.dealerSelectionMethod || safeResponse.dealerSelectionMethod,
+    turnNumber: state.turnNumber ?? state.turn?.number,
+    turnState: state.turnState || state.turn || null,
+    turnHasDiscarded: Boolean(state.turnHasDiscarded ?? state.hasDiscardedThisTurn ?? state.myTurnHasDiscarded ?? false),
+    discardCountThisTurn: Number(state.discardCountThisTurn ?? state.turnState?.discardCount ?? state.turn?.discardCount ?? 0) || 0,
+    turnEndedByDiscard: Boolean(state.turnEndedByDiscard ?? false),
+    myTurnHasDiscarded: Boolean(state.myTurnHasDiscarded ?? state.hasDiscardedThisTurn ?? false),
+    canDiscard: state.canDiscard ?? state.turn?.canDiscard,
+    canPlayBonus: state.canPlayBonus ?? state.turn?.canPlayBonus,
+    playableBonusTiles: state.playableBonusTiles || state.bonusTilesInHand || state.turn?.playableBonusTiles || [],
+    wallRemaining: state.wallRemaining
+      ?? state.remainingWall
+      ?? state.remainingWallTiles
+      ?? state.wallTilesRemaining
+      ?? state.tilesRemaining
+      ?? state.wallCount
+      ?? state.wall?.remaining
+      ?? state.wall?.remainingTiles
+      ?? state.wall?.count,
+    currentFan: state.currentFan ?? state.totalFan ?? state.fanCount ?? state.fanValue,
+    minimumFan: state.minimumFan ?? state.minFan ?? state.requiredFan ?? state.requiredFans,
+    fanInfo: state.fanInfo || state.fanSummary || state.handEvaluation || state.winPreview || state.scoring || null,
+    currentDiscard: state.currentDiscard ?? state.discardedTile ?? state.lastDiscard,
+    serverNow: state.serverNow ?? state.serverTime ?? state.now,
+    turnStartedAt: state.turnStartedAt ?? state.turnState?.startedAt ?? state.turn?.startedAt,
+    turnEndsAt: state.turnEndsAt ?? state.timerEndsAt ?? state.turnState?.turnEndsAt ?? state.turnState?.endsAt ?? state.turn?.turnEndsAt ?? state.turn?.endsAt,
+    timerEndsAt: state.timerEndsAt ?? state.turnEndsAt ?? state.turnState?.turnEndsAt ?? state.turnState?.endsAt ?? state.turn?.turnEndsAt ?? state.turn?.endsAt,
+    remainingSeconds: state.remainingSeconds ?? state.timer ?? state.turnState?.remainingSeconds,
+    timeLimit: state.timeLimit ?? state.turnState?.timeLimit ?? state.turn?.timeLimit,
+    timeLimitMs: state.timeLimitMs ?? state.turnDurationMs ?? state.turnState?.timeLimitMs ?? state.turn?.timeLimitMs,
+    timer: state.timer ?? state.remainingSeconds ?? state.timeLimit ?? 30,
+    handTiles: state.handTiles || state.playerHand || state.myHand || state.currentPlayerHand || privateHand || [],
+    myHand: state.myHand || state.handTiles || state.playerHand || state.currentPlayerHand || privateHand || [],
     discards: state.discards || state.discardTiles || state.discardPiles || {},
     centerTiles: state.centerTiles || state.centerDiscardTiles || state.centerMeldTiles || state.meldTiles || state.melds?.center || [],
-    availableActions: state.availableActions || state.actions || state.allowedActions || [],
+    claimWindow,
+    reclaimFei: feiReclaim,
+    availableActions,
+    validActions: availableActions,
+    maxPlayers: state.maxPlayers || state.room?.maxPlayers || safeResponse.maxPlayers,
+    playerCount: state.playerCount || state.players?.length || safeResponse.playerCount,
     status: state.status || safeResponse.status,
     winner: state.winner || safeResponse.winner,
     winnerId: state.winnerId || safeResponse.winnerId,
@@ -69,9 +250,26 @@ const ROOM_TIER_SKINS = [
   { bg: 'room-card-gold.png', character: 'bird.png', button: 'button-gold.png', level: 'Master' },
 ];
 
+function getNestedValue(source, path) {
+  return path.split('.').reduce((current, key) => (current && current[key] !== undefined ? current[key] : undefined), source);
+}
+
+function firstDefined(source, paths) {
+  for (const path of paths) {
+    const value = getNestedValue(source, path);
+    if (value !== undefined && value !== null && value !== '') {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
 function formatCoins(value, fallback = '0') {
   if (value === null || value === undefined || value === '') return fallback;
-  const numberValue = Number(value);
+
+  const cleanValue = typeof value === 'string' ? value.replace(/,/g, '').trim() : value;
+  const numberValue = Number(cleanValue);
   return Number.isFinite(numberValue) ? numberValue.toLocaleString('en-US') : String(value);
 }
 
@@ -87,48 +285,132 @@ function titleFromTierId(tierId = '') {
 }
 
 export function normalizeRoomTier(tier = {}, index = 0) {
-  const tierId = tier.tierId || tier.id || tier.roomId || `room_tier_${index + 1}`;
-  const entryFee = tier.entryFee?.amount ?? tier.entryFee ?? tier.fee ?? tier.bet ?? 0;
+  const tierId = firstDefined(tier, ['tierId', 'id', '_id', 'roomId', 'slug', 'key']) || `room_tier_${index + 1}`;
+  const entryFee = firstDefined(tier, [
+    'entryFee.amount',
+    'entryFee.value',
+    'entryFee',
+    'fee.amount',
+    'fee.value',
+    'fee',
+    'bet.amount',
+    'bet.value',
+    'bet',
+    'cost.amount',
+    'cost.value',
+    'cost',
+  ]) ?? 0;
+  const prizePool = firstDefined(tier, [
+    'prizePool.amount',
+    'prizePool.value',
+    'prizePool',
+    'prize.amount',
+    'prize.value',
+    'prize',
+    'reward.amount',
+    'reward.value',
+    'reward',
+  ]);
   const skin = ROOM_TIER_SKINS[index % ROOM_TIER_SKINS.length];
-  const name = tier.name || tier.title || tier.roomName || titleFromTierId(tierId);
-  const maxPlayers = Number(tier.maxPlayers || tier.playersCount || String(tierId).match(/(\d+)p/i)?.[1] || 3);
+  const name = firstDefined(tier, ['name', 'title', 'roomName', 'displayName', 'label']) || titleFromTierId(tierId);
+  const maxPlayers = 3;
+  const onlinePlayers = firstDefined(tier, [
+    'playersOnline',
+    'onlinePlayers',
+    'onlineCount',
+    'playerCount',
+    'players',
+    'activePlayers',
+    'stats.playersOnline',
+    'stats.onlinePlayers',
+  ]);
+  const entryFeeAmount = Number(String(entryFee).replace(/,/g, '')) || 0;
 
   return {
     ...tier,
     id: tierId,
     roomId: tierId,
     tierId,
-    title: String(tier.title || name).toUpperCase(),
+    title: String(firstDefined(tier, ['title', 'name', 'roomName', 'displayName']) || name).toUpperCase(),
     name,
-    level: tier.level || tier.difficulty || skin.level,
+    level: firstDefined(tier, ['level', 'difficulty', 'rank', 'tierName']) || skin.level,
     maxPlayers,
-    players: tier.players ?? tier.onlinePlayers ?? tier.playerCount ?? '—',
+    players: formatCoins(onlinePlayers, '—'),
     fee: formatCoins(entryFee, '0'),
     bet: `${formatCoins(entryFee, '0')} coins`,
-    entryFee: { amount: Number(entryFee) || 0 },
-    prize: tier.prize ?? tier.prizePool ?? formatCoins((Number(entryFee) || 0) * maxPlayers, '0'),
-    bg: tier.bg || tier.background || skin.bg,
-    character: tier.character || tier.avatar || skin.character,
-    button: tier.button || skin.button,
-    status: tier.status || 'Available',
+    entryFee: { amount: entryFeeAmount },
+    prize: formatCoins(prizePool ?? entryFeeAmount * maxPlayers, '0'),
+    bg: firstDefined(tier, ['bg', 'background', 'backgroundImage', 'cardBg']) || skin.bg,
+    character: firstDefined(tier, ['character', 'avatar', 'icon', 'mascot']) || skin.character,
+    button: firstDefined(tier, ['button', 'buttonImage']) || skin.button,
+    status: firstDefined(tier, ['status', 'state']) || 'Available',
   };
 }
 
 export function normalizeRoomTierList(response = {}) {
-  const list = response.tiers || response.roomTiers || response.data?.tiers || response.data || response;
-  return Array.isArray(list) ? list.map(normalizeRoomTier) : [];
+  const list = response.tiers
+    || response.roomTiers
+    || response.rooms
+    || response.data?.tiers
+    || response.data?.roomTiers
+    || response.data?.rooms
+    || response.data?.results
+    || response.results
+    || response.data
+    || response;
+
+  if (!Array.isArray(list)) return [];
+
+  return list
+    .filter((tier) => {
+      const id = String(firstDefined(tier, ['tierId', 'id', '_id', 'roomId', 'slug', 'key']) || '');
+      const rawMaxPlayers = Number(firstDefined(tier, ['maxPlayers', 'playersCount', 'playerLimit', 'capacity']) || String(id).match(/(\d+)p/i)?.[1] || 3);
+      return rawMaxPlayers === 3 && !/_2p$/i.test(id);
+    })
+    .map(normalizeRoomTier);
 }
 
 export function normalizePrivateRoom(response = {}, requestPayload = {}) {
   const room = response.room || response.privateRoom || response.data || response;
+  const isSolo = Boolean(
+    room.isSolo
+    || room.enableBots
+    || room.botsEnabled
+    || room.mode === 'solo'
+    || room.type === 'solo'
+    || requestPayload.enableBots
+    || requestPayload.botsEnabled
+    || requestPayload.mode === 'solo'
+    || requestPayload.type === 'solo'
+  );
+
   return {
     ...room,
     id: room.roomId || room.id || requestPayload.tierId,
     roomId: room.roomId || room.id || requestPayload.tierId,
     roomCode: room.roomCode || room.code || '',
     tierId: room.tierId || requestPayload.tierId,
-    maxPlayers: Number(room.maxPlayers || requestPayload.maxPlayers || 3),
+    maxPlayers: 3,
     status: room.status || 'created',
+    roomName: room.roomName || requestPayload.roomName || '',
+    visibility: isSolo ? 'private' : (room.visibility || requestPayload.visibility || 'private'),
+    isListed: Boolean(room.isListed ?? (room.visibility === 'public' || requestPayload.visibility === 'public')),
+    type: isSolo ? 'solo' : (room.type || requestPayload.type || 'private'),
+    mode: isSolo ? 'solo' : (room.mode || requestPayload.mode || 'private'),
+    enableBots: isSolo,
+    botsEnabled: isSolo,
+    isSolo,
+    botCount: Number(room.botCount || (isSolo ? 2 : 0)),
+    humanPlayerCount: Number(room.humanPlayerCount || (isSolo ? 1 : (room.players?.length || 1))),
+    entryFee: room.entryFee || null,
+    entryFeeAmount: room.entryFeeAmount ?? room.entryFee?.amount ?? 0,
+    currency: room.currency || room.entryFee?.currency || 'coins',
+    prizePool: room.prizePool ?? 0,
+    seatOrder: room.seatOrder || [],
+    turnOrderPositions: room.turnOrderPositions || [],
+    rotation: room.rotation || 'bottom_top_left',
+    players: room.players || [],
+    botPlayers: room.botPlayers || [],
   };
 }
 
@@ -140,6 +422,7 @@ export function normalizeRoom(room = {}) {
     name: room.name || room.title || room.roomName || 'Sakura Room',
     level: room.level || room.tier || room.difficulty || 'Beginner',
     players: room.players ?? room.onlinePlayers ?? room.playerCount ?? '0',
+    maxPlayers: 3,
     fee: room.fee ?? room.bet ?? room.entryFee ?? '500',
     prize: room.prize ?? room.prizePool ?? '2,000',
     bg: room.bg || room.background || 'room-card-green.png',
@@ -159,21 +442,41 @@ function normalizeScoreValue(value, fallback = 0) {
 }
 
 export function normalizeResultPlayer(player = {}, index = 0, winnerId = null) {
-  const id = player.id || player.userId || player.playerId || `result_player_${index + 1}`;
-  const score = normalizeScoreValue(
-    player.scoreDelta ?? player.delta ?? player.pointsDelta ?? player.reward ?? player.score,
-    index === 0 ? 0 : 0
+  const id = normalizeId(player.id || player.userId || player.playerId || player._id || `result_player_${index + 1}`);
+  const coinDelta = normalizeScoreValue(
+    player.coinDelta
+      ?? player.coinChange
+      ?? player.coinsDelta
+      ?? player.moneyDelta
+      ?? player.scoreDelta
+      ?? player.delta
+      ?? player.pointsDelta
+      ?? player.payout
+      ?? player.reward
+      ?? player.score,
+    0
   );
+  const totalScore = player.totalScore ?? player.finalScore ?? player.points ?? player.balance ?? player.scoreTotal;
 
   return {
     ...player,
     id,
-    name: player.name || player.username || player.displayName || `Player ${index + 1}`,
-    avatar: player.avatar || player.avatarUrl || player.icon || player.resultAvatar || (index === 0 ? 'ic1.png' : index === 1 ? 'ic2.png' : 'ic3.png'),
-    score,
-    scoreDelta: score,
-    totalScore: player.totalScore ?? player.points ?? player.balance,
-    isWinner: Boolean(player.isWinner ?? player.winner ?? (winnerId && id === winnerId)),
+    userId: player.userId || id,
+    name: getBackendPlayerName(player) || (winnerId && id === normalizeId(winnerId) ? 'Winner' : 'Unknown player'),
+    avatar: player.avatar || player.avatarUrl || player.avatarId || player.imageUrl || player.icon || player.resultAvatar || null,
+    avatarId: player.avatarId || player.avatar || player.avatarUrl || player.imageUrl || player.icon || player.resultAvatar || null,
+    title: player.title || player.rankTitle || '',
+    coinDelta,
+    coinChange: player.coinChange ?? coinDelta,
+    coinsDelta: player.coinsDelta ?? coinDelta,
+    score: coinDelta,
+    scoreDelta: coinDelta,
+    payout: player.payout ?? coinDelta,
+    totalScore,
+    finalScore: player.finalScore ?? totalScore,
+    roundStats: player.roundStats || player.stats || {},
+    summaryRows: player.summaryRows || [],
+    isWinner: Boolean(player.isWinner ?? player.winner ?? (winnerId && id === normalizeId(winnerId))),
   };
 }
 
@@ -199,37 +502,100 @@ function normalizeSummaryRows(result = {}) {
   return Object.entries(rows).map(([labelKey, value]) => ({ labelKey, value }));
 }
 
+function buildResultPlayersFromMaps(result = {}, winnerId = null) {
+  const coinPayouts = (result.coinPayouts || result.coinDeltas || result.moneyDeltas) && typeof (result.coinPayouts || result.coinDeltas || result.moneyDeltas) === 'object'
+    ? (result.coinPayouts || result.coinDeltas || result.moneyDeltas)
+    : null;
+  const payouts = coinPayouts || (result.payouts && typeof result.payouts === 'object' ? result.payouts : {});
+  const finalScores = result.finalScores && typeof result.finalScores === 'object' ? result.finalScores : {};
+  const sourcePlayers = toArray(result.players || result.results || result.standings || result.scoreboard || result.participants || result.room?.players || result.gameState?.players);
+  const ids = Array.from(new Set([
+    ...Object.keys(payouts),
+    ...Object.keys(finalScores),
+    ...sourcePlayers.map((player) => normalizeId(player.id || player.userId || player.playerId || player._id)).filter(Boolean),
+    normalizeId(winnerId),
+  ].filter(Boolean)));
+
+  if (!ids.length) return [];
+
+  return ids.map((id) => {
+    const existing = sourcePlayers.find((player) => [player.id, player.userId, player.playerId, player._id].map(normalizeId).includes(id)) || {};
+    const coinDelta = payouts[id] ?? existing.coinDelta ?? existing.coinChange ?? existing.coinsDelta ?? existing.scoreDelta ?? existing.delta;
+    return {
+      ...existing,
+      id,
+      userId: existing.userId || id,
+      coinDelta,
+      coinChange: existing.coinChange ?? coinDelta,
+      coinsDelta: existing.coinsDelta ?? coinDelta,
+      scoreDelta: coinDelta,
+      payout: payouts[id] ?? existing.payout ?? coinDelta,
+      totalScore: finalScores[id] ?? existing.totalScore ?? existing.finalScore,
+      finalScore: finalScores[id] ?? existing.finalScore ?? existing.totalScore,
+      isWinner: normalizeId(winnerId) === id || existing.isWinner || existing.winner,
+    };
+  });
+}
+
 export function normalizeGameResult(response = {}) {
   const safeResponse = response && typeof response === 'object' ? response : { result: response };
   const result = safeResponse.result && typeof safeResponse.result === 'object'
     ? safeResponse.result
     : safeResponse.gameResult || safeResponse.roundResult || safeResponse.data || safeResponse;
   const winnerId = result.winnerId || result.winner?.id || result.winner?.userId || safeResponse.winnerId;
-  const playerList = result.players || result.results || result.standings || result.scoreboard || [];
+  const myPlayerId = normalizeId(result.myPlayerId || result.selfPlayerId || safeResponse.myPlayerId || safeResponse.selfPlayerId);
+  const playerSummaries = result.playerSummaries || result.roundSummary?.playerStats || {};
+  const playerList = buildResultPlayersFromMaps(result, winnerId);
   const players = Array.isArray(playerList)
     ? playerList.map((player, index) => normalizeResultPlayer(player, index, winnerId))
     : [];
-  const normalizedWinner = result.winner
+  const normalizedWinner = result.winner && typeof result.winner === 'object'
     ? normalizeResultPlayer(result.winner, 0, winnerId)
-    : players.find((player) => player.isWinner || player.id === winnerId) || players[0];
+    : players.find((player) => player.isWinner || normalizeId(player.id) === normalizeId(winnerId)) || null;
+  const myPlayer = myPlayerId ? players.find((player) => normalizeId(player.id) === myPlayerId || normalizeId(player.userId) === myPlayerId) : null;
   const resultType = typeof result.result === 'string'
     ? result.result
-    : result.outcome || result.status || safeResponse.status || 'win';
+    : result.outcome || result.status || safeResponse.status || (normalizedWinner ? 'win' : 'draw');
+  const totalScore = result.totalCoins
+    ?? result.totalScore
+    ?? myPlayer?.coinDelta
+    ?? myPlayer?.scoreDelta
+    ?? result.rewards?.coins
+    ?? normalizedWinner?.coinDelta;
+  const ownSummaryRows = myPlayerId && playerSummaries?.[myPlayerId]?.summaryRows
+    ? playerSummaries[myPlayerId].summaryRows
+    : myPlayer?.summaryRows;
+  const summaryRows = ownSummaryRows && ownSummaryRows.length ? ownSummaryRows : normalizeSummaryRows(result);
 
   return {
     ...result,
     matchId: result.matchId || result.id || safeResponse.matchId,
     roomId: result.roomId || result.room?.id || safeResponse.roomId,
+    tierId: result.tierId || result.room?.tierId || safeResponse.tierId,
     maxPlayers: result.maxPlayers || result.room?.maxPlayers || safeResponse.maxPlayers,
     status: result.status || safeResponse.status,
     result: resultType,
-    title: result.title || result.heading,
+    reason: result.reason || safeResponse.reason,
+    title: result.title || result.heading || (result.reason === 'forfeit' ? 'Won by forfeit' : undefined),
     titleKey: result.titleKey,
+    myPlayerId,
+    selfPlayerId: result.selfPlayerId || result.myPlayerId || safeResponse.selfPlayerId || safeResponse.myPlayerId,
     winnerId,
     winner: normalizedWinner,
     players,
-    summaryRows: normalizeSummaryRows(result),
+    winningHand: result.winningHand || [],
+    winningTile: result.winningTile,
+    yaku: result.yaku || result.fan || [],
+    han: result.han ?? result.totalFan,
+    isTsumo: result.isTsumo,
+    payouts: result.coinPayouts || result.coinDeltas || result.payouts || {},
+    coinPayouts: result.coinPayouts || result.coinDeltas || result.payouts || {},
+    currency: result.currency || 'coins',
+    finalScores: result.finalScores || {},
+    playerSummaries,
+    summaryRows,
     rewards: result.rewards || result.reward || safeResponse.rewards || {},
-    totalScore: result.totalScore ?? result.score ?? result.finalScore ?? normalizedWinner?.score ?? result.rewards?.coins,
+    totalScore,
+    totalCoins: totalScore,
   };
 }

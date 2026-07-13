@@ -1,35 +1,161 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../router/routes.js';
-import { claimDailyReward, getBalances, getDailyRewardStatus } from '../services/economyService.js';
+import { DEFAULT_DAILY_REWARD_SCHEDULE, claimDailyReward, getBalances, getDailyRewardStatus } from '../services/economyService.js';
 import { saveMatchmakingContext } from '../store/gameStore.js';
-import { mockFeaturedRooms } from '../mocks/mockRooms.js';
-import { mockPlayerProfile } from '../mocks/mockProfile.js';
 import { getStoredAuthUser } from '../services/authService.js';
 import { getRoomTiers } from '../services/roomService.js';
+import { isMockApiEnabled } from '../services/api.js';
+import { acceptFriendRequest as acceptFriendRequestApi, declineFriendRequest as declineFriendRequestApi, getApiErrorMessage, getBulkFriendStatus, getFriends, getIncomingFriendRequests, removeFriend as removeFriendApi, searchFriendUsers, sendFriendRequest } from '../services/friendsService.js';
 import { useLanguage } from '../i18n/useLanguage.js';
 
 const asset = (name) => `/assets/main-menu/${name}`;
 const profileAsset = (name) => `/assets/profile/${name}`;
 const dailyAsset = (name) => `/assets/daily-login/${name}`;
 const PROFILE_AVATAR_STORAGE_KEY = 'sakura_profile_avatar';
+const SAKURA_CUP_TIER_ID = 'sakura_garden_3p';
 
-function getStoredProfileAvatar() {
-  try {
-    return window.localStorage.getItem(PROFILE_AVATAR_STORAGE_KEY) || '';
-  } catch {
-    return '';
-  }
+const PROFILE_AVATAR_ID_TO_FILE = {
+  dragon_avatar: 'ICO.png',
+  default: 'ICO.png',
+  default_avatar: 'ICO.png',
+  stevie: 'avatar-stevie.png',
+  kiki: 'avatar-kiki.png',
+  bunbun: 'avatar-bunbun.png',
+  panda: 'avatar-panda.png',
+};
+
+const EMPTY_MENU_PROFILE = {
+  id: '',
+  username: 'Player',
+  name: 'Player',
+};
+
+function pickFriendUser(friend = {}) {
+  return friend.user
+    || friend.friend
+    || friend.profile
+    || friend.player
+    || friend.targetUser
+    || friend.target
+    || friend.recipient
+    || friend.sender
+    || friend.from
+    || {};
 }
 
-function getMainMenuAvatarSrc(profile) {
-  const avatarValue = getStoredProfileAvatar() || profile?.avatarUrl || profile?.imageUrl || profile?.avatar || profile?.avatarId;
+function getFriendUserId(user) {
+  const nestedUser = pickFriendUser(user || {});
+  return user?.userId
+    || user?.id
+    || user?._id
+    || user?.targetUserId
+    || user?.friendId
+    || nestedUser.userId
+    || nestedUser.id
+    || nestedUser._id
+    || '';
+}
 
-  if (typeof avatarValue !== 'string') {
-    return asset('friend-girl.png');
+
+function getFriendRequestId(request) {
+  return request?.requestId
+    || request?.id
+    || request?._id
+    || request?.friendRequestId
+    || request?.friendshipId
+    || request?.pendingRequestId
+    || request?.incomingRequestId
+    || request?.request?.id
+    || request?.request?._id
+    || request?.request?.requestId
+    || '';
+}
+
+function pickFriendRequestUser(request = {}) {
+  return request.sender
+    || request.from
+    || request.fromUser
+    || request.requester
+    || request.requestedBy
+    || request.user
+    || request.createdBy
+    || request.owner
+    || request.request?.sender
+    || request.request?.from
+    || request.request?.fromUser
+    || {};
+}
+
+function getFriendRequestUserId(request = {}) {
+  const user = pickFriendRequestUser(request);
+
+  return request.fromUserId
+    || request.senderId
+    || request.requesterId
+    || request.createdById
+    || user.userId
+    || user.id
+    || user._id
+    || request.userId
+    || '';
+}
+
+function getFriendRequestName(request = {}) {
+  const user = pickFriendRequestUser(request);
+
+  return user.username
+    || user.name
+    || user.displayName
+    || request.username
+    || request.name
+    || request.fromUsername
+    || request.senderUsername
+    || request.requesterUsername
+    || request.request?.username
+    || request.request?.fromUsername
+    || 'Unknown player';
+}
+
+function getFriendRequestLevel(request = {}) {
+  const user = pickFriendRequestUser(request);
+  const level = user.level
+    ?? request.level
+    ?? request.fromLevel
+    ?? request.senderLevel
+    ?? request.requesterLevel
+    ?? request.request?.level;
+
+  if (level !== undefined && level !== null && String(level).trim() !== '') {
+    return `Level ${level}`;
   }
 
-  const avatar = avatarValue.trim();
+  return user.levelLabel
+    || request.levelLabel
+    || request.sender?.levelLabel
+    || request.from?.levelLabel
+    || request.request?.levelLabel
+    || '';
+}
+
+function getFriendRequestAvatar(request = {}) {
+  const user = pickFriendRequestUser(request);
+
+  return user.avatarUrl
+    || user.imageUrl
+    || user.avatar
+    || user.avatarId
+    || request.avatarUrl
+    || request.imageUrl
+    || request.avatar
+    || request.avatarId
+    || request.request?.avatar
+    || request.request?.avatarId
+    || '';
+}
+
+function getFriendAvatarSrc(avatarValue) {
+  const avatar = normalizeProfileAvatarValue(avatarValue);
 
   if (!avatar) {
     return asset('friend-girl.png');
@@ -40,73 +166,140 @@ function getMainMenuAvatarSrc(profile) {
   }
 
   if (/\.(png|jpe?g|webp|gif|svg)$/i.test(avatar)) {
-    return profileAsset(avatar);
+    return avatar.includes('/') ? avatar : profileAsset(avatar);
   }
 
   return asset('friend-girl.png');
 }
 
-const fallbackRoomCards = [
-  {
-    title: 'SAKURA GARDEN',
-    level: 'Beginner',
-    bg: 'room-card-green.png',
-    character: 'panda.png',
-    players: '4,326',
-    fee: '500',
-    prize: '2,000',
-    button: 'button-green.png',
-    route: ROUTES.matchmaking,
-  },
-  {
-    title: 'BLOSSOM TABLE',
-    level: 'Intermediate',
-    bg: 'room-card-blue.png',
-    character: 'fox.png',
-    players: '1,842',
-    fee: '1,000',
-    prize: '5,000',
-    button: 'button-blue.png',
-    route: ROUTES.matchmaking,
-  },
-  {
-    title: 'LUCKY BAMBOO',
-    level: 'Advanced',
-    bg: 'room-card-purple.png',
-    character: 'bunny.png',
-    players: '812',
-    fee: '5,000',
-    prize: '20,000',
-    button: 'button-violet.png',
-    route: ROUTES.matchmaking,
-  },
-  {
-    title: 'DRAGON PAVILION',
-    level: 'Master',
-    bg: 'room-card-gold.png',
-    character: 'bird.png',
-    players: '320',
-    fee: '50,000',
-    prize: '200,000',
-    button: 'button-gold.png',
-    route: ROUTES.matchmaking,
-  },
-];
+function pickBestFriendSearchResult(results, query) {
+  const normalizedQuery = String(query || '').trim().toLowerCase();
 
-const friends = [
-  { name: 'Momo', state: 'Online', action: 'INVITE', avatar: 'friend-panda.png' },
-  { name: 'Panda', state: 'In Lobby', action: 'INVITE', avatar: 'friend-panda.png' },
-  { name: 'Bunbun', state: 'Playing', action: 'WATCH', avatar: 'friend-bunny.png' },
-  { name: 'Ryu', state: 'Online', action: 'INVITE', avatar: 'friend-dragon.png' },
-  { name: 'Kiki', state: 'Online', action: 'INVITE', avatar: 'friend-bird.png' },
-  { name: 'Stevie', state: 'In Game', action: 'WATCH', avatar: 'friend-girl.png' },
-];
+  if (!Array.isArray(results) || !results.length) {
+    return null;
+  }
 
-const initialFriendRequests = [
-  { id: 'req-luna', name: 'Luna', level: 'Level 12', avatar: 'friend-girl.png' },
-  { id: 'req-milo', name: 'Milo', level: 'Level 9', avatar: 'friend-bunny.png' },
-  { id: 'req-hana', name: 'Hana', level: 'Level 18', avatar: 'friend-panda.png' },
-];
+  return results.find((user) => String(user?.playerId || '').toLowerCase() === normalizedQuery)
+    || results.find((user) => String(user?.username || user?.name || '').toLowerCase() === normalizedQuery)
+    || results.find((user) => getFriendUserId(user))
+    || results[0];
+}
+
+function getStoredProfileAvatar() {
+  try {
+    return window.localStorage.getItem(PROFILE_AVATAR_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function normalizeProfileAvatarValue(avatarValue) {
+  if (typeof avatarValue !== 'string') {
+    return '';
+  }
+
+  const avatar = avatarValue.trim();
+
+  if (!avatar) {
+    return '';
+  }
+
+  return PROFILE_AVATAR_ID_TO_FILE[avatar] || avatar;
+}
+
+function getOwnProfileAvatarValue(profile) {
+  return getStoredProfileAvatar() || profile?.avatarUrl || profile?.imageUrl || profile?.avatar || profile?.avatarId || '';
+}
+
+function getFriendDisplayName(friend = {}) {
+  const user = pickFriendUser(friend);
+  return user.username
+    || user.name
+    || user.displayName
+    || friend.username
+    || friend.name
+    || friend.displayName
+    || friend.friendUsername
+    || 'Friend';
+}
+
+function getFriendBackendStatus(friend = {}) {
+  const user = pickFriendUser(friend);
+  return user.status
+    || user.state
+    || user.onlineStatus
+    || user.presence
+    || friend.status
+    || friend.state
+    || friend.onlineStatus
+    || friend.presence
+    || '';
+}
+
+function formatFriendStatus(status) {
+  if (status === true) return 'Online';
+  if (status === false) return 'Offline';
+
+  const value = String(status || '').trim();
+  if (!value) return '';
+
+  const normalized = value.toLowerCase();
+  if (normalized === 'online' || normalized === 'active') return 'Online';
+  if (normalized === 'offline' || normalized === 'inactive') return 'Offline';
+
+  return value;
+}
+
+function isOwnProfileRecord(friend = {}, profile = {}) {
+  const friendId = String(getFriendUserId(friend) || '').trim();
+  const profileId = String(profile?.userId || profile?.id || profile?._id || '').trim();
+  const friendName = String(getFriendDisplayName(friend) || '').trim().toLowerCase();
+  const profileName = String(profile?.username || profile?.name || '').trim().toLowerCase();
+
+  return Boolean((friendId && profileId && friendId === profileId) || (friendName && profileName && friendName === profileName));
+}
+
+function getFriendAvatarValue(friend = {}, profile = {}) {
+  const user = pickFriendUser(friend);
+
+  if (isOwnProfileRecord(friend, profile)) {
+    const ownAvatar = getOwnProfileAvatarValue(profile);
+
+    if (ownAvatar) {
+      return ownAvatar;
+    }
+  }
+
+  return user.avatarUrl
+    || user.imageUrl
+    || user.avatar
+    || user.avatarId
+    || friend.avatarUrl
+    || friend.imageUrl
+    || friend.avatar
+    || friend.avatarId
+    || friend.profileAvatar
+    || friend.friendAvatar
+    || 'friend-girl.png';
+}
+
+function getMainMenuAvatarSrc(profile) {
+  const avatar = normalizeProfileAvatarValue(getOwnProfileAvatarValue(profile));
+
+  if (!avatar) {
+    return asset('friend-girl.png');
+  }
+
+  if (/^(https?:)?\/\//i.test(avatar) || avatar.startsWith('/')) {
+    return avatar;
+  }
+
+  if (/\.(png|jpe?g|webp|gif|svg)$/i.test(avatar)) {
+    return avatar.includes('/') ? avatar : profileAsset(avatar);
+  }
+
+  return asset('friend-girl.png');
+}
 
 function formatCurrencyValue(value, fallback = '—') {
   if (value === null || value === undefined || value === '') {
@@ -202,21 +395,34 @@ function RoomCard({ room, onPlay, t, tx }) {
 
 
 
-const dailyRewards = [
-  { day: 1, image: 'day-1.png' },
-  { day: 2, image: 'day-2.png' },
-  { day: 3, image: 'day-3.png' },
-  { day: 4, image: 'day-4.png' },
-  { day: 5, image: 'day-5.png' },
-  { day: 6, image: 'day-6.png' },
-  { day: 7, image: 'day-7.png' },
-];
+function getDailyRewardImage(day) {
+  return `day-${day}.png`;
+}
+
+function getDailyRewardLabel(reward = {}) {
+  if (reward.coins) {
+    return `${reward.coins} Coins`;
+  }
+
+  if (reward.diamonds) {
+    return `${reward.diamonds} Gems`;
+  }
+
+  if (reward.chest) {
+    return 'Chest';
+  }
+
+  return 'Reward';
+}
 
 function DailyLoginPopup({ status, onClose, onClaim }) {
-  const rawStreak = Number(status?.currentStreak ?? status?.streak ?? status?.newStreak ?? 1);
+  const rewardSchedule = Array.isArray(status?.rewardSchedule) && status.rewardSchedule.length > 0
+    ? status.rewardSchedule
+    : DEFAULT_DAILY_REWARD_SCHEDULE;
+  const rawStreak = Number(status?.claimableDay ?? status?.currentStreak ?? status?.streak ?? status?.newStreak ?? 1);
   const streak = Number.isFinite(rawStreak) && rawStreak > 0 ? rawStreak : 1;
   const canClaimToday = Boolean(status?.canClaimToday);
-  const activeDay = Math.min(Math.max(streak, 1), dailyRewards.length);
+  const activeDay = Math.min(Math.max(streak, 1), rewardSchedule.length);
   const streakUnit = activeDay === 1 ? 'Day' : 'Days';
 
   return (
@@ -231,14 +437,15 @@ function DailyLoginPopup({ status, onClose, onClaim }) {
         </div>
 
         <div className="daily-login-cards">
-          {dailyRewards.map((reward) => {
-            const isClaimable = reward.day === activeDay && canClaimToday;
-            const isClaimed = reward.day < activeDay || (reward.day === activeDay && !canClaimToday);
-            const isLocked = reward.day > activeDay;
+          {rewardSchedule.map((reward) => {
+            const rewardDay = Number(reward.day) || 1;
+            const isClaimable = rewardDay === activeDay && canClaimToday;
+            const isClaimed = rewardDay < activeDay || (rewardDay === activeDay && !canClaimToday);
+            const isLocked = rewardDay > activeDay;
 
             return (
-              <article className={`daily-login-card${isClaimable ? ' is-active' : ''}`} key={reward.day}>
-                <img className="daily-login-card-art" src={dailyAsset(reward.image)} alt={`Day ${reward.day}`} />
+              <article className={`daily-login-card${isClaimable ? ' is-active' : ''}`} key={rewardDay} title={getDailyRewardLabel(reward)}>
+                <img className="daily-login-card-art" src={dailyAsset(getDailyRewardImage(rewardDay))} alt={`Day ${rewardDay} - ${getDailyRewardLabel(reward)}`} />
 
                 {isClaimed && (
                   <div className="daily-login-claimed">
@@ -266,22 +473,22 @@ function DailyLoginPopup({ status, onClose, onClaim }) {
 }
 
 
-function AddFriendPopup({ value, onChange, onAccept, onCancel }) {
+function AddFriendPopup({ value, onChange, onAccept, onCancel, t }) {
   return (
-    <div className="add-friend-overlay" role="dialog" aria-modal="true" aria-label="Add friend">
+    <div className="add-friend-overlay" role="dialog" aria-modal="true" aria-label={t('addFriendTitle')}>
       <div className="add-friend-modal">
-        <h2>Enter Friend Name</h2>
+        <h2>{t('addFriendTitle')}</h2>
         <input
           className="add-friend-input"
           type="text"
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          placeholder="Enter friend name"
+          placeholder={t('addFriendPlaceholder')}
           autoFocus
         />
         <div className="add-friend-actions">
-          <button className="add-friend-accept" type="button" onClick={onAccept}>Accept</button>
-          <button className="add-friend-cancel" type="button" onClick={onCancel}>Cancel</button>
+          <button className="add-friend-accept" type="button" onClick={onAccept}>{t('accept')}</button>
+          <button className="add-friend-cancel" type="button" onClick={onCancel}>{t('cancel')}</button>
         </div>
       </div>
     </div>
@@ -304,14 +511,14 @@ function FriendRequestModal({ requests, onClose, onAccept, onDecline }) {
           {requests.length ? (
             requests.map((request) => (
               <div className="friend-request-row" key={request.id}>
-                <img src={asset(request.avatar)} alt="" />
+                <img src={getFriendAvatarSrc(request.avatar)} alt="" />
                 <div className="friend-request-copy">
                   <strong>{request.name}</strong>
                   <span>{request.level}</span>
                 </div>
                 <div className="friend-request-actions">
                   <button className="accept-request" type="button" onClick={() => onAccept(request)}>ACCEPT</button>
-                  <button className="decline-request" type="button" onClick={() => onDecline(request.id)}>DECLINE</button>
+                  <button className="decline-request" type="button" onClick={() => onDecline(request)}>DECLINE</button>
                 </div>
               </div>
             ))
@@ -324,15 +531,22 @@ function FriendRequestModal({ requests, onClose, onAccept, onDecline }) {
   );
 }
 
-function FriendRow({ friend, tx }) {
+function FriendRow({ friend, tx, onRemove }) {
   return (
     <div className="friend-row">
-      <img src={asset(friend.avatar)} alt="" />
+      <img src={getFriendAvatarSrc(friend.avatar)} alt="" />
       <div>
         <strong>{friend.name}</strong>
-        <span>{tx(friend.state)}</span>
+        {friend.state && <span>{tx(friend.state)}</span>}
       </div>
-      <button type="button">{tx(friend.action)}</button>
+      <button
+        className="remove-friend-button"
+        type="button"
+        onClick={() => onRemove(friend)}
+        disabled={friend.isRemoving}
+      >
+        {friend.isRemoving ? '...' : 'REMOVE'}
+      </button>
     </div>
   );
 }
@@ -340,10 +554,11 @@ function FriendRow({ friend, tx }) {
 export default function MainMenuPage() {
   const navigate = useNavigate();
   const { t, tx } = useLanguage();
-  const [roomCards, setRoomCards] = useState(fallbackRoomCards);
-  const [profile, setProfile] = useState(() => getStoredAuthUser() || mockPlayerProfile);
-  const [friendList, setFriendList] = useState(friends);
-  const [friendRequests, setFriendRequests] = useState(initialFriendRequests);
+  const [roomCards, setRoomCards] = useState([]);
+  const [profile, setProfile] = useState(() => getStoredAuthUser() || EMPTY_MENU_PROFILE);
+  const [friendList, setFriendList] = useState([]);
+  const [friendRequests, setFriendRequests] = useState([]);
+  const [friendsError, setFriendsError] = useState('');
   const [isFriendRequestsOpen, setIsFriendRequestsOpen] = useState(false);
   const [isAddFriendOpen, setIsAddFriendOpen] = useState(false);
   const [friendName, setFriendName] = useState('');
@@ -357,8 +572,8 @@ export default function MainMenuPage() {
   useEffect(() => {
     let isMounted = true;
 
-    Promise.allSettled([getBalances(), getDailyRewardStatus(), getRoomTiers()])
-      .then(([balancesResult, rewardResult, roomTiersResult]) => {
+    Promise.allSettled([getBalances(), getDailyRewardStatus(), getRoomTiers(), getFriends(), getIncomingFriendRequests()])
+      .then(([balancesResult, rewardResult, roomTiersResult, friendsResult, requestsResult]) => {
         if (!isMounted) {
           return;
         }
@@ -380,14 +595,80 @@ export default function MainMenuPage() {
           console.error('Failed to load room tiers:', roomTiersResult.reason);
         }
 
-        setRoomCards(roomTiers?.length ? roomTiers : mockFeaturedRooms);
-        setProfile((current) => current || mockPlayerProfile);
+        setRoomCards(Array.isArray(roomTiers) ? roomTiers : []);
+        setProfile((current) => current || EMPTY_MENU_PROFILE);
 
         if (economyBalances) {
           setBalances({
             coins: economyBalances.coins ?? null,
             diamonds: economyBalances.diamonds ?? economyBalances.gems ?? null,
           });
+        }
+
+        const backendFriends = friendsResult.status === 'fulfilled' ? friendsResult.value : null;
+        const backendRequests = requestsResult.status === 'fulfilled' ? requestsResult.value : null;
+
+        if (friendsResult.status === 'rejected') {
+          console.error('Failed to load friends:', friendsResult.reason);
+          setFriendsError('Failed to load friends');
+          if (!isMockApiEnabled()) {
+            setFriendList([]);
+          }
+        }
+
+        if (requestsResult.status === 'rejected') {
+          console.error('Failed to load friend requests:', requestsResult.reason);
+          setFriendsError('Failed to load friend requests');
+          if (!isMockApiEnabled()) {
+            setFriendRequests([]);
+          }
+        }
+
+        if (friendsResult.status === 'fulfilled') {
+          const mappedFriends = backendFriends.map((friend) => {
+            const userId = getFriendUserId(friend);
+
+            return {
+              id: userId || friend.username || friend.name,
+              userId,
+              name: getFriendDisplayName(friend),
+              state: formatFriendStatus(getFriendBackendStatus(friend)),
+              action: 'REMOVE',
+              avatar: getFriendAvatarValue(friend, profile),
+              raw: friend,
+            };
+          });
+
+          setFriendList(mappedFriends);
+
+          const friendUserIds = mappedFriends.map((friend) => friend.userId).filter(Boolean);
+          if (friendUserIds.length) {
+            getBulkFriendStatus(friendUserIds)
+              .then((statuses) => {
+                if (!isMounted || !statuses || typeof statuses !== 'object') {
+                  return;
+                }
+
+                setFriendList((current) => current.map((friend) => ({
+                  ...friend,
+                  state: formatFriendStatus(statuses[friend.userId] ?? friend.state),
+                })));
+              })
+              .catch((error) => {
+                console.error('Failed to load friend online statuses:', error);
+              });
+          }
+        }
+
+        if (requestsResult.status === 'fulfilled') {
+          setFriendRequests(backendRequests.map((request) => ({
+            id: getFriendRequestId(request),
+            userId: getFriendRequestUserId(request),
+            name: getFriendRequestName(request),
+            level: getFriendRequestLevel(request),
+            avatar: getFriendRequestAvatar(request),
+            raw: request,
+          })).filter((request) => request.id));
         }
 
         setDailyRewardStatus(rewardStatus || null);
@@ -441,31 +722,104 @@ export default function MainMenuPage() {
     }
   };
 
-  const handleAcceptAddFriend = () => {
-    const nextFriendName = friendName.trim();
+  const handleAcceptAddFriend = async () => {
+    const nextFriendQuery = friendName.trim();
 
-    if (!nextFriendName) {
+    if (!nextFriendQuery) {
       return;
     }
 
-    setFriendList((current) => [
-      ...current,
-      { name: nextFriendName, state: 'Online', action: 'INVITE', avatar: 'friend-girl.png' },
-    ]);
-    setFriendName('');
-    setIsAddFriendOpen(false);
+    try {
+      const searchResults = await searchFriendUsers(nextFriendQuery);
+      const selectedUser = pickBestFriendSearchResult(searchResults, nextFriendQuery);
+      const targetUserId = getFriendUserId(selectedUser);
+
+      if (!targetUserId) {
+        throw new Error('Friend not found. Search by username or Player ID.');
+      }
+
+      await sendFriendRequest(targetUserId);
+      setFriendName('');
+      setIsAddFriendOpen(false);
+      setFriendsError('Friend request sent');
+    } catch (error) {
+      const message = getApiErrorMessage(error, 'Failed to send friend request');
+      console.error('Failed to send friend request:', message, error);
+      setFriendsError(message);
+    }
   };
 
-  const acceptFriendRequest = (request) => {
-    setFriendList((current) => [
-      ...current,
-      { name: request.name, state: 'Online', action: 'INVITE', avatar: request.avatar },
-    ]);
-    setFriendRequests((current) => current.filter((item) => item.id !== request.id));
+  const acceptFriendRequest = async (request) => {
+    const requestId = getFriendRequestId(request);
+
+    if (!requestId) {
+      setFriendsError('Friend request id is missing');
+      console.error('Failed to accept friend request: missing requestId', request);
+      return;
+    }
+
+    try {
+      await acceptFriendRequestApi(requestId);
+      setFriendList((current) => [
+        ...current,
+        { id: request.userId || requestId, userId: request.userId, name: request.name, state: '', action: 'REMOVE', avatar: request.avatar },
+      ]);
+      setFriendRequests((current) => current.filter((item) => getFriendRequestId(item) !== requestId));
+      setFriendsError('Friend request accepted');
+    } catch (error) {
+      const message = getApiErrorMessage(error, 'Failed to accept friend request');
+      console.error('Failed to accept friend request:', message, error);
+      setFriendsError(message);
+    }
   };
 
-  const declineFriendRequest = (requestId) => {
-    setFriendRequests((current) => current.filter((item) => item.id !== requestId));
+  const declineFriendRequest = async (request) => {
+    const requestId = getFriendRequestId(request);
+
+    if (!requestId) {
+      setFriendsError('Friend request id is missing');
+      console.error('Failed to decline friend request: missing requestId', request);
+      return;
+    }
+
+    try {
+      await declineFriendRequestApi(requestId);
+    } catch (error) {
+      const message = getApiErrorMessage(error, 'Failed to decline friend request');
+      console.error('Failed to decline friend request:', message, error);
+      setFriendsError(message);
+      return;
+    }
+
+    setFriendRequests((current) => current.filter((item) => getFriendRequestId(item) !== requestId));
+  };
+
+
+  const handleRemoveFriend = async (friend) => {
+    const friendId = friend?.userId || friend?.id || getFriendUserId(friend?.raw || friend);
+
+    if (!friendId) {
+      setFriendsError('Friend id is missing');
+      console.error('Failed to remove friend: missing friendId', friend);
+      return;
+    }
+
+    setFriendList((current) => current.map((item) => (
+      item.id === friend.id ? { ...item, isRemoving: true } : item
+    )));
+
+    try {
+      await removeFriendApi(friendId);
+      setFriendList((current) => current.filter((item) => item.id !== friend.id));
+      setFriendsError('Friend removed');
+    } catch (error) {
+      const message = getApiErrorMessage(error, 'Failed to remove friend');
+      console.error('Failed to remove friend:', message, error);
+      setFriendsError(message);
+      setFriendList((current) => current.map((item) => (
+        item.id === friend.id ? { ...item, isRemoving: false } : item
+      )));
+    }
   };
 
   return (
@@ -482,20 +836,29 @@ export default function MainMenuPage() {
             <CurrencyPill icon="coin.png" value={formatCurrencyValue(balances.coins)} />
             <CurrencyPill icon="gem.png" value={formatCurrencyValue(balances.diamonds)} />
             <button
-              className="square-top-button shop-menu-button"
+              className="square-top-button leaderboard-menu-button"
               type="button"
-              aria-label="Open shop"
-              onClick={() => navigate(ROUTES.shop)}
-              title="Open shop"
+              aria-label="Open leaderboard"
+              onClick={() => navigate(ROUTES.leaderboard)}
+              title="Open leaderboard"
             >
-              <img src="/assets/shop/icon-shop.png" alt="" />
+              <img src="/assets/leaderboard/icon-leaderboard.png" alt="" />
+            </button>
+            <button
+              className="square-top-button missions-menu-button"
+              type="button"
+              aria-label="Open missions"
+              onClick={() => navigate(ROUTES.missions)}
+              title="Open missions"
+            >
+              <img src="/assets/missions/icon-missions.png" alt="" />
             </button>
             <button
               className="square-top-button friends-menu-button"
               type="button"
-              aria-label="Add friend"
+              aria-label={t('addFriendTitle')}
               onClick={() => setIsAddFriendOpen(true)}
-              title="Add friend"
+              title={t('addFriendTitle')}
             >
               <img src="/assets/friends/icon-friends.png" alt="" />
             </button>
@@ -508,7 +871,6 @@ export default function MainMenuPage() {
             >
               <img src={dailyAsset('gift.png')} alt="" />
             </button>
-            <button className="square-top-button has-badge" type="button" aria-label={t('notifications')}>🔔<span>3</span></button>
             <button className="profile-pill" type="button" onClick={() => navigate(ROUTES.profile)} aria-label={t('openProfile')}>
               <img src={getMainMenuAvatarSrc(profile)} alt="" />
               <span>⌄</span>
@@ -521,28 +883,26 @@ export default function MainMenuPage() {
             <div className="hero-banner" style={{ backgroundImage: `url(${asset('bg.png')})` }} aria-hidden="true" />
 
             <div className="sakura-room-grid">
-              {roomCards.map((room) => (
+              {roomCards.length ? roomCards.map((room) => (
                 <RoomCard
-                  key={room.title}
+                  key={room.id || room.roomId || room.tierId || room.title}
                   room={room}
                   t={t}
                   tx={tx}
                   onPlay={() => {
-                    saveMatchmakingContext({
-                      roomId: room.id || room.roomId || room.title,
-                      maxPlayers: room.maxPlayers || 3,
+                    const matchmakingState = {
+                      roomId: room.roomId || room.id || room.tierId || room.title,
+                      tierId: room.tierId || room.id || room.roomId || '',
+                      maxPlayers: Number(room.maxPlayers) || 3,
                       source: 'room-card',
-                    });
-                    navigate(ROUTES.matchmaking, {
-                      state: {
-                        roomId: room.id || room.roomId || room.title,
-                        maxPlayers: room.maxPlayers || 3,
-                        source: 'room-card',
-                      },
-                    });
+                    };
+                    saveMatchmakingContext(matchmakingState);
+                    navigate(ROUTES.matchmaking, { state: matchmakingState });
                   }}
                 />
-              ))}
+              )) : (
+                <div className="rooms-empty-state">No rooms available.</div>
+              )}
             </div>
 
             <div className="bottom-room-actions">
@@ -575,10 +935,11 @@ export default function MainMenuPage() {
                   {friendRequests.length > 0 && <span>{friendRequests.length}</span>}
                 </button>
               </div>
+              {friendsError && <div className="friends-api-status">{friendsError}</div>}
               <div className="friend-list">
-                {friendList.map((friend) => (
-                  <FriendRow key={`${friend.name}-${friend.state}`} friend={friend} tx={tx} />
-                ))}
+                {friendList.length > 0 ? friendList.map((friend) => (
+                  <FriendRow key={`${friend.id || friend.name}-${friend.state}`} friend={friend} tx={tx} onRemove={handleRemoveFriend} />
+                )) : <div className="friends-empty-state">No friends</div>}
               </div>
               <button className="view-all" type="button">{t('viewAllFriends')} <span>›</span></button>
             </section>
@@ -591,8 +952,9 @@ export default function MainMenuPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    saveMatchmakingContext({ roomId: 'sakura_cup', maxPlayers: 3, source: 'sakura-cup' });
-                    navigate(ROUTES.matchmaking, { state: { roomId: 'sakura_cup', maxPlayers: 3, source: 'sakura-cup' } });
+                    const matchmakingContext = { tierId: SAKURA_CUP_TIER_ID, maxPlayers: 3, source: 'sakura-cup' };
+                    saveMatchmakingContext(matchmakingContext);
+                    navigate(ROUTES.matchmaking, { state: matchmakingContext });
                   }}
                 >
                   {t('joinNow')}
@@ -607,6 +969,7 @@ export default function MainMenuPage() {
             value={friendName}
             onChange={setFriendName}
             onAccept={handleAcceptAddFriend}
+            t={t}
             onCancel={() => {
               setFriendName('');
               setIsAddFriendOpen(false);
