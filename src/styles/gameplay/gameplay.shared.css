@@ -1,0 +1,36 @@
+/* =========================================================
+   Gameplay — Shared
+   Scope: declarations that must behave identically in portrait and landscape.
+
+   Cleanup Patch 1 establishes the final three-file structure. Common visual
+   rules will be migrated here only when they are proven identical, avoiding
+   visual regressions during the structural cleanup.
+   ========================================================= */
+
+/* Patch 1 — gameplay asset preload guard */
+.gameplay-asset-preload {
+  position: absolute;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(18, 6, 35, 0.76);
+  backdrop-filter: blur(4px);
+  pointer-events: auto;
+}
+
+.gameplay-asset-preload span {
+  min-width: 220px;
+  padding: 18px 28px;
+  border: 2px solid rgba(255, 210, 88, 0.8);
+  border-radius: 24px;
+  background: rgba(50, 12, 78, 0.88);
+  box-shadow: 0 0 28px rgba(255, 189, 58, 0.25);
+  color: #fff6c9;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1.1;
+  text-align: center;
+  text-shadow: 0 3px 8px rgba(0, 0, 0, 0.55);
+}

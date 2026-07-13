@@ -29,6 +29,14 @@ export function getEffectiveDeviceMode(physicalDevice, orientation) {
   return physicalDevice;
 }
 
+export function getLayoutMode(deviceMode, orientation = 'portrait') {
+  // Portrait UI is intentionally limited to the 720x1280 mobile canvas.
+  // Desktop windows and rotated mobile devices always use the landscape UI.
+  return deviceMode === 'mobile' && orientation === 'portrait'
+    ? 'portrait'
+    : 'landscape';
+}
+
 export function getDesignResolution(deviceMode, orientation = 'portrait') {
   if (deviceMode === 'mobile') {
     return orientation === 'landscape' ? MOBILE_LANDSCAPE_RESOLUTION : MOBILE_PORTRAIT_RESOLUTION;

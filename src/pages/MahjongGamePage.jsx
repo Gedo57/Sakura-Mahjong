@@ -20,7 +20,9 @@ import {
 import { clearActiveMatch, clearMatchmakingContext, getActiveMatch, saveActiveMatch } from '../store/gameStore.js';
 import { useLanguage } from '../i18n/useLanguage.js';
 import { mockGameState as fullMockGameState } from '../mocks/mockGameState.js';
-import { handleProfileAvatarError, isDefaultProfileAvatarValue, resolveProfileAvatarSrc } from '../utils/avatarAssets.js';
+import { isDefaultProfileAvatarValue } from '../utils/avatarAssets.js';
+import { Compass, GameplayTile, PlayerBadge, SideTool, TileWall } from '../components/gameplay/GameplayPrimitives.jsx';
+import { BonusTileRack, ReclaimFeiPrompt, TileFocusOverlay } from '../components/gameplay/GameplayOverlays.jsx';
 import { preloadGameplayAssets } from '../utils/gameplayAssetPreloader.js';
 
 const asset = (name) => `/assets/gameplay/${name}`;
@@ -1856,127 +1858,9 @@ const actionDefinitions = {
   tsumo: { labelKey: 'win', className: 'orange' },
 };
 
-function GameplayTile({ name, className = '', label = '' }) {
-  const tileName = name || 'tile_back.png';
-
-  return (
-    <img
-      className={`gameplay-tile ${className}`}
-      src={asset(tileName)}
-      alt={label}
-      draggable="false"
-      onError={(event) => {
-        const img = event.currentTarget;
-        if (img.dataset.tileFallbackApplied === 'true') return;
-        img.dataset.tileFallbackApplied = 'true';
-        img.src = asset('tile_back.png');
-      }}
-    />
-  );
-}
-
-function TileFocusOverlay({ focus }) {
-  if (!focus?.tileName) return null;
-
-  const kind = String(focus.kind || 'tile').toLowerCase();
-  const position = normalizePosition(focus.position || 'center') || 'center';
-  const visibility = String(focus.visibility || 'public').toLowerCase();
-
-  return (
-    <div
-      className={`gameplay-tile-focus gameplay-tile-focus--${kind} gameplay-tile-focus--${position} gameplay-tile-focus--${visibility}`}
-      key={focus.id}
-      aria-hidden="true"
-    >
-      <span className="gameplay-tile-focus-label">{focus.label || (kind === 'draw' ? 'DRAW' : 'DISCARD')}</span>
-      <GameplayTile name={focus.tileName} className="gameplay-tile--focus" />
-    </div>
-  );
-}
-
-function ReclaimFeiPrompt({ windowState, t, onConfirm, onSkip, isPending = false }) {
-  if (!windowState?.active) return null;
-
-  const option = toArray(windowState.options)[0] || {};
-  const meldTiles = toArray(option.meldTiles).filter(Boolean);
-  const replacementTile = option.replacementTile || '';
-  const feiTile = option.feiTile || 'fei.png';
-
-  return (
-    <div className="gameplay-fei-reclaim" role="dialog" aria-modal="true" aria-label={t('reclaimFeiTitle')}>
-      <div className="gameplay-fei-reclaim-card">
-        <span className="gameplay-fei-reclaim-kicker">FEI</span>
-        <h2>{t('reclaimFeiTitle')}</h2>
-        <p>{windowState.message || t('reclaimFeiBody')}</p>
-
-        <div className="gameplay-fei-reclaim-tiles" aria-label={t('reclaimFeiMeld')}>
-          <div className="gameplay-fei-reclaim-tile-group">
-            <span>{t('reclaimFeiMeld')}</span>
-            <div className="gameplay-fei-reclaim-tile-row">
-              {meldTiles.length ? meldTiles.map((tile, index) => (
-                <GameplayTile name={tile} key={`fei-reclaim-meld-${tile}-${index}`} />
-              )) : (
-                <GameplayTile name={feiTile} className="gameplay-tile--fei" />
-              )}
-            </div>
-          </div>
-
-          <div className="gameplay-fei-reclaim-arrow" aria-hidden="true">→</div>
-
-          <div className="gameplay-fei-reclaim-tile-group">
-            <span>{t('reclaimFeiReplacement')}</span>
-            <div className="gameplay-fei-reclaim-tile-row">
-              {replacementTile ? <GameplayTile name={replacementTile} /> : null}
-              <GameplayTile name={feiTile} className="gameplay-tile--fei" />
-            </div>
-          </div>
-        </div>
-
-        <div className="gameplay-fei-reclaim-actions">
-          <button type="button" className="gameplay-fei-reclaim-button confirm" onClick={() => onConfirm(option)} disabled={isPending}>
-            {t('reclaimFeiConfirm')}
-          </button>
-          <button type="button" className="gameplay-fei-reclaim-button skip" onClick={() => onSkip(option)} disabled={isPending}>
-            {t('reclaimFeiSkip')}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const MAX_VISIBLE_BONUS_TILES = 4;
 const MAX_VISIBLE_MELD_GROUPS = 3;
 const MAX_VISIBLE_SIDE_MELD_GROUPS = 2;
 const MAX_VISIBLE_MELD_TILES = 4;
-
-function BonusTileRack({ position = 'left', tiles = [], label = 'BONUS', visible = false }) {
-  const tileList = toArray(tiles).filter(Boolean);
-  const visibleTiles = tileList.slice(0, MAX_VISIBLE_BONUS_TILES);
-  const hiddenTileCount = Math.max(tileList.length - visibleTiles.length, 0);
-
-  if (!visible && !tileList.length) return null;
-
-  return (
-    <div className={`gameplay-bonus-rack gameplay-bonus-rack--${position} ${tileList.length ? 'has-tiles' : 'empty'} ${hiddenTileCount ? 'has-overflow' : ''}`} aria-label={`${label} ${position}`}>
-      <span className="gameplay-bonus-rack-label">{hiddenTileCount ? `${label} +${hiddenTileCount}` : label}</span>
-      <div className="gameplay-bonus-rack-body">
-        {tileList.length ? (
-          <>
-            {visibleTiles.map((tile, index) => (
-              <GameplayTile name={tile} key={`bonus-${position}-${tile}-${index}`} />
-            ))}
-            {hiddenTileCount ? (
-              <span className="gameplay-bonus-overflow-badge" aria-label={`${hiddenTileCount} more bonus tiles`}>+{hiddenTileCount}</span>
-            ) : null}
-          </>
-        ) : Array.from({ length: 4 }).map((_, index) => (
-          <span className="gameplay-bonus-empty-slot" key={`bonus-empty-${position}-${index}`} aria-hidden="true" />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function getMeldDisplayLabel(type = '') {
   const normalized = normalizeActionForUi(type);
@@ -2020,80 +1904,6 @@ function PlayerMeldRack({ position = 'left', melds = [] }) {
       {hiddenMeldCount ? (
         <div className="gameplay-meld-overflow-badge" aria-label={`${hiddenMeldCount} more melds`}>+{hiddenMeldCount}</div>
       ) : null}
-    </div>
-  );
-}
-
-function TileWall({ count = 14, direction = 'horizontal', className = '' }) {
-  return (
-    <div className={`gameplay-tile-wall ${direction} ${className}`} aria-hidden="true">
-      {Array.from({ length: count }).map((_, index) => (
-        <img src={asset('tile_back.png')} alt="" draggable="false" key={index} />
-      ))}
-    </div>
-  );
-}
-
-function SideTool({ icon, label, onClick, className = '', disabled = false }) {
-  return (
-    <button
-      className={`gameplay-side-tool ${className}`}
-      type="button"
-      aria-label={label}
-      onClick={onClick}
-      disabled={disabled}
-    >
-      <span className="gameplay-side-icon-shell">
-        <img src={asset(icon)} alt="" draggable="false" />
-      </span>
-      <span className="gameplay-side-label">{label}</span>
-    </button>
-  );
-}
-
-function PlayerBadge({ variant = 'small', avatar, name, title = '', seatLabel = '', coins, className = '', isActiveTurn = false, turnLabel = '', isDealer = false, dealerLabel = 'Dealer' }) {
-  const displayName = String(name || '').trim() || 'Player';
-  const subtitle = [title, seatLabel].filter(Boolean).join(' • ');
-
-  return (
-    <article className={`gameplay-player-badge ${variant} ${className} ${isActiveTurn ? 'active-turn' : ''}`}>
-      {isActiveTurn ? (
-        <>
-          <span className="gameplay-turn-badge">{turnLabel}</span>
-          <span className="gameplay-turn-arrow" aria-hidden="true">➤</span>
-        </>
-      ) : null}
-      <img
-        src={resolveProfileAvatarSrc(avatar)}
-        alt=""
-        className="gameplay-player-avatar"
-        draggable="false"
-        onError={(event) => handleProfileAvatarError(event)}
-      />
-      {isDealer ? <span className="gameplay-dealer-chip">{dealerLabel}</span> : null}
-      <div className="gameplay-player-info">
-        <strong>{displayName}</strong>
-        {subtitle ? <small>{subtitle}</small> : null}
-        {coins ? (
-          <span>
-            <i aria-hidden="true" />
-            {coins}
-          </span>
-        ) : null}
-      </div>
-    </article>
-  );
-}
-
-function Compass({ round = 'East 1', timer = 30, turnLabel = 'YOUR TURN' }) {
-  return (
-    <div className="gameplay-center-compass" aria-label={`Round ${round}. ${turnLabel}`}>
-      <span className="timer">{timer}</span>
-      <span className="east">E</span>
-      <strong>{round}</strong>
-      <em>{turnLabel}</em>
-      <span className="south">S</span>
-      <span className="west">W</span>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import {
   DESKTOP_RESOLUTION,
   getDesignResolution,
   getEffectiveDeviceMode,
+  getLayoutMode,
   getPhysicalDeviceMode,
   getViewportOrientation,
 } from '../utils/resolution.js';
@@ -107,6 +108,7 @@ function applyRootState(layout) {
   root.dataset.device = layout.device;
   root.dataset.physicalDevice = layout.physicalDevice;
   root.dataset.orientation = layout.orientation;
+  root.dataset.layout = layout.layout;
 
   if (layout.browser) {
     root.dataset.browser = layout.browser;
@@ -133,6 +135,7 @@ function computeResolutionState() {
       device: 'desktop',
       physicalDevice: 'desktop',
       orientation: 'landscape',
+      layout: 'landscape',
       browser: '',
       viewport: DESKTOP_RESOLUTION,
       width: DESKTOP_RESOLUTION.width,
@@ -165,6 +168,7 @@ function computeResolutionState() {
   }
 
   const device = getEffectiveDeviceMode(physicalDevice, orientation);
+  const layout = getLayoutMode(device, orientation);
   const resolution = getDesignResolution(device, orientation);
   const scale = Math.min(viewport.width / resolution.width, viewport.height / resolution.height);
 
@@ -173,6 +177,7 @@ function computeResolutionState() {
     device,
     physicalDevice,
     orientation,
+    layout,
     browser,
     viewport,
     width: resolution.width,
@@ -252,6 +257,7 @@ export function useResolutionScale() {
       document.documentElement.classList.remove('keyboard-open');
       document.body?.classList.remove('keyboard-open');
       delete document.documentElement.dataset.browser;
+      delete document.documentElement.dataset.layout;
     };
   }, []);
 

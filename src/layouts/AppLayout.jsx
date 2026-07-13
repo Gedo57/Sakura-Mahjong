@@ -32,6 +32,7 @@ export default function AppLayout() {
     device,
     physicalDevice,
     orientation,
+    layout,
     viewport,
     keyboardOpen,
   } = useResolutionScale();
@@ -43,6 +44,7 @@ export default function AppLayout() {
       data-device={device}
       data-physical-device={physicalDevice}
       data-orientation={orientation}
+      data-layout={layout}
       data-keyboard-open={keyboardOpen ? 'true' : 'false'}
       style={{
         '--frame-scale': scale,
